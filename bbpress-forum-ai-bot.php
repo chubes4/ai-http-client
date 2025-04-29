@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: bbPress Forum AI Bot
- * Plugin URI:  https://github.com/chubes4/bbpress-forum-ai-bot # Replace with actual URL or leave blank
+ * Plugin URI:  https://github.com/chubes/bbpress-forum-ai-bot # Replace with actual URL or leave blank
  * Description: AI bot for bbPress forums that can be configured to reply to mentions or keywords.
  * Version:     1.0.0
  * Author:      Chubes
