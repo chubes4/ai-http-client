@@ -1,8 +1,8 @@
 <?php
 /**
- * Admin page for the bbPress Forum AI Bot plugin.
+ * Admin page for the AI Bot for bbPress plugin.
  *
- * @package Bbpress_Forum_AI_Bot
+ * @package Ai_Bot_For_Bbpress
  */
 
 // Exit if accessed directly.

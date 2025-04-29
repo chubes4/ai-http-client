@@ -9,6 +9,8 @@ License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ai-bot-for-bbpress
 
+Integrates a configurable AI bot into bbPress forums, responding to mentions or keywords.
+
 == Description ==
 
 AI Bot for bbPress integrates seamlessly with your bbPress forums, allowing a configurable AI bot user to participate in discussions. The bot can be triggered by direct mentions (@YourBotUsername) or specific keywords within forum posts, leveraging context from the forum and optionally a remote WordPress site.
@@ -63,6 +65,12 @@ No. It only provides an API endpoint for use by the AI Bot for bbPress plugin.
 
 The endpoint itself is public by default, typical of WordPress REST API endpoints. Security relies on the fact that only the AI Bot for bbPress knows to query it, and it only returns publicly available content (published posts/pages). Access control could be added in future versions if needed.
 
+== Screenshots ==
+
+1.  Configuration screen showing the main settings.
+2.  Example of a bot reply in a forum topic.
+3.  (Add more descriptions as needed)
+
 == Changelog ==
 
 = 1.0.0 =
@@ -75,6 +83,11 @@ The endpoint itself is public by default, typical of WordPress REST API endpoint
 *   Fix: Improved reliability of cron job scheduling and execution logging.
 *   Update: Added configuration options for temperature and prompts.
 *   Update: Tested compatibility up to WordPress 6.8.
+
+== Upgrade Notice ==
+
+= 1.0.0 =
+This is the version submitted to the WordPress plugin repository. 
 
 = 0.1.2 =
 *   Updated plugin name and description.

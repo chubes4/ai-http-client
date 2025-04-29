@@ -1,4 +1,5 @@
 <?php
+namespace AiBot\Core;
 
 /**
  * Simple Service Container for AI Bot for bbPress
@@ -35,7 +36,7 @@ class AiBot_Service_Container {
         }
 
         if ( ! $this->has( $id ) ) {
-            throw new InvalidArgumentException( sprintf( 'Service "%s" is not registered in the container.', $id ) );
+            throw new InvalidArgumentException( sprintf( 'Service "%s" is not registered in the container.', esc_html( $id ) ) );
         }
 
         // Check if it's a factory callable

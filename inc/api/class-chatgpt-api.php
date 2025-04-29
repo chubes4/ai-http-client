@@ -29,7 +29,7 @@ class ChatGPT_API {
         $model = 'gpt-4o'; // Changed model name to gpt-4o
 
         if ( empty( $api_key ) ) {
-            error_log('AI Bot Error: OpenAI API Key is not set.');
+            // error_log('AI Bot Error: OpenAI API Key is not set.');
             return new WP_Error( 'no_api_key', __( 'ChatGPT API key not set.', 'ai-bot-for-bbpress' ) );
         }
 
@@ -76,7 +76,7 @@ class ChatGPT_API {
         $response = wp_remote_post( $api_url, $args );
 
         if ( is_wp_error( $response ) ) {
-            error_log( 'AI Bot Error: OpenAI API request failed. Error: ' . $response->get_error_message() );
+            // error_log( 'AI Bot Error: OpenAI API request failed. Error: ' . $response->get_error_message() );
             return $response; // Return WP_Error object
         }
 
@@ -86,16 +86,17 @@ class ChatGPT_API {
         // Check for non-200 response code
         if ( 200 !== $response_code ) {
             // Log details on non-200 response
-            error_log( 'AI Bot Error: OpenAI API HTTP Error Code: ' . $response_code );
-            error_log( 'AI Bot Error: OpenAI API Request Args on HTTP Error: ' . print_r( $args, true ) );
-            error_log( 'AI Bot Error: OpenAI API Response Body on HTTP Error: ' . $response_body );
+            // error_log( 'AI Bot Error: OpenAI API HTTP Error Code: ' . $response_code );
+            // error_log( 'AI Bot Error: OpenAI API Request Args on HTTP Error: ' . print_r( $args, true ) );
+            // error_log( 'AI Bot Error: OpenAI API Response Body on HTTP Error: ' . $response_body );
+            /* translators: %d: HTTP error code */
             return new WP_Error( 'api_error', sprintf( __( 'ChatGPT API error: %d', 'ai-bot-for-bbpress' ), $response_code ) ); // Simplify error message
         }
 
         // Optional: Log details even on success if the debug flag is set
         if ( $log_api_details ) {
-            error_log( 'AI Bot Info: OpenAI API Request Args (Debug): ' . print_r( $args, true ) );
-            error_log( 'AI Bot Info: OpenAI API Response Body (Success): ' . $response_body );
+            // error_log( 'AI Bot Info: OpenAI API Request Args (Debug): ' . print_r( $args, true ) );
+            // error_log( 'AI Bot Info: OpenAI API Response Body (Success): ' . $response_body );
         }
 
         $response_data = json_decode( $response_body, true );
@@ -103,16 +104,16 @@ class ChatGPT_API {
         // Check if response format is valid
         if ( json_last_error() !== JSON_ERROR_NONE || !isset( $response_data['choices'][0]['message']['content'] ) ) {
             // Log details on invalid response format
-             error_log( 'AI Bot Error: OpenAI API Invalid Response Format.' );
-             error_log( 'AI Bot Error: OpenAI API Request Args on Invalid Format: ' . print_r( $args, true ) );
-             error_log( 'AI Bot Error: OpenAI API Response Body on Invalid Format: ' . $response_body );
+             // error_log( 'AI Bot Error: OpenAI API Invalid Response Format.' );
+             // error_log( 'AI Bot Error: OpenAI API Request Args on Invalid Format: ' . print_r( $args, true ) );
+             // error_log( 'AI Bot Error: OpenAI API Response Body on Invalid Format: ' . $response_body );
             return new WP_Error( 'api_response_error', __( 'Invalid ChatGPT API response format.', 'ai-bot-for-bbpress' ) );
         }
 
         // Success case
         $final_content = wp_kses_post( $response_data['choices'][0]['message']['content'] ); // Sanitize output
         // Log the final extracted content - Keep this one as it confirms success
-        error_log( 'AI Bot Info: Final Extracted Content: ' . $final_content );
+        // error_log( 'AI Bot Info: Final Extracted Content: ' . $final_content );
         return $final_content;
     }
 }

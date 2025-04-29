@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Plugin/Project Specific
+documentation/
+
+# Optional: Ignore composer dependencies if you manage them separately
+# vendor/
+
+# Optional: Ignore node modules if you use npm/yarn
+# node_modules/
+
+# Optional: Ignore build artifacts if you have a build process
+# build/
+# dist/ 

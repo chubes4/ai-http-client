@@ -56,7 +56,7 @@ class Local_Context_Retriever {
 
         // Log the count of database search results found (after filtering)
         $results_count = count($search_results);
-        error_log('AI Bot Info: Database Search Found ' . $results_count . ' relevant local results.');
+        // error_log('AI Bot Info: Database Search Found ' . $results_count . ' relevant local results.');
 
         // 4. Format the single most relevant search result for context
         $formatted_context = '';

@@ -4,7 +4,8 @@ namespace AiBot\Response;
 
 use AiBot\API\ChatGPT_API;
 use AiBot\Context\Content_Interaction_Service;
-use AiBot_Service_Container; // Class is in global namespace
+use AiBot\Core\AiBot_Service_Container; // Update use statement for namespaced container
+use AiBot\Core\AiBot; // Add use statement for the main bot class
 
 /**
  * Generate Bot Response Class
@@ -45,14 +46,14 @@ class Generate_Bot_Response {
     public function generate_and_post_ai_response_cron( $post_id, $topic_id, $forum_id, $anonymous_data, $reply_author ) {
 
         // Log the start of the cron function
-        error_log('AI Bot Info: generate_and_post_ai_response_cron started for post ID: ' . $post_id);
+        // error_log('AI Bot Info: generate_and_post_ai_response_cron started for post ID: ' . $post_id);
 
         // Get the Bot User ID from options - Use new option name
         $bot_user_id = get_option( 'ai_bot_user_id' );
 
         // Check if Bot User ID is set
         if ( ! $bot_user_id ) {
-            error_log('AI Bot Error: Bot User ID option (ai_bot_user_id) is not set. Cannot generate response.');
+            // error_log('AI Bot Error: Bot User ID option (ai_bot_user_id) is not set. Cannot generate response.');
             return; // Stop execution if no bot user is configured
         }
 
@@ -61,7 +62,7 @@ class Generate_Bot_Response {
 
         // Check if user data was retrieved successfully
         if ( ! $bot_user_data ) {
-            error_log('AI Bot Error: Could not find user data for Bot User ID: ' . $bot_user_id);
+            // error_log('AI Bot Error: Could not find user data for Bot User ID: ' . $bot_user_id);
             return; // Stop execution if user doesn't exist
         }
 
@@ -76,22 +77,22 @@ class Generate_Bot_Response {
 
             // Check if response generation resulted in an error
             if ( is_wp_error( $response_content ) ) {
-                 error_log('AI Bot Error: Error generating AI response: ' . $response_content->get_error_message());
+                 // error_log('AI Bot Error: Error generating AI response: ' . $response_content->get_error_message());
                  // Optionally, post a generic error reply or just log and exit
                  return;
             }
 
             // Get bot instance from container *now* and call the post method
             $bot_instance = $this->container->get('bot.main');
-            // Use the new class name for the type check
-            if ($bot_instance instanceof \AiBot) { // Ensure it's the correct type
+            // Use the namespaced class name for the type check
+            if ($bot_instance instanceof AiBot) { // Check against the imported AiBot class
                  $bot_instance->post_bot_reply( $topic_id, $response_content );
             } else {
-                 error_log('AI Bot Error: Could not retrieve valid bot instance from container.');
+                 // error_log('AI Bot Error: Could not retrieve valid bot instance from container.');
             }
         } catch (\Exception $e) {
             // Catch any exceptions and log them
-            error_log('AI Bot Error: Error in generate_and_post_ai_response_cron for post ID ' . $post_id . ': ' . $e->getMessage());
+            // error_log('AI Bot Error: Error in generate_and_post_ai_response_cron for post ID ' . $post_id . ': ' . $e->getMessage());
             // Optionally, you could attempt to post a generic error reply here
         }
     }
@@ -136,7 +137,7 @@ class Generate_Bot_Response {
 
         if ( is_wp_error( $response ) ) {
             // Log error (for future improvement)
-            error_log('AI Bot Error: ChatGPT API Error: ' . $response->get_error_message());
+            // error_log('AI Bot Error: ChatGPT API Error: ' . $response->get_error_message());
             // Consider using a translatable string here with the new text domain
             return new \WP_Error('api_error', __('Sorry, I\'m having trouble generating a response right now. Please try again later.', 'ai-bot-for-bbpress'));
         } else {

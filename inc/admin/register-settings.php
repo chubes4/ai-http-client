@@ -1,8 +1,8 @@
 <?php
 /**
- * Registers and defines settings for the bbPress Forum AI Bot admin page.
+ * Registers and defines settings for the AI Bot for bbPress admin page.
  *
- * @package Bbpress_Forum_AI_Bot
+ * @package Ai_Bot_For_Bbpress
  * @subpackage Admin
  */
 
@@ -139,70 +139,70 @@ function ai_bot_register_all_settings() {
 
 // Section Callbacks
 function ai_bot_api_settings_section_callback() {
-    echo '<p>' . __( 'Configure API access and the bot user.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p>' . esc_html__( 'Configure API access and the bot user.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_behavior_settings_section_callback() {
-    echo '<p>' . __( 'Define how the bot behaves, its personality, and what triggers responses.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p>' . esc_html__( 'Define how the bot behaves, its personality, and what triggers responses.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_context_settings_section_callback() {
-    echo '<p>' . __( 'Configure how the bot accesses local and remote information to provide contextually relevant answers.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p>' . esc_html__( 'Configure how the bot accesses local and remote information to provide contextually relevant answers.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 // Field Callbacks
 function ai_bot_api_key_callback() {
     $api_key = get_option( 'ai_bot_api_key' );
     echo '<input type="password" name="ai_bot_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
-    echo '<p class="description">' . __( 'Enter your OpenAI API key.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Enter your OpenAI API key.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_user_id_callback() {
     $user_id = get_option( 'ai_bot_user_id' );
     echo '<input type="number" name="ai_bot_user_id" value="' . esc_attr( $user_id ) . '" class="small-text" min="1" step="1" />';
-    echo '<p class="description">' . __( 'Enter the WordPress User ID for the bot account.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Enter the WordPress User ID for the bot account.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_system_prompt_callback() {
     $prompt = get_option( 'ai_bot_system_prompt', 'You are a helpful forum assistant.' );
     echo '<textarea name="ai_bot_system_prompt" rows="5" class="large-text">' . esc_textarea( $prompt ) . '</textarea>';
-    echo '<p class="description">' . __( 'Define the base personality and role of the bot.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Define the base personality and role of the bot.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_custom_prompt_callback() {
     $prompt = get_option( 'ai_bot_custom_prompt' );
     echo '<textarea name="ai_bot_custom_prompt" rows="5" class="large-text">' . esc_textarea( $prompt ) . '</textarea>';
-    echo '<p class="description">' . __( 'Add specific instructions to guide the bot\'s responses (e.g., formatting rules, tone adjustments). Appended to every request.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Add specific instructions to guide the bot\'s responses (e.g., formatting rules, tone adjustments). Appended to every request.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_temperature_callback() {
     $temperature = get_option( 'ai_bot_temperature', 0.5 );
     echo '<input type="number" name="ai_bot_temperature" value="' . esc_attr( $temperature ) . '" class="small-text" min="0" max="1" step="0.1" />';
-    echo '<p class="description">' . __( 'Controls randomness (0.0 = deterministic, 1.0 = max creativity). Default: 0.5', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Controls randomness (0.0 = deterministic, 1.0 = max creativity). Default: 0.5', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_trigger_keywords_callback() {
     $keywords = get_option( 'ai_bot_trigger_keywords', '' );
     echo '<textarea name="ai_bot_trigger_keywords" rows="3" class="large-text">' . esc_textarea( $keywords ) . '</textarea>';
-    echo '<p class="description">' . __( 'Comma-separated list of keywords that trigger the bot (case-insensitive). Mentioning the bot user always triggers it.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Comma-separated list of keywords that trigger the bot (case-insensitive). Mentioning the bot user always triggers it.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_local_search_limit_callback() {
     $limit = get_option( 'ai_bot_local_search_limit', 3 );
     echo '<input type="number" name="ai_bot_local_search_limit" value="' . esc_attr( $limit ) . '" min="0" step="1" class="small-text"/>';
-    echo '<p class="description">' . __( 'Max number of relevant posts/topics from this forum to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Max number of relevant posts/topics from this forum to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_remote_endpoint_url_callback() {
     $url = get_option( 'ai_bot_remote_endpoint_url', '' );
-    echo '<input type="url" name="ai_bot_remote_endpoint_url" value="' . esc_attr( $url ) . '" class="regular-text" placeholder="https://your-site.com/wp-json/bbp-bot-helper/v1/search" />';
-    echo '<p class="description">' . __( 'URL of the BBP Bot Helper plugin\'s REST endpoint on your remote site. Leave blank to disable remote context.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<input type="url" name="ai_bot_remote_endpoint_url" value="' . esc_attr( $url ) . '" class="regular-text" placeholder="https://your-site.com/wp-json/ai-bot-for-bbpress-helper/v1/search" />';
+    echo '<p class="description">' . esc_html__( 'URL of the AI Bot for bbPress Helper plugin\'s REST endpoint on your remote site. Leave blank to disable remote context.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 function ai_bot_remote_search_limit_callback() {
     $limit = get_option( 'ai_bot_remote_search_limit', 3 );
     echo '<input type="number" name="ai_bot_remote_search_limit" value="' . esc_attr( $limit ) . '" min="0" step="1" class="small-text"/>';
-    echo '<p class="description">' . __( 'Max number of relevant posts from the remote site to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '<p class="description">' . esc_html__( 'Max number of relevant posts from the remote site to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
 // Sanitization callback for temperature

@@ -1,4 +1,5 @@
 <?php
+namespace AiBot\Core;
 
 use AiBot\Triggers\Handle_Mention;
 use AiBot\Response\Generate_Bot_Response;
@@ -75,7 +76,7 @@ class AiBot {
             // Hooks for admin menu and settings are already added in admin-central.php
             // No need to add them again here.
         } else {
-            error_log('AI Bot Error: Admin functions not loaded.');
+            // error_log('AI Bot Error: Admin functions not loaded.');
         }
 
     }
@@ -93,7 +94,7 @@ class AiBot {
         $forum_id = bbp_get_topic_forum_id( $topic_id );
 
         if ( ! $bot_user_id ) {
-            error_log( 'AI Bot Error: Cannot post reply, Bot User ID is not set.' );
+            // error_log( 'AI Bot Error: Cannot post reply, Bot User ID is not set.' );
             return new \WP_Error( 'config_error', __( 'Bot User ID not configured.', 'ai-bot-for-bbpress' ) );
         }
 
@@ -110,10 +111,10 @@ class AiBot {
         $reply_id = bbp_insert_reply( $reply_data, array('forum_id' => $forum_id) );
 
         if ( is_wp_error( $reply_id ) ) {
-            error_log( 'AI Bot Error: Failed to insert bbPress reply for topic ' . $topic_id . '. Error: ' . $reply_id->get_error_message() );
+            // error_log( 'AI Bot Error: Failed to insert bbPress reply for topic ' . $topic_id . '. Error: ' . $reply_id->get_error_message() );
             return $reply_id; // Return the WP_Error object
         } else {
-            error_log( 'AI Bot Info: Successfully posted reply ID ' . $reply_id . ' to topic ID ' . $topic_id );
+            // error_log( 'AI Bot Info: Successfully posted reply ID ' . $reply_id . ' to topic ID ' . $topic_id );
             return $reply_id;
         }
     }

@@ -183,10 +183,10 @@ class Database_Agent {
 
         // Log the search parameters for debugging
         $keywords_list = implode(", ", explode(", ", $keywords_comma_separated)); // For logging
-        error_log("AI Bot Info: Searching local content with keywords: [{$keywords_list}], Limit: {$limit}, Exclude Post: {$exclude_post_id}, Exclude Topic: {$topic_id}");
+        // error_log("AI Bot Info: Searching local content with keywords: [{$keywords_list}], Limit: {$limit}, Exclude Post: {$exclude_post_id}, Exclude Topic: {$topic_id}");
 
         if ( empty($keywords_comma_separated) ) {
-            error_log("AI Bot Warning: Empty keywords provided for local content search.");
+            // error_log("AI Bot Warning: Empty keywords provided for local content search.");
             return []; // Return empty array if no valid keywords
         }
 
