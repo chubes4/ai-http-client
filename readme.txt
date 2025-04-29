@@ -1,22 +1,23 @@
-=== bbPress Forum AI Bot ===
+=== AI Bot for bbPress ===
 Contributors: chubes
-Tags: bbpress, ai, bot, forum, chatgpt, openai
+Tags: bbpress, ai, bot, forum, chatgpt
 Requires at least: 5.0
 Tested up to: 6.8
 Stable tag: 1.0.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: ai-bot-for-bbpress
 
 == Description ==
 
-bbPress Forum AI Bot integrates seamlessly with your bbPress forums, allowing a configurable AI bot user to participate in discussions. The bot can be triggered by direct mentions (@YourBotUsername) or specific keywords within forum posts, leveraging context from the forum and optionally a remote WordPress site.
+AI Bot for bbPress integrates seamlessly with your bbPress forums, allowing a configurable AI bot user to participate in discussions. The bot can be triggered by direct mentions (@YourBotUsername) or specific keywords within forum posts, leveraging context from the forum and optionally a remote WordPress site.
 
 == Installation ==
 
-1.  Upload the `bbpress-forum-ai-bot` folder to the `/wp-content/plugins/` directory
+1.  Upload the `ai-bot-for-bbpress` folder to the `/wp-content/plugins/` directory
 2.  Activate the plugin through the 'Plugins' menu in WordPress
-3.  Configure the plugin settings under the 'Forum AI Bot' menu in the WordPress admin panel (Settings > Forum AI Bot).
+3.  Configure the plugin settings under the 'AI Bot for bbPress' menu in the WordPress admin panel (Settings > Forum AI Bot).
 
 == Configuration ==
 
@@ -40,32 +41,32 @@ This plugin allows you to integrate an AI bot into your bbPress forums. The bot 
 
 = How do I configure the bot? =
 
-You can configure the bot's behavior and settings under the 'Forum AI Bot' menu in the WordPress admin panel.
+You can configure the bot's behavior and settings under the 'AI Bot for bbPress' menu in the WordPress admin panel.
 
 = What is the "Remote REST Endpoint URL" setting? =
 
-The remote context feature allows the bot to search for relevant information on a separate WordPress installation (like your main website). To enable this, you need to install the companion plugin, **BBP Bot Helper**, on that *other* WordPress site. This helper plugin creates a secure REST API endpoint. You then enter the URL of this endpoint into the "Remote REST Endpoint URL" setting in *this* plugin (bbPress Forum AI Bot).
+The remote context feature allows the bot to search for relevant information on a separate WordPress installation (like your main website). To enable this, you need to install the companion plugin, **BBP Bot Helper**, on that *other* WordPress site. This helper plugin creates a secure REST API endpoint. You then enter the URL of this endpoint into the "Remote REST Endpoint URL" setting in *this* plugin (AI Bot for bbPress).
 
 = What is the BBP Bot Helper plugin? =
 
-It provides a REST API endpoint for the bbPress Forum AI Bot plugin to securely query content for context.
+It provides a REST API endpoint for the AI Bot for bbPress plugin to securely query content for context.
 
 = Where do I install the BBP Bot Helper plugin? =
 
-Install it on the WordPress site whose content you want the bbPress Forum AI Bot to be able to search. This is often your main website, separate from where the bbPress forum itself is hosted.
+Install it on the WordPress site whose content you want the AI Bot for bbPress to be able to search. This is often your main website, separate from where the bbPress forum itself is hosted.
 
 = Does the BBP Bot Helper plugin do anything on its own? =
 
-No. It only provides an API endpoint for use by the bbPress Forum AI Bot plugin.
+No. It only provides an API endpoint for use by the AI Bot for bbPress plugin.
 
 = Is the BBP Bot Helper endpoint secure? =
 
-The endpoint itself is public by default, typical of WordPress REST API endpoints. Security relies on the fact that only the bbPress Forum AI Bot knows to query it, and it only returns publicly available content (published posts/pages). Access control could be added in future versions if needed.
+The endpoint itself is public by default, typical of WordPress REST API endpoints. Security relies on the fact that only the AI Bot for bbPress knows to query it, and it only returns publicly available content (published posts/pages). Access control could be added in future versions if needed.
 
 == Changelog ==
 
 = 1.0.0 =
-*   Major Refactor: Generalized codebase for broader use.
+*   Major Refactor: Renamed plugin to "AI Bot for bbPress" and updated internal naming conventions.
 *   Feature: Added optional remote context retrieval via BBP Bot Helper companion plugin.
 *   Feature: Added Local and Remote search limit settings.
 *   Feature: Added Trigger Keywords setting.

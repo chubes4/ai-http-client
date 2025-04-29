@@ -1,6 +1,6 @@
 <?php
 
-namespace BbpressForumAiBot\Context;
+namespace AiBot\Context;
 
 /**
  * Retrieves context from a remote REST API endpoint.
@@ -29,24 +29,24 @@ class Remote_Context_Retriever {
      * @return array An array of formatted context strings, or an empty array if no context is found or an error occurs.
      */
     public function get_remote_context( $keyword, $limit ) {
-        $remote_url    = get_option( 'bbpress_forum_ai_bot_remote_endpoint_url' );
+        $remote_url    = get_option( 'ai_bot_remote_endpoint_url' );
         $formatted_context = [];
 
         if ( empty( $remote_url ) ) {
-            error_log( 'bbPress Forum AI Bot: Remote endpoint URL is not configured.' );
+            error_log( 'AI Bot Error: Remote endpoint URL is not configured.' );
             return $formatted_context;
         }
 
         // Ensure keyword is not empty
         if ( empty( $keyword ) ) {
-            error_log( 'bbPress Forum AI Bot: Remote context retrieval skipped due to empty keyword.' );
+            error_log( 'AI Bot Warning: Remote context retrieval skipped due to empty keyword.' );
             return $formatted_context;
         }
 
         // Ensure limit is valid
         $limit = absint( $limit );
         if ( $limit <= 0 ) {
-            error_log( 'bbPress Forum AI Bot: Remote context retrieval skipped due to invalid limit: ' . $limit );
+            error_log( 'AI Bot Warning: Remote context retrieval skipped due to invalid limit: ' . $limit );
             return $formatted_context;
         }
 
@@ -62,14 +62,14 @@ class Remote_Context_Retriever {
         );
 
         // Log the exact request URL
-        error_log( 'bbPress Forum AI Bot: Remote API Request URL: ' . $request_url );
+        error_log( 'AI Bot Info: Remote API Request URL: ' . $request_url );
 
         // Make the API request
         $response = wp_remote_get( esc_url_raw( $request_url ), [ 'timeout' => 15 ] ); // 15-second timeout
 
         // Check for WP_Error
         if ( is_wp_error( $response ) ) {
-            error_log( 'bbPress Forum AI Bot: Remote API wp_remote_get failed. Error: ' . $response->get_error_message() );
+            error_log( 'AI Bot Error: Remote API wp_remote_get failed. Error: ' . $response->get_error_message() );
             return $formatted_context; // Return empty on error
         }
 
@@ -77,8 +77,8 @@ class Remote_Context_Retriever {
         $status_code = wp_remote_retrieve_response_code( $response );
         if ( $status_code !== 200 ) {
             $response_body_on_error = wp_remote_retrieve_body( $response );
-            error_log( 'bbPress Forum AI Bot: Remote API request returned non-200 status code: ' . $status_code );
-            error_log( 'bbPress Forum AI Bot: Remote API response body on error: ' . $response_body_on_error );
+            error_log( 'AI Bot Error: Remote API request returned non-200 status code: ' . $status_code );
+            error_log( 'AI Bot Error: Remote API response body on error: ' . $response_body_on_error );
             return $formatted_context; // Return empty on error
         }
 
@@ -88,9 +88,9 @@ class Remote_Context_Retriever {
 
         // Check for JSON decoding errors
         if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $data ) ) {
-             error_log( 'bbPress Forum AI Bot: Failed to decode JSON response or invalid format from remote API.' );
-             error_log( 'bbPress Forum AI Bot: JSON Decode Error: ' . json_last_error_msg() );
-             error_log( 'bbPress Forum AI Bot: Raw response body on decode error: ' . $body );
+             error_log( 'AI Bot Error: Failed to decode JSON response or invalid format from remote API.' );
+             error_log( 'AI Bot Error: JSON Decode Error: ' . json_last_error_msg() );
+             error_log( 'AI Bot Error: Raw response body on decode error: ' . $body );
             return $formatted_context; // Return empty on error
         }
 
@@ -113,15 +113,15 @@ class Remote_Context_Retriever {
                     )
                 ];
             } else {
-                error_log( 'bbPress Forum AI Bot: Remote API item missing title, content, url, or date key. Item: ' . print_r( $item, true ) ); // Updated error log to mention date
+                error_log( 'AI Bot Warning: Remote API item missing title, content, url, or date key. Item: ' . print_r( $item, true ) ); // Updated error log to mention date
             }
         }
 
         // Log the successfully formatted context before returning
         if ( ! empty( $formatted_context ) ) {
-            error_log( 'bbPress Forum AI Bot: Successfully formatted remote context: ' . print_r( $formatted_context, true ) );
+            error_log( 'AI Bot Info: Successfully formatted remote context: ' . print_r( $formatted_context, true ) );
         } else {
-             error_log( 'bbPress Forum AI Bot: No valid remote context items found after processing response.' );
+             error_log( 'AI Bot Info: No valid remote context items found after processing response.' );
         }
 
         return $formatted_context;

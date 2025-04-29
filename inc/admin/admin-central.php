@@ -9,53 +9,57 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-require_once __DIR__ . '/register-settings.php';
+
+// Include settings registration file - Update path if needed
+require_once plugin_dir_path( __FILE__ ) . 'register-settings.php';
 
 /**
- * Registers the admin menu page.
+ * Add options page for AI Bot for bbPress
  */
-function bbpress_forum_ai_bot_admin_menu() {
-	add_menu_page(
-		__( 'bbPress Forum AI Bot Settings', 'bbpress-forum-ai-bot' ), // Page title
-		'Forum AI Bot', // Menu title
-		'manage_options', // Capability
-		'bbpress-forum-ai-bot', // Menu slug
-		'bbpress_forum_ai_bot_admin_page', // Callback function
-		'dashicons-format-chat', // Icon slug (changed for relevance)
-		60 // Position
+function ai_bot_add_options_page() {
+	add_options_page(
+		__( 'AI Bot for bbPress Settings', 'ai-bot-for-bbpress' ), // Page title
+		__( 'Forum AI Bot', 'ai-bot-for-bbpress' ),            // Menu title (Keep short?)
+		'manage_options',
+		'ai-bot-for-bbpress-settings',                        // Menu slug
+		'ai_bot_options_page_html'                          // Callback function
 	);
 }
-add_action( 'admin_menu', 'bbpress_forum_ai_bot_admin_menu' );
+add_action( 'admin_menu', 'ai_bot_add_options_page' );
 
 /**
- * Renders the admin page content.
+ * Register settings for AI Bot for bbPress
  */
-function bbpress_forum_ai_bot_admin_page() {
+function ai_bot_register_settings() {
+	// This function now delegates to the function in register-settings.php
+	ai_bot_register_all_settings(); // Call the function from the included file
+}
+add_action( 'admin_init', 'ai_bot_register_settings' );
+
+/**
+ * Render the options page HTML
+ */
+function ai_bot_options_page_html() {
+	// Check user capabilities
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
 	?>
 	<div class="wrap">
-		<h1><?php esc_html_e( 'bbPress Forum AI Bot Settings', 'bbpress-forum-ai-bot' ); ?></h1>
-		<form method="post" action="options.php">
+		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+		<form action="options.php" method="post">
 			<?php
-				settings_fields( 'bbpress_forum_ai_bot_options_group' );
-				do_settings_sections( 'bbpress-forum-ai-bot' );
-				submit_button( __( 'Save Settings', 'bbpress-forum-ai-bot' ) );
+			// Output security fields for the registered setting group
+			settings_fields( 'ai_bot_settings_group' ); // Use the new settings group name
+			// Output setting sections and fields
+			do_settings_sections( 'ai-bot-for-bbpress-settings' ); // Use the new menu slug
+			// Output save settings button
+			submit_button( __( 'Save Settings', 'ai-bot-for-bbpress' ) );
 			?>
 		</form>
 	</div>
 	<?php
 }
-/**
- * Initializes admin settings and fields.
- */
-function bbpress_forum_ai_bot_admin_init() {
-    bbpress_forum_ai_bot_register_settings();
-    bbpress_forum_ai_bot_add_settings_fields();
-}
-add_action( 'admin_init', 'bbpress_forum_ai_bot_admin_init' );
-
-/**
- * Registers settings and fields.
- */
 
 /**
  * Section content callback function.

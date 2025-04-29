@@ -1,18 +1,11 @@
 <?php
 
-namespace BbpressForumAiBot\Context;
+namespace AiBot\Context;
 
-use BbpressForumAiBot\API\ChatGPT_API;
-use BbpressForumAiBot\Context\Database_Agent;
-use BbpressForumAiBot\Context\Local_Context_Retriever; // Add use statement for Local_Context_Retriever
-use BbpressForumAiBot\Context\Remote_Context_Retriever; // Add use statement for Remote_Context_Retriever
-
-// Ensure the class files are included. Use require_once to prevent multiple inclusions.
-// These require_once calls might become redundant if using an autoloader, but are kept for now.
-require_once plugin_dir_path( __FILE__ ) . '../api/class-chatgpt-api.php';
-require_once plugin_dir_path( __FILE__ ) . 'class-database-agent.php';
-require_once plugin_dir_path( __FILE__ ) . 'class-local-context-retriever.php';
-require_once plugin_dir_path( __FILE__ ) . 'class-remote-context-retriever.php';
+use AiBot\API\ChatGPT_API;
+use AiBot\Context\Database_Agent;
+use AiBot\Context\Local_Context_Retriever; // Add use statement for Local_Context_Retriever
+use AiBot\Context\Remote_Context_Retriever; // Add use statement for Remote_Context_Retriever
 
 /**
  * Content Interaction Service Class
@@ -88,7 +81,7 @@ class Content_Interaction_Service {
     public function should_trigger_interaction( $post_id, $post_content, $topic_id, $forum_id ) {
 
         // Get the Bot User ID and Username - Use new option name
-        $bot_user_id = get_option( 'bbpress_forum_ai_bot_user_id' );
+        $bot_user_id = get_option( 'ai_bot_user_id' );
         $bot_username = null;
         if ( $bot_user_id ) {
             $bot_user_data = get_userdata( $bot_user_id );
@@ -100,12 +93,12 @@ class Content_Interaction_Service {
         // 1. Check for mention (only if bot username is configured)
         if ( $bot_username && preg_match( '/@' . preg_quote( $bot_username, '/' ) . '/i', $post_content ) ) {
             // Use new logging prefix
-            error_log( "bbPress Forum AI Bot: Mention detected for user @{$bot_username}" );
+            error_log( "AI Bot Info: Mention detected for user @{$bot_username}" );
             return true;
         }
 
         // 2. Check for keywords - Use new option name
-        $keywords_string = get_option( 'bbpress_forum_ai_bot_trigger_keywords', '' );
+        $keywords_string = get_option( 'ai_bot_trigger_keywords', '' );
         if ( ! empty( $keywords_string ) ) {
             // Split keywords by comma or newline, trim whitespace, remove empty entries
             $keywords = preg_split( '/[\s,]+/', $keywords_string, -1, PREG_SPLIT_NO_EMPTY );
@@ -133,7 +126,7 @@ class Content_Interaction_Service {
      */
     public function get_remote_hostname() {
         // Use new option name
-        $remote_url = get_option( 'bbpress_forum_ai_bot_remote_endpoint_url' );
+        $remote_url = get_option( 'ai_bot_remote_endpoint_url' );
         $remote_host = 'Remote Source'; // Default label
         if ( ! empty( $remote_url ) ) {
             $parsed_host = parse_url( $remote_url, PHP_URL_HOST );
@@ -157,7 +150,7 @@ class Content_Interaction_Service {
 
         $context_string = '';
         // Use new option name
-        $bot_user_id = get_option( 'bbpress_forum_ai_bot_user_id' ); // Get bot user ID
+        $bot_user_id = get_option( 'ai_bot_user_id' ); // Get bot user ID
         $bot_username = 'Bot'; // Default display name if not found
         if ( $bot_user_id ) {
              $bot_user_data = get_userdata( $bot_user_id );
@@ -222,14 +215,14 @@ class Content_Interaction_Service {
             $keywords_comma_separated = trim( $keywords_response );
             if ( ! empty( $keywords_comma_separated ) ) {
                  // Use new logging prefix
-                error_log('bbPress Forum AI Bot: Extracted Keywords for Context Search: ' . $keywords_comma_separated);
+                error_log('AI Bot Info: Extracted Keywords for Context Search: ' . $keywords_comma_separated);
             } else {
                  // Use new logging prefix
-                error_log('bbPress Forum AI Bot: OpenAI returned empty keyword list for context search.');
+                error_log('AI Bot Warning: OpenAI returned empty keyword list for context search.');
             }
         } else {
              // Use new logging prefix
-            error_log('bbPress Forum AI Bot: Failed to extract keywords for context search: ' . (is_wp_error($keywords_response) ? $keywords_response->get_error_message() : 'Empty response'));
+            error_log('AI Bot Error: Failed to extract keywords for context search: ' . (is_wp_error($keywords_response) ? $keywords_response->get_error_message() : 'Empty response'));
         }
 
         // --- Initialize Context Variables ---
@@ -240,7 +233,7 @@ class Content_Interaction_Service {
         $fetched_remote_urls = []; // Track fetched URLs to prevent duplicates
         $remote_results_count = 0;
         // Use new option name
-        $configured_remote_limit = get_option( 'bbpress_forum_ai_bot_remote_search_limit', 3 );
+        $configured_remote_limit = get_option( 'ai_bot_remote_search_limit', 3 );
 
         // Proceed only if we have keywords
         if ( ! empty( $keywords_comma_separated ) ) {
@@ -255,7 +248,7 @@ class Content_Interaction_Service {
 
             foreach ( $ordered_keywords as $keyword ) {
                 if ( $remote_results_count >= $configured_remote_limit ) {
-                    error_log("bbPress Forum AI Bot: Reached remote limit ($configured_remote_limit), stopping fallback search.");
+                    error_log("AI Bot Info: Reached remote limit ($configured_remote_limit), stopping fallback search.");
                     break; // Stop searching if we've hit the configured limit
                 }
 
@@ -263,19 +256,19 @@ class Content_Interaction_Service {
                 $needed_limit = $configured_remote_limit - $remote_results_count;
 
                 // Use new logging prefix
-                error_log("bbPress Forum AI Bot: Attempting remote context for keyword '{$keyword}' with needed limit {$needed_limit}");
+                error_log("AI Bot Info: Attempting remote context for keyword '{$keyword}' with needed limit {$needed_limit}");
 
                 // Pass the keyword and needed limit to the remote retriever
                 $results_this_keyword = $this->remote_context_retriever->get_remote_context( $keyword, $needed_limit );
 
                 if ( is_array( $results_this_keyword ) && ! empty( $results_this_keyword ) ) {
                     // Use new logging prefix
-                    error_log( "bbPress Forum AI Bot: Received " . count($results_this_keyword) . " results for keyword '{$keyword}'." );
+                    error_log( "AI Bot Info: Received " . count($results_this_keyword) . " results for keyword '{$keyword}'." );
 
                     foreach ( $results_this_keyword as $result ) {
                         if ( $remote_results_count >= $configured_remote_limit ) {
                             // Use new logging prefix
-                            error_log("bbPress Forum AI Bot: Reached remote limit ({$configured_remote_limit}) within keyword '{$keyword}', breaking inner loop.");
+                            error_log("AI Bot Info: Reached remote limit ({$configured_remote_limit}) within keyword '{$keyword}', breaking inner loop.");
                             break 2; // Break out of both loops if limit reached
                         }
 
@@ -288,24 +281,24 @@ class Content_Interaction_Service {
                                 $fetched_remote_urls[] = $url; // Track the URL
                                 $remote_results_count++;
                                 // Use new logging prefix
-                                error_log("bbPress Forum AI Bot: Added remote result #{$remote_results_count} (URL: {$url})");
+                                error_log("AI Bot Info: Added remote result #{$remote_results_count} (URL: {$url})");
                             } else {
                                 // Use new logging prefix
-                                error_log("bbPress Forum AI Bot: Skipped duplicate remote URL: {$url}");
+                                error_log("AI Bot Info: Skipped duplicate remote URL: {$url}");
                             }
                         } else {
                             // Use new logging prefix
-                            error_log("bbPress Forum AI Bot: Received invalid remote result format for keyword '{$keyword}': " . print_r($result, true));
+                            error_log("AI Bot Warning: Received invalid remote result format for keyword '{$keyword}': " . print_r($result, true));
                         }
                     }
                 } else {
                     // Use new logging prefix
-                    error_log("bbPress Forum AI Bot: No valid remote results found for keyword '{$keyword}'.");
+                    error_log("AI Bot Info: No valid remote results found for keyword '{$keyword}'.");
                 }
             } // End foreach keyword
         } else {
             // Use new logging prefix
-            error_log("bbPress Forum AI Bot: Skipping context search due to empty keywords.");
+            error_log("AI Bot Info: Skipping context search due to empty keywords.");
         }
 
         // --- Combine Context ---
@@ -331,7 +324,7 @@ class Content_Interaction_Service {
         }
 
         // Log the final context string being returned (optional, can be verbose)
-        // error_log("bbPress Forum AI Bot: Final Context String for AI: " . $context_string);
+        // error_log("AI Bot Debug: Final Context String for AI: " . $context_string);
 
         return $context_string;
     }

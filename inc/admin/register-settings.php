@@ -12,253 +12,203 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Registers the plugin settings.
+ * Register all settings, sections, and fields for AI Bot for bbPress.
  */
-function bbpress_forum_ai_bot_register_settings() {
-	register_setting(
-		'bbpress_forum_ai_bot_options_group', // Option group
-		'bbpress_forum_ai_bot_user_id', // Option name
-		'sanitize_text_field' // Sanitize callback
-	);
-    register_setting(
-		'bbpress_forum_ai_bot_options_group',
-		'bbpress_forum_ai_bot_chatgpt_api_key',
-		'sanitize_text_field'
-	);
-    register_setting(
-		'bbpress_forum_ai_bot_options_group',
-		'bbpress_forum_ai_bot_system_prompt',
-		'sanitize_textarea_field'
-	);
-    register_setting(
-		'bbpress_forum_ai_bot_options_group',
-		'bbpress_forum_ai_bot_custom_prompt',
-		'sanitize_textarea_field'
-	);
-    register_setting(
-		'bbpress_forum_ai_bot_options_group',
-		'bbpress_forum_ai_bot_temperature',
-		'sanitize_text_field' // Or 'sanitize_text_field' and validate/sanitize in callback
-	);
-	register_setting(
-		'bbpress_forum_ai_bot_options_group',
-		'bbpress_forum_ai_bot_trigger_keywords',
-		'sanitize_textarea_field' // Store as potentially multi-line, sanitize later
-	);
-    // Register new setting for local search limit
-    register_setting(
-        'bbpress_forum_ai_bot_options_group',
-        'bbpress_forum_ai_bot_local_search_limit',
-        'absint' // Sanitize as absolute integer
-    );
-	// Register new setting for remote REST endpoint URL
-    register_setting(
-        'bbpress_forum_ai_bot_options_group',
-        'bbpress_forum_ai_bot_remote_endpoint_url',
-        'sanitize_url' // Sanitize as a URL
-    );
-    // Register new setting for remote search limit
-    register_setting(
-        'bbpress_forum_ai_bot_options_group',
-        'bbpress_forum_ai_bot_remote_search_limit',
-        'absint' // Sanitize as absolute integer
-    );
-}
+function ai_bot_register_all_settings() {
+    $settings_group = 'ai_bot_settings_group';
+    $page_slug      = 'ai-bot-for-bbpress-settings';
 
-/**
- * Adds settings sections and fields to the admin page.
- */
-function bbpress_forum_ai_bot_add_settings_fields() {
-	add_settings_section(
-		'setting_section_id', // ID
-		__( 'Bot User Settings', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_section_info', // Callback
-		'bbpress-forum-ai-bot' // Page
-	);
+    // Register settings (Each option needs to be registered)
+    register_setting( $settings_group, 'ai_bot_api_key', 'sanitize_text_field' );
+    register_setting( $settings_group, 'ai_bot_user_id', 'absint' );
+    register_setting( $settings_group, 'ai_bot_system_prompt', 'wp_kses_post' );
+    register_setting( $settings_group, 'ai_bot_custom_prompt', 'wp_kses_post' );
+    register_setting( $settings_group, 'ai_bot_temperature', 'ai_bot_sanitize_temperature' );
+    register_setting( $settings_group, 'ai_bot_trigger_keywords', 'sanitize_textarea_field' );
+    register_setting( $settings_group, 'ai_bot_local_search_limit', 'absint' );
+    register_setting( $settings_group, 'ai_bot_remote_endpoint_url', 'esc_url_raw' );
+    register_setting( $settings_group, 'ai_bot_remote_search_limit', 'absint' );
+
+    // API Settings Section
     add_settings_section(
-		'chatgpt_api_settings_section', // ID
-		__( 'ChatGPT API Settings', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_chatgpt_api_section_info', // Callback
-		'bbpress-forum-ai-bot' // Page
-	);
-	add_settings_section(
-		'trigger_settings_section', // ID
-		__( 'Trigger Settings', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_trigger_section_info', // Callback
-		'bbpress-forum-ai-bot' // Page
-	);
-    // Add new section for Context Retrieval Settings
+        'ai_bot_api_settings_section', // ID
+        __( 'API Configuration', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_api_settings_section_callback', // Callback
+        $page_slug // Page
+    );
+
+    // Bot Behavior Section
     add_settings_section(
-        'context_retrieval_settings_section', // ID
-        __( 'Context Retrieval Settings', 'bbpress-forum-ai-bot' ), // Title
-        'bbpress_forum_ai_bot_context_retrieval_section_info', // Callback
-        'bbpress-forum-ai-bot' // Page
+        'ai_bot_behavior_settings_section', // ID
+        __( 'Bot Behavior & Triggers', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_behavior_settings_section_callback', // Callback
+        $page_slug // Page
     );
 
-
-	add_settings_field(
-		'bbpress_forum_ai_bot_user_id', // ID
-		__( 'Bot User ID', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_user_id_callback', // Callback
-		'bbpress-forum-ai-bot', // Page
-		'setting_section_id' // Section
-	);
-    add_settings_field(
-		'bbpress_forum_ai_bot_chatgpt_api_key', // ID
-		__( 'ChatGPT API Key', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_chatgpt_api_key_callback', // Callback
-		'bbpress-forum-ai-bot', // Page
-		'chatgpt_api_settings_section' // Section
-	);
-    add_settings_field(
-		'bbpress_forum_ai_bot_system_prompt', // ID
-		__( 'System Prompt', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_system_prompt_callback', // Callback
-		'bbpress-forum-ai-bot', // Page
-		'chatgpt_api_settings_section' // Section
-	);
-    add_settings_field(
-		'bbpress_forum_ai_bot_custom_prompt', // ID
-		__( 'Custom Prompt', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_custom_prompt_callback', // Callback
-		'bbpress-forum-ai-bot', // Page
-		'chatgpt_api_settings_section' // Section
-	);
-    add_settings_field(
-		'bbpress_forum_ai_bot_temperature', // ID
-		__( 'Temperature', 'bbpress-forum-ai-bot' ), // Title
-		'bbpress_forum_ai_bot_temperature_callback', // Callback
-		'bbpress-forum-ai-bot', // Page
-		'chatgpt_api_settings_section' // Section
-	);
-    add_settings_field(
-        'bbpress_forum_ai_bot_trigger_keywords', // ID
-        __( 'Trigger Keywords', 'bbpress-forum-ai-bot' ), // Title
-        'bbpress_forum_ai_bot_trigger_keywords_callback', // Callback
-        'bbpress-forum-ai-bot', // Page
-        'trigger_settings_section' // Section
+    // Context Settings Section
+    add_settings_section(
+        'ai_bot_context_settings_section', // ID
+        __( 'Context & Knowledge Base', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_context_settings_section_callback', // Callback
+        $page_slug // Page
     );
+
+    // Add Fields
+    // API Key Field
     add_settings_field(
-        'bbpress_forum_ai_bot_local_search_limit', // ID
-        __( 'Local Search Limit', 'bbpress-forum-ai-bot' ), // Title
-        'bbpress_forum_ai_bot_local_search_limit_callback', // Callback
-        'bbpress-forum-ai-bot', // Page
-        'context_retrieval_settings_section' // Section
+        'ai_bot_api_key', // ID
+        __( 'OpenAI API Key', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_api_key_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_api_settings_section' // Section
     );
+
+    // Bot User ID Field
     add_settings_field(
-        'bbpress_forum_ai_bot_remote_endpoint_url', // ID
-        __( 'Remote REST Endpoint URL', 'bbpress-forum-ai-bot' ), // Title
-        'bbpress_forum_ai_bot_remote_endpoint_url_callback', // Callback
-        'bbpress-forum-ai-bot', // Page
-        'context_retrieval_settings_section' // Section
+        'ai_bot_user_id', // ID
+        __( 'Bot User ID', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_user_id_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_api_settings_section' // Section
     );
+
+    // System Prompt Field
     add_settings_field(
-        'bbpress_forum_ai_bot_remote_search_limit', // ID
-        __( 'Remote Search Limit', 'bbpress-forum-ai-bot' ), // Title
-        'bbpress_forum_ai_bot_remote_search_limit_callback', // Callback
-        'bbpress-forum-ai-bot', // Page
-        'context_retrieval_settings_section' // Section
+        'ai_bot_system_prompt', // ID
+        __( 'System Prompt', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_system_prompt_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_behavior_settings_section' // Section
     );
+
+    // Custom Prompt Field
+    add_settings_field(
+        'ai_bot_custom_prompt', // ID
+        __( 'Custom Prompt (Instructions)', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_custom_prompt_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_behavior_settings_section' // Section
+    );
+
+    // Temperature Field
+    add_settings_field(
+        'ai_bot_temperature', // ID
+        __( 'Temperature', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_temperature_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_behavior_settings_section' // Section
+    );
+
+    // Trigger Keywords Field
+    add_settings_field(
+        'ai_bot_trigger_keywords', // ID
+        __( 'Trigger Keywords', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_trigger_keywords_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_behavior_settings_section' // Section
+    );
+
+    // Local Search Limit Field
+    add_settings_field(
+        'ai_bot_local_search_limit', // ID
+        __( 'Local Search Limit', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_local_search_limit_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_context_settings_section' // Section
+    );
+
+    // Remote Endpoint URL Field
+    add_settings_field(
+        'ai_bot_remote_endpoint_url', // ID
+        __( 'Remote REST Endpoint URL', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_remote_endpoint_url_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_context_settings_section' // Section
+    );
+
+    // Remote Search Limit Field
+    add_settings_field(
+        'ai_bot_remote_search_limit', // ID
+        __( 'Remote Search Limit', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_remote_search_limit_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_context_settings_section' // Section
+    );
+
 }
 
-/*
- * Section content callback function.
- */
-function bbpress_forum_ai_bot_section_info() {
-	esc_html_e( 'Set the user ID for the bot to use when interacting with the chat service.', 'bbpress-forum-ai-bot' );
-}
-function bbpress_forum_ai_bot_chatgpt_api_section_info() {
-	esc_html_e( 'Configure the ChatGPT API settings to enable AI-powered responses.', 'bbpress-forum-ai-bot' );
-}
-function bbpress_forum_ai_bot_trigger_section_info() {
-	esc_html_e( 'Configure keywords that will trigger the bot to respond, in addition to mentions.', 'bbpress-forum-ai-bot' );
-}
-// New section info callback for Context Retrieval Settings
-function bbpress_forum_ai_bot_context_retrieval_section_info() {
-    esc_html_e( 'Configure settings related to retrieving context from local and external sources.', 'bbpress-forum-ai-bot' );
+// Section Callbacks
+function ai_bot_api_settings_section_callback() {
+    echo '<p>' . __( 'Configure API access and the bot user.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
-/**
- * User ID field callback function.
- */
-function bbpress_forum_ai_bot_user_id_callback() {
-	$user_id = get_option( 'bbpress_forum_ai_bot_user_id' );
-	?>
-	<input type="text" name="bbpress_forum_ai_bot_user_id" value="<?php echo isset( $user_id ) ? esc_attr( $user_id ) : ''; ?>" />
-	<?php
-}
-function bbpress_forum_ai_bot_chatgpt_api_key_callback() {
-	$api_key = get_option( 'bbpress_forum_ai_bot_chatgpt_api_key' );
-	?>
-	<input type="text" name="bbpress_forum_ai_bot_chatgpt_api_key" value="<?php echo isset( $api_key ) ? esc_attr( $api_key ) : ''; ?>" />
-	<?php
-}
-function bbpress_forum_ai_bot_system_prompt_callback() {
-	$system_prompt = get_option( 'bbpress_forum_ai_bot_system_prompt' );
-	?>
-	<textarea name="bbpress_forum_ai_bot_system_prompt" rows="5" cols="50"><?php echo isset( $system_prompt ) ? esc_textarea( $system_prompt ) : ''; ?></textarea>
-	<?php
-}
-function bbpress_forum_ai_bot_custom_prompt_callback() {
-	$custom_prompt = get_option( 'bbpress_forum_ai_bot_custom_prompt' );
-	?>
-	<textarea name="bbpress_forum_ai_bot_custom_prompt" rows="5" cols="50"><?php echo isset( $custom_prompt ) ? esc_textarea( $custom_prompt ) : ''; ?></textarea>
-	<?php
-}
-function bbpress_forum_ai_bot_temperature_callback() {
-	$temperature = get_option( 'bbpress_forum_ai_bot_temperature' );
-	if (empty($temperature)) {
-		$temperature = 0.5; // Default temperature if not set
-	}
-	?>
-	<input type="range" name="bbpress_forum_ai_bot_temperature" value="<?php echo esc_attr( $temperature ); ?>" min="0" max="1" step="0.1" />
-    <span id="temperature_value"><?php echo esc_attr( $temperature ); ?></span>
-    <script>
-        // Use unique ID for the script if this file is included multiple times, or better, enqueue JS properly
-        const slider_temp = document.querySelector('input[name="bbpress_forum_ai_bot_temperature"]');
-        const output_temp = document.getElementById('temperature_value');
-        if (slider_temp && output_temp) { // Check elements exist
-            output_temp.innerHTML = slider_temp.value; // Display default value
-            slider_temp.oninput = function() {
-              output_temp.innerHTML = this.value;
-            }
-        }
-    </script>
-	<?php
+function ai_bot_behavior_settings_section_callback() {
+    echo '<p>' . __( 'Define how the bot behaves, its personality, and what triggers responses.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
-/**
- * Trigger Keywords field callback function.
- */
-function bbpress_forum_ai_bot_trigger_keywords_callback() {
-	$keywords = get_option( 'bbpress_forum_ai_bot_trigger_keywords' );
-	?>
-	<textarea name="bbpress_forum_ai_bot_trigger_keywords" rows="5" cols="50" placeholder="<?php esc_attr_e( 'Enter keywords, separated by commas or new lines', 'bbpress-forum-ai-bot' ); ?>"><?php echo isset( $keywords ) ? esc_textarea( $keywords ) : ''; ?></textarea>
-    <p class="description"><?php esc_html_e( 'The bot will respond if the post content contains any of these keywords (case-insensitive). Separate keywords with commas or new lines.', 'bbpress-forum-ai-bot' ); ?></p>
-	<?php
+function ai_bot_context_settings_section_callback() {
+    echo '<p>' . __( 'Configure how the bot accesses local and remote information to provide contextually relevant answers.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
-// New callback function for local search limit field
-function bbpress_forum_ai_bot_local_search_limit_callback() {
-    $limit = get_option( 'bbpress_forum_ai_bot_local_search_limit', 3 ); // Default to 3 if not set
-    ?>
-    <input type="number" name="bbpress_forum_ai_bot_local_search_limit" value="<?php echo esc_attr( $limit ); ?>" min="1" step="1" />
-    <p class="description"><?php esc_html_e( 'The maximum number of relevant local content results to include in the context for the AI model.', 'bbpress-forum-ai-bot' ); ?></p>
-    <?php
+// Field Callbacks
+function ai_bot_api_key_callback() {
+    $api_key = get_option( 'ai_bot_api_key' );
+    echo '<input type="password" name="ai_bot_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
+    echo '<p class="description">' . __( 'Enter your OpenAI API key.', 'ai-bot-for-bbpress' ) . '</p>';
 }
-// New callback function for remote REST endpoint URL field
-function bbpress_forum_ai_bot_remote_endpoint_url_callback() {
-    $url = get_option( 'bbpress_forum_ai_bot_remote_endpoint_url' );
-    ?>
-    <input type="url" name="bbpress_forum_ai_bot_remote_endpoint_url" value="<?php echo isset( $url ) ? esc_url( $url ) : ''; ?>" size="50" placeholder="https://example.com/wp-json/bbp-bot-helper/v1/context" />
-    <p class="description"><?php esc_html_e( 'Enter the full URL for the remote REST API endpoint used for context retrieval.', 'bbpress-forum-ai-bot' ); ?></p>
-    <?php
+
+function ai_bot_user_id_callback() {
+    $user_id = get_option( 'ai_bot_user_id' );
+    echo '<input type="number" name="ai_bot_user_id" value="' . esc_attr( $user_id ) . '" class="small-text" min="1" step="1" />';
+    echo '<p class="description">' . __( 'Enter the WordPress User ID for the bot account.', 'ai-bot-for-bbpress' ) . '</p>';
 }
-// New callback function for remote search limit field
-function bbpress_forum_ai_bot_remote_search_limit_callback() {
-    $limit = get_option( 'bbpress_forum_ai_bot_remote_search_limit', 3 ); // Default to 3 if not set
-    ?>
-    <input type="number" name="bbpress_forum_ai_bot_remote_search_limit" value="<?php echo esc_attr( $limit ); ?>" min="1" step="1" />
-    <p class="description"><?php esc_html_e( 'The maximum number of relevant remote content results to fetch and include in the context.', 'bbpress-forum-ai-bot' ); ?></p>
-    <?php
+
+function ai_bot_system_prompt_callback() {
+    $prompt = get_option( 'ai_bot_system_prompt', 'You are a helpful forum assistant.' );
+    echo '<textarea name="ai_bot_system_prompt" rows="5" class="large-text">' . esc_textarea( $prompt ) . '</textarea>';
+    echo '<p class="description">' . __( 'Define the base personality and role of the bot.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_custom_prompt_callback() {
+    $prompt = get_option( 'ai_bot_custom_prompt' );
+    echo '<textarea name="ai_bot_custom_prompt" rows="5" class="large-text">' . esc_textarea( $prompt ) . '</textarea>';
+    echo '<p class="description">' . __( 'Add specific instructions to guide the bot\'s responses (e.g., formatting rules, tone adjustments). Appended to every request.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_temperature_callback() {
+    $temperature = get_option( 'ai_bot_temperature', 0.5 );
+    echo '<input type="number" name="ai_bot_temperature" value="' . esc_attr( $temperature ) . '" class="small-text" min="0" max="1" step="0.1" />';
+    echo '<p class="description">' . __( 'Controls randomness (0.0 = deterministic, 1.0 = max creativity). Default: 0.5', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_trigger_keywords_callback() {
+    $keywords = get_option( 'ai_bot_trigger_keywords', '' );
+    echo '<textarea name="ai_bot_trigger_keywords" rows="3" class="large-text">' . esc_textarea( $keywords ) . '</textarea>';
+    echo '<p class="description">' . __( 'Comma-separated list of keywords that trigger the bot (case-insensitive). Mentioning the bot user always triggers it.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_local_search_limit_callback() {
+    $limit = get_option( 'ai_bot_local_search_limit', 3 );
+    echo '<input type="number" name="ai_bot_local_search_limit" value="' . esc_attr( $limit ) . '" min="0" step="1" class="small-text"/>';
+    echo '<p class="description">' . __( 'Max number of relevant posts/topics from this forum to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_remote_endpoint_url_callback() {
+    $url = get_option( 'ai_bot_remote_endpoint_url', '' );
+    echo '<input type="url" name="ai_bot_remote_endpoint_url" value="' . esc_attr( $url ) . '" class="regular-text" placeholder="https://your-site.com/wp-json/bbp-bot-helper/v1/search" />';
+    echo '<p class="description">' . __( 'URL of the BBP Bot Helper plugin\'s REST endpoint on your remote site. Leave blank to disable remote context.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+function ai_bot_remote_search_limit_callback() {
+    $limit = get_option( 'ai_bot_remote_search_limit', 3 );
+    echo '<input type="number" name="ai_bot_remote_search_limit" value="' . esc_attr( $limit ) . '" min="0" step="1" class="small-text"/>';
+    echo '<p class="description">' . __( 'Max number of relevant posts from the remote site to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
+}
+
+// Sanitization callback for temperature
+function ai_bot_sanitize_temperature( $input ) {
+    $input = floatval($input);
+    if ($input < 0) return 0;
+    if ($input > 1) return 1;
+    return $input;
 }

@@ -1,9 +1,9 @@
 <?php
 
-namespace BbpressForumAiBot\Context;
+namespace AiBot\Context;
 
-use BbpressForumAiBot\API\ChatGPT_API;
-use BbpressForumAiBot\Context\Database_Agent;
+use AiBot\API\ChatGPT_API;
+use AiBot\Context\Database_Agent;
 
 /**
  * Local Context Retriever Class
@@ -51,12 +51,12 @@ class Local_Context_Retriever {
         }
 
         // Use Database Agent to search local content using provided keywords
-        $limit = get_option('bbpress_forum_ai_bot_local_search_limit', 3); // Get limit from settings, default to 3
+        $limit = get_option('ai_bot_local_search_limit', 3); // Get limit from settings, default to 3
         $search_results = $this->database_agent->search_local_content_by_keywords( $keywords_comma_separated, $limit, $exclude_post_id, $topic_id );
 
         // Log the count of database search results found (after filtering)
         $results_count = count($search_results);
-        error_log('bbPress Forum AI Bot: Database Search Found ' . $results_count . ' relevant local results.');
+        error_log('AI Bot Info: Database Search Found ' . $results_count . ' relevant local results.');
 
         // 4. Format the single most relevant search result for context
         $formatted_context = '';

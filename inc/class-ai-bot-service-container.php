@@ -1,12 +1,13 @@
 <?php
 
 /**
- * Simple Service Container for bbPress Forum AI Bot
+ * Simple Service Container for AI Bot for bbPress
  */
-class Bbpress_Forum_AI_Bot_Service_Container {
+class AiBot_Service_Container {
 
     private $services = [];
     private $instances = []; // Store instantiated services
+    private $factories = [];
 
     /**
      * Register a service definition.
