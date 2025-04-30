@@ -29,7 +29,9 @@ class Handle_Mention {
      * Initialize the handler
      */
     public function init() {
-        add_action( 'plugins_loaded', array( $this, 'register_mention_handler' ) );
+        // Directly register the hooks needed for this handler
+        add_action( 'bbp_new_reply', array( $this, 'handle_bot_trigger' ), 9, 5 ); // Priority 9 (Earlier)
+        add_action( 'bbp_new_topic', array( $this, 'handle_bot_trigger' ), 9, 4 ); // Priority 9 (Earlier)
     }
 
     /**
@@ -59,15 +61,6 @@ class Handle_Mention {
             }
 
         }
-    }
-
-    /**
-     * Register mention handler after plugins loaded
-     */
-    public function register_mention_handler() {
-        // Update method name used in add_action calls
-        add_action( 'bbp_new_reply', array( $this, 'handle_bot_trigger' ), 11, 5 ); // Priority 11, after extrachill_capture_mention_notifications (priority 12)
-        add_action( 'bbp_new_topic', array( $this, 'handle_bot_trigger' ), 11, 4 );
     }
 }
 

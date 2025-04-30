@@ -71,7 +71,7 @@ class ChatGPT_API {
         );
 
         // Log the request and response only on error or for debugging
-        $log_api_details = false; // Set to true for debugging if needed
+        $log_api_details = true; // Set to true for debugging if needed
 
         $response = wp_remote_post( $api_url, $args );
 
