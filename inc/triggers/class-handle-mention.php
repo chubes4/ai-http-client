@@ -38,6 +38,10 @@ class Handle_Mention {
      * Handle mention or keyword trigger
      */
     public function handle_bot_trigger( $post_id, $topic_id, $forum_id, $anonymous_data, $reply_author = 0 ) {
+        // *** DEBUG LOG: Trigger Start ***
+        error_log("AI Bot Debug: handle_bot_trigger started for Post ID: " . $post_id . " in Topic ID: " . $topic_id);
+        // *** END DEBUG LOG ***
+
         $post_content = ($reply_author == 0) ? bbp_get_topic_content( $post_id ) : bbp_get_reply_content( $post_id );
 
         // Check if the interaction should be triggered using the injected service

@@ -4,6 +4,7 @@ namespace AiBot\Response;
 
 use AiBot\API\ChatGPT_API;
 use AiBot\Context\Content_Interaction_Service;
+use AiBot\Context\Forum_Structure_Provider;
 use AiBot\Core\AiBot_Service_Container; // Update use statement for namespaced container
 use AiBot\Core\AiBot; // Add use statement for the main bot class
 
@@ -23,6 +24,11 @@ class Generate_Bot_Response {
     private $content_interaction_service;
 
     /**
+     * @var Forum_Structure_Provider
+     */
+    private $forum_structure_provider;
+
+    /**
      * @var AiBot_Service_Container
      */
     private $container; // Store the container
@@ -32,11 +38,18 @@ class Generate_Bot_Response {
      *
      * @param ChatGPT_API $chatgpt_api The ChatGPT API instance.
      * @param Content_Interaction_Service $content_interaction_service The content interaction service instance.
+     * @param Forum_Structure_Provider $forum_structure_provider The forum structure provider instance.
      * @param AiBot_Service_Container $container The service container instance.
      */
-    public function __construct( ChatGPT_API $chatgpt_api, Content_Interaction_Service $content_interaction_service, AiBot_Service_Container $container ) {
+    public function __construct(
+        ChatGPT_API $chatgpt_api,
+        Content_Interaction_Service $content_interaction_service,
+        Forum_Structure_Provider $forum_structure_provider,
+        AiBot_Service_Container $container
+    ) {
         $this->chatgpt_api                 = $chatgpt_api;
         $this->content_interaction_service = $content_interaction_service;
+        $this->forum_structure_provider    = $forum_structure_provider;
         $this->container                   = $container; // Store the container
     }
 
@@ -100,11 +113,15 @@ class Generate_Bot_Response {
     /**
      * Generate AI response using ChatGPT API
      */
-    private function generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id ) { // Ensure parameter name matches
+    private function generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id ) {
         // Use new option names
         $system_prompt = get_option( 'ai_bot_system_prompt' );
         $custom_prompt = get_option( 'ai_bot_custom_prompt' );
         $temperature   = get_option( 'ai_bot_temperature', 0.5 ); // Default temperature
+
+        // --- Get Forum Structure JSON using the provider ---
+        // The provider handles caching and bbPress availability checks internally
+        $forum_structure_json = $this->forum_structure_provider->get_forum_structure_json();
 
         // --- Add Current Date/Time to System Prompt ---
         // Get the current time according to WordPress settings.
@@ -129,7 +146,18 @@ class Generate_Bot_Response {
 
         // Prepend the date/time instruction block to the system prompt.
         $system_prompt = $date_instruction . "\n\n" . $system_prompt;
-        // --- End Date/Time Addition ---
+
+        // --- Prepend Forum Structure JSON to System Prompt ---
+        // Check if the provider returned valid JSON (it returns null on error/bbPress unavailable)
+        if ( ! is_null($forum_structure_json) && json_decode($forum_structure_json) !== null ) {
+            $forum_context_header = "--- FORUM CONTEXT ---\n";
+            $forum_context_header .= "The following JSON object describes the structure of this forum site. Use this information to understand the site's overall organization and purpose when formulating your responses:\n";
+            $forum_context_footer = "\n--- END FORUM CONTEXT ---\n\n";
+
+            // Prepend the structure JSON wrapped in headers/footers
+            $system_prompt = $forum_context_header . $forum_structure_json . $forum_context_footer . $system_prompt;
+        }
+        // --- End Forum Structure Addition ---
 
         // Get relevant context using the injected Content Interaction Service
         $context_string = $this->content_interaction_service->get_relevant_context( $post_id, $post_content, $topic_id, $forum_id );
@@ -148,25 +176,33 @@ class Generate_Bot_Response {
 
         // Append context and instructions
         // Make instructions more directive about using the provided context, HTML formatting, and source relevance
+        // Reference the new context section headings
         $instruction = sprintf(
             "\n--- Your Response Instructions ---\n".
-            "1. Respond to the 'Current Post' above as @%s.\n".
-            "2. Use the 'Additional Relevant Context' (from %s) to inform your answer.\n".
-            "3. If quoting information found specifically within the context, quote it directly.\n".
-            "4. Your *entire* response must be formatted using only HTML tags suitable for direct rendering in a web page (e.g., <p>, <b>, <i>, <a>, <ul>, <ol>, <li>). \n".
-            "5. **Important:** Do NOT wrap your response in Markdown code fences (like ```html) or any other non-HTML wrappers.\n".
-            "6. Provide the 'Remote Context Source URL' as an HTML link (using <a href='...'>) only if it is directly relevant to the specific information being discussed or quoted.",
-            $bot_username, // Use the passed dynamic username
+            "1. Understand the user query from the 'CURRENT INTERACTION' section.\n".
+            "2. Use the chronological 'CONVERSATION HISTORY (Oldest First)' section to understand the flow of discussion and maintain context. The author of each post is identified by their username slug like `[Author: @username-slug]` or `[Author: You (@your-slug)]`.\n".
+            "3. Primarily use information from 'RELEVANT KNOWLEDGE BASE (LOCAL)' and 'RELEVANT KNOWLEDGE BASE (REMOTE)' to answer the query, if they contain relevant information.\n".
+            "4. Respond to the user as @%s.\n".
+            "5. **Mentioning Users:** When you need to mention a user from the conversation history, use the exact `@username-slug` format provided in the `[Author: @username-slug]` tag for that user. For example, to mention the user with slug `john-doe`, write `@john-doe`. **Do not** invent slugs or use display names for mentions.\n".
+            "6. Cite the source URL (if provided in the context) primarily when presenting specific facts, figures, or direct quotes from the 'RELEVANT KNOWLEDGE BASE' sections (local or remote) to support your response. For general discussion drawing on the context, citation is less critical.\n".
+            "7. Your *entire* response must be formatted using only HTML tags suitable for direct rendering in a web page (e.g., <p>, <b>, <i>, <a>, <ul>, <ol>, <li>). \n".
+            "8. **Important:** Do NOT wrap your response in Markdown code fences (like ```html) or any other non-HTML wrappers.\n".
+            "9. Prefer local knowledge base information if available and relevant.\n".
+            "10. Use the remote knowledge base (from %s) to supplement local information or when local context is insufficient.",
+            $bot_username, // Bot's user_login (as defined earlier in the function)
             $remote_host   // Use the dynamically fetched hostname
         );
 
-        $prompt = $context_string . "\nCurrent Post: " . $cleaned_post_content . $instruction; // Append instructions
+        // The context_string now contains all structured context sections
+        // We no longer need to add the cleaned_post_content here as it's included in the CURRENT INTERACTION section
+        $prompt = $context_string . $instruction; // Append instructions directly to the structured context
 
         // Prepare the final prompt for the API
         $final_prompt = $prompt; // Use the combined prompt
-        // error_log("AI Bot Debug: System Prompt: " . $system_prompt);
-        // error_log("AI Bot Debug: Custom Prompt: " . $custom_prompt);
-        // error_log("AI Bot Debug: Final Prompt (Context + Instructions) being sent to API: " . $final_prompt);
+
+        // *** DEBUG LOG: Final Prompt to API ***
+        error_log("AI Bot Debug: Final Prompt being sent to API:\n---\n" . $final_prompt . "\n---");
+        // *** END DEBUG LOG ***
 
         // 2. Generate Response using ChatGPT API
         $response = $this->chatgpt_api->generate_response( $final_prompt, $system_prompt, $custom_prompt, $temperature );

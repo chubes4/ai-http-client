@@ -26,7 +26,7 @@ class ChatGPT_API {
      */
     public function generate_response( $prompt, $system_prompt, $custom_prompt, $temperature ) {
         $api_key = $this->get_api_key();
-        $model = 'gpt-4o'; // Changed model name to gpt-4o
+        $model = 'gpt-4.1-mini';
 
         if ( empty( $api_key ) ) {
             // error_log('AI Bot Error: OpenAI API Key is not set.');

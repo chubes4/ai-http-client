@@ -126,6 +126,34 @@ class Database_Agent {
     }
 
     /**
+     * Get chronological replies for a topic, excluding a specific post.
+     *
+     * @param int   $topic_id         The topic ID.
+     * @param int   $limit            Maximum number of replies to retrieve (optional, default: 10).
+     * @param array $exclude_post_ids Array of reply IDs to exclude (optional).
+     * @return array Array of forum reply post objects, sorted by date (ascending).
+     */
+    public function get_chronological_topic_replies( $topic_id, $limit = 10, $exclude_post_ids = array() ) {
+        $args = [
+            'post_type'      => bbp_get_reply_post_type(),
+            'post_parent'    => $topic_id,
+            'posts_per_page' => $limit,
+            'orderby'        => 'date',
+            'order'          => 'DESC', // Order newest first
+            'post_status'    => 'publish' // Ensure only published replies are fetched
+        ];
+
+        if ( ! empty( $exclude_post_ids ) ) {
+            $args['post__not_in'] = $exclude_post_ids;
+        }
+
+        $replies = get_posts( $args );
+
+        // Note: get_posts already returns oldest first with order=ASC
+        return $replies;
+    }
+
+    /**
      * Search for relevant local posts and pages based on keywords, excluding a specific post.
      *
      * @param string $keywords_comma_separated Comma-separated keywords/phrases from OpenAI.
@@ -142,13 +170,20 @@ class Database_Agent {
         // Store keywords for the filter closure
         $this->current_search_keywords = $keywords_comma_separated;
 
+        // Get the first keyword to use for the 's' parameter to help relevance sorting
+        $first_keyword = '';
+        $keywords_array = preg_split('/\s*,\s*/', $keywords_comma_separated, -1, PREG_SPLIT_NO_EMPTY);
+        if (!empty($keywords_array)) {
+            $first_keyword = $keywords_array[0];
+        }
+
         $args = [
             'post_type'      => array( 'post', 'page', bbp_get_topic_post_type(), bbp_get_reply_post_type() ), // Search in posts, pages, topics, and replies
-            's'              => '', // Set search term to empty, logic is handled by posts_where filter
+            's'              => $first_keyword, // Use first keyword to activate relevance sorting
             'posts_per_page' => $limit,
             'post_status'    => 'publish', // Only retrieve published content
-            'orderby'        => 'relevance', // Order by relevance - Note: relevance might be less meaningful with custom WHERE
-            'order'          => 'DESC',
+            'orderby'        => 'relevance', // Change from 'date' to 'relevance'
+            // 'order'          => 'DESC', // Order is less relevant when using 'relevance'
         ];
 
         if ( ! empty( $exclude_post_id ) ) {
@@ -159,23 +194,62 @@ class Database_Agent {
         add_filter( 'posts_where', array( $this, 'build_or_search_where_clause' ), 10, 2 );
 
         // Use WP_Query directly to access the generated SQL query
+        error_log("AI Bot Debug: Running WP_Query with args: " . print_r($args, true)); // Log Args
         $query = new \WP_Query( $args );
+        error_log("AI Bot Debug: Last SQL Query: " . $query->request); // Log full SQL query
         $initial_search_results = $query->posts; // Get the posts from the query result
+
+        // *** DEBUG LOG: Initial Results ***
+        error_log("AI Bot Debug: Initial DB Results Count: " . count($initial_search_results));
+        if (!empty($initial_search_results)) {
+            error_log("AI Bot Debug: Initial DB Result IDs: " . print_r(wp_list_pluck($initial_search_results, 'ID'), true));
+        }
+        // *** END DEBUG LOG ***
 
         // Filter out replies from the current topic
         $filtered_results = [];
         if ( ! empty( $initial_search_results ) && $topic_id > 0 ) {
+            // Get the reply post type once
+            $reply_post_type = bbp_get_reply_post_type();
+
             foreach ( $initial_search_results as $post ) {
                 // Keep the post if it's NOT a reply OR if it IS a reply but NOT from the current topic
                 // AND also ensure it's not the topic starter post itself.
-                if ( ($post->post_type !== bbp_get_reply_post_type() || $post->post_parent != $topic_id) && $post->ID != $topic_id ) {
+                $is_reply = ($post->post_type === $reply_post_type);
+                $is_current_topic_reply = ($is_reply && $post->post_parent == $topic_id);
+                $is_current_topic_post = ($post->ID == $topic_id);
+
+                if ( !$is_current_topic_reply && !$is_current_topic_post ) {
                     $filtered_results[] = $post;
+                } else {
+                    // *** DEBUG LOG: Excluded Post Details ***
+                    $reason = [];
+                    if ($is_current_topic_reply) { $reason[] = "Is reply in current topic"; }
+                    if ($is_current_topic_post) { $reason[] = "Is current topic post"; }
+                    error_log(
+                        sprintf(
+                            "AI Bot Debug: Excluding Post ID: %d | Type: %s | Parent: %s | Current Topic ID: %d | Reason: %s",
+                            $post->ID,
+                            $post->post_type,
+                            $post->post_parent ?? 'N/A',
+                            $topic_id,
+                            implode(' & ', $reason)
+                        )
+                    );
+                    // *** END DEBUG LOG ***
                 }
             }
         } else {
             // If no topic ID provided or no initial results, keep all results
             $filtered_results = $initial_search_results;
         }
+
+        // *** DEBUG LOG: Filtered Results ***
+        error_log("AI Bot Debug: Filtered DB Results Count (after topic exclusion): " . count($filtered_results));
+        if (!empty($filtered_results)) {
+             error_log("AI Bot Debug: Filtered DB Result IDs: " . print_r(wp_list_pluck($filtered_results, 'ID'), true));
+        }
+        // *** END DEBUG LOG ***
 
         // Remove the filter immediately after the query
         remove_filter( 'posts_where', array( $this, 'build_or_search_where_clause' ), 10 );
@@ -210,8 +284,10 @@ class Database_Agent {
         }
 
         // Split comma-separated keywords/phrases, trim whitespace
-        $search_terms = array_map( 'trim', explode( ',', $this->current_search_keywords ) );
-        $search_terms = array_filter( $search_terms ); // Remove empty entries
+        // Use preg_split for potentially more robust splitting (e.g., comma + space)
+        $search_terms = preg_split('/\s*,\s*/', $this->current_search_keywords, -1, PREG_SPLIT_NO_EMPTY);
+        // $search_terms = array_map( 'trim', explode( ',', $this->current_search_keywords ) );
+        // $search_terms = array_filter( $search_terms ); // Remove empty entries (already handled by preg_split flag)
 
         if ( empty( $search_terms ) ) {
             return $where; // Do nothing if no valid terms
@@ -219,14 +295,15 @@ class Database_Agent {
 
         $or_clauses = [];
         foreach ( $search_terms as $term ) {
-            // Prepare the term for LIKE comparison
-            $like_term = '%' . $wpdb->esc_like( $term ) . '%';
-            // Build clause for this term (searching title OR content)
-            $or_clauses[] = $wpdb->prepare(
-                "({$wpdb->posts}.post_title LIKE %s OR {$wpdb->posts}.post_content LIKE %s)",
-                $like_term,
-                $like_term
-            );
+            // Escape the term ONCE for use in LIKE
+            $escaped_term = $wpdb->esc_like( $term );
+
+            // Manually add wildcards and construct the LIKE conditions for title and content
+            $title_like = "wp_posts.post_title LIKE '%" . $escaped_term . "%'";
+            $content_like = "wp_posts.post_content LIKE '%" . $escaped_term . "%'";
+
+            // Combine the title and content conditions for this term with OR
+            $or_clauses[] = "({$title_like} OR {$content_like})";
         }
 
         if ( ! empty( $or_clauses ) ) {
@@ -235,6 +312,15 @@ class Database_Agent {
             // Append our custom OR conditions to the existing WHERE clause
             $where .= " AND " . $search_where;
         }
+
+        // *** DEBUG LOG: WHERE Clause ***
+        // Log just the dynamically added part for clarity
+        if (!empty($search_where)) {
+             error_log("AI Bot Debug: SQL WHERE Clause Addition: AND " . $search_where);
+        } else {
+             error_log("AI Bot Debug: SQL WHERE Clause Addition: None (No valid search terms)");
+        }
+        // *** END DEBUG LOG ***
 
         return $where;
     }

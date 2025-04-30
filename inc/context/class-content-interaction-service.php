@@ -149,7 +149,13 @@ class Content_Interaction_Service {
      */
     public function get_relevant_context( $post_id, $post_content, $topic_id, $forum_id ) {
 
-        $context_string = '';
+        // Initialize context sections
+        $current_interaction_context = "";
+        $local_history_context = ""; // Ensure this is initialized
+        $local_knowledge_context = "";
+        $remote_knowledge_context = "";
+        $context_string = ""; // Initialize final string
+
         // Use new option name
         $bot_user_id = get_option( 'ai_bot_user_id' ); // Get bot user ID
         $bot_username = 'Bot'; // Default display name if not found
@@ -160,53 +166,86 @@ class Content_Interaction_Service {
              }
         }
 
-        // --- Basic Topic Info ---
+        // --- Section 1: Current Interaction ---
+        $current_interaction_context .= "--- CURRENT INTERACTION ---\n";
         $forum_title = bbp_get_forum_title( $forum_id );
         $topic_title = bbp_get_topic_title( $topic_id );
-        $starter_post_content = bbp_get_topic_content( $topic_id ); // Get the original post content
+        $current_interaction_context .= "Forum: " . $forum_title . "\n";
+        $current_interaction_context .= "Topic: " . $topic_title . "\n";
+        // Add the actual post content that triggered the bot *here*
+        $cleaned_post_content = html_entity_decode( wp_strip_all_tags( $post_content ), ENT_QUOTES, 'UTF-8' );
+        $cleaned_post_content = str_replace( "\u{00A0}", " ", $cleaned_post_content ); // Replace non-breaking spaces
+        $current_interaction_context .= "Current Post Content:\n" . trim($cleaned_post_content) . "\n";
+        $current_interaction_context .= "--- END CURRENT INTERACTION ---\n\n";
 
-        $context_string .= "Forum: " . $forum_title . "\n";
-        $context_string .= "Topic: " . $topic_title . "\n\n";
-        $context_string .= "Topic Starter Post:\n" . wp_strip_all_tags( $starter_post_content ) . "\n\n";
+        // --- Section 2: Conversation History (Chronological) ---
+        $conversation_history_context = ""; // New variable for clarity
+        $conversation_history_context .= "--- CONVERSATION HISTORY (Oldest First) ---\n";
 
-        // --- Bot's Previous Replies ---
-        if ( $bot_user_id ) {
-            $bot_replies = $this->database_agent->get_bot_replies_in_topic( $topic_id, $bot_user_id, 5, array( $post_id ) );
-            if ( ! empty( $bot_replies ) ) {
-                $context_string .= "Your Previous Replies in this Topic (most recent first):\n";
-                foreach ( $bot_replies as $reply ) {
-                    $reply_content    = bbp_get_reply_content( $reply->ID );
-                    // Use the dynamic bot username here
-                    $context_string  .= sprintf("[You (@%s)]: %s\n", $bot_username, wp_strip_all_tags( $reply_content ) );
-                }
-                $context_string .= "\n"; // Add a newline after bot replies
-            }
-        }
-
-        // --- Recent Replies (Excluding Bot and Current Post) ---
-        $exclude_authors = $bot_user_id ? array( $bot_user_id ) : array();
-        $recent_replies = $this->database_agent->get_recent_forum_replies( $topic_id, 3, array( $post_id ), $exclude_authors );
-
-        if ( ! empty( $recent_replies ) ) {
-            $context_string .= "Recent Replies in this Topic (excluding yours, oldest first):\n";
-            // Reverse the order to show oldest first for better conversational flow
-            $recent_replies = array_reverse( $recent_replies );
-            foreach ( $recent_replies as $reply ) {
-                $reply_id         = $reply->ID;
-                $reply_content    = bbp_get_reply_content( $reply_id );
-                $reply_author_obj = get_userdata( $reply->post_author );
-                $reply_author_name = $reply_author_obj ? $reply_author_obj->display_name : 'Anonymous';
-                // Decode HTML entities like &nbsp;
-                $cleaned_content = html_entity_decode( wp_strip_all_tags( $reply_content ), ENT_QUOTES, 'UTF-8' );
-                $context_string  .= "[" . $reply_author_name . "]: " . trim($cleaned_content) . "\n";
-            }
-            $context_string .= "\n"; // Add a newline after recent replies
+        // --- Topic Starter Post ---
+        $topic_starter_post = get_post($topic_id);
+        if ($topic_starter_post) {
+             $starter_author_obj = get_userdata( $topic_starter_post->post_author );
+             // Use user_nicename (slug) for consistency and mentions
+             $starter_author_name = $starter_author_obj ? $starter_author_obj->user_nicename : 'anonymous'; // Changed to user_nicename and lowercase anonymous
+             $starter_post_content = bbp_get_topic_content( $topic_id );
+             // Format with slug
+             $conversation_history_context .= "[Author: @" . $starter_author_name . "] " . trim(html_entity_decode( wp_strip_all_tags( $starter_post_content ), ENT_QUOTES, 'UTF-8' )) . "\n\n"; // Added trim, strip_tags, decode, and @ prefix
         } else {
-            $context_string .= "No other recent replies in this topic.\n\n";
+             $conversation_history_context .= "[Could not retrieve topic starter post.]\n\n";
         }
+
+
+        // --- Chronological Replies (Excluding Trigger Post) ---
+        // Use a limit, e.g., 10 most recent relevant posts before the trigger
+        $reply_limit = (int) get_option('ai_bot_reply_history_limit', 10); // Use option
+        $chronological_replies = $this->database_agent->get_chronological_topic_replies( $topic_id, $reply_limit, array( $post_id ) );
+
+        if ( ! empty( $chronological_replies ) ) {
+            // The query now returns newest first (DESC). Reverse this to get oldest first for display.
+            $ordered_replies_for_display = array_reverse( $chronological_replies );
+
+            $conversation_history_context .= "Relevant Previous Replies (Oldest First):\n";
+            // Loop through the correctly ordered replies
+            foreach ( $ordered_replies_for_display as $reply ) {
+                $reply_content    = bbp_get_reply_content( $reply->ID );
+                $reply_author_obj = get_userdata( $reply->post_author );
+                $reply_author_slug = 'anonymous'; // Default to lowercase anonymous slug
+                $is_bot = false;
+
+                if ($reply_author_obj) {
+                    $reply_author_slug = $reply_author_obj->user_nicename; // Use user_nicename (slug)
+                    // Check if this author is the bot
+                    if ( $bot_user_id && $reply->post_author == $bot_user_id ) {
+                         // Ensure bot username is fetched correctly if needed here, or use a generic 'You'/'Bot' identifier
+                         // Using the bot's slug for consistency is ideal if the bot user has a meaningful slug
+                         $bot_user_data = get_userdata( $bot_user_id );
+                         $bot_slug = $bot_user_data ? $bot_user_data->user_nicename : 'ai-bot'; // Fallback slug
+                         $reply_author_slug = "You (@" . $bot_slug . ")"; // Identify bot replies clearly using slug
+                         $is_bot = true;
+                    } else {
+                         // Format regular user with slug
+                         $reply_author_slug = "@" . $reply_author_slug;
+                    }
+                } else {
+                    // Handle anonymous case - already defaulted to 'anonymous'
+                     $reply_author_slug = "@anonymous";
+                }
+
+
+                // Decode HTML entities like &nbsp; and clean content
+                $cleaned_content = trim(html_entity_decode( wp_strip_all_tags( $reply_content ), ENT_QUOTES, 'UTF-8' ));
+                // Include the author slug in the output
+                $conversation_history_context .= "[Author: " . $reply_author_slug . "]: " . $cleaned_content . "\n";
+            }
+            $conversation_history_context .= "\n"; // Add a newline after replies
+        } else {
+            $conversation_history_context .= "No other replies found in this topic before the current post.\n\n";
+        }
+
+        $conversation_history_context .= "--- END CONVERSATION HISTORY ---\n\n";
 
         // --- Extract Keywords for Context Search ---
-
         // Prepare list of terms to exclude from keywords
         $excluded_terms = ['forum', 'topic', 'post', 'reply', 'thread', 'discussion', 'message', 'conversation'];
         if (isset($bot_username) && $bot_username !== 'Bot') { // Make sure we have a specific bot username
@@ -215,10 +254,17 @@ class Content_Interaction_Service {
         }
         $exclude_list_string = implode(', ', $excluded_terms);
 
-        $keywords_string = '';
-        $keywords = [];
+        $keywords_comma_separated = ''; // Initialize
+        // Refined prompt for keyword extraction V3
         $keyword_extraction_prompt = sprintf(
-            "Analyze the following forum post content. Extract up to 3 main keywords or topics useful for searching a knowledge base. Order the keywords starting with the most specific and central topic discussed, followed by related but less central topics. Provide the keywords as a single comma-separated list.\n\n**Important:** Do not include any of the following terms in your list: %s.\n\nPost Content: %s",
+            "Analyze the following forum post content. Extract the most relevant keywords or phrases for searching a knowledge base to answer the user's core query. Provide the results as a single comma-separated list.\\n\\n".
+            "**Guidelines:**\\n".
+            "1. Prioritize specific, multi-word phrases (e.g., 'Grateful Dead Ripple', 'artist story sharing') over single generic words (e.g., 'music', 'artists').\\n".
+            "2. If the user asks about a specific person, band, song, place, event name, or other named entity, ensure that entity's name is the core part of your primary extracted phrase.\\n".
+            "3. Order the results from most central to least central to the user's query.\\n".
+            "4. Extract *up to* 3 distinct phrases/keywords. If the user's post is short or very specific, providing only 1 or 2 highly relevant phrases/keywords is preferable to adding less relevant ones.\\n".
+            "5. **CRITICAL:** Avoid appending generic terms like 'discussion', 'event', 'forecast', 'update', 'info', 'details', 'question', 'help', or the forum terms (%s) to the core subject. For example, if the post is about 'High Water 2025', extract 'High Water 2025', NOT 'High Water 2025 discussion' or 'High Water 2025 event'. Only include such terms if they are part of a specific official name or title explicitly mentioned in the post content.\\n\\n". // V3 refinement
+            "Post Content:\\n%s",
             $exclude_list_string,
             wp_strip_all_tags( $post_content )
         );
@@ -239,106 +285,109 @@ class Content_Interaction_Service {
             // error_log('AI Bot Error: Failed to extract keywords for context search: ' . (is_wp_error($keywords_response) ? $keywords_response->get_error_message() : 'Empty response'));
         }
 
-        // --- Initialize Context Variables ---
-        $local_content = '';
-        // $remote_content = []; // <<< Will be built iteratively
+        // *** DEBUG LOG: Extracted Keywords ***
+        error_log("AI Bot Debug: Keywords extracted for search: [" . $keywords_comma_separated . "]");
+        // *** END DEBUG LOG ***
 
-        $final_remote_results = []; // Holds the final formatted strings
-        $fetched_remote_urls = []; // Track fetched URLs to prevent duplicates
-        $remote_results_count = 0;
-        // Use new option name
-        $configured_remote_limit = get_option( 'ai_bot_remote_search_limit', 3 );
+        // --- Section 3: Relevant Knowledge Base Search (Coordinator Logic) ---
 
-        // Proceed only if we have keywords
+        // Use new option names for limits
+        $local_limit = max(1, intval(get_option( 'ai_bot_local_search_limit', 3 )));
+        $remote_limit = max(1, intval(get_option( 'ai_bot_remote_search_limit', 3 )));
+
+        // Initialize results storage
+        $local_knowledge_string = ""; // Will hold the formatted string from local retriever
+        $remote_knowledge_results = []; // Will hold formatted strings from remote retriever
+        $fetched_remote_urls = []; // Track fetched remote URLs for deduplication
+
+        // --- Local Search (Single Query) ---
         if ( ! empty( $keywords_comma_separated ) ) {
-        // --- Relevant Local Content (from search) ---
-            // Ensure local content is retrieved before attempting remote fallback
-            $local_content = $this->local_context_retriever->get_relevant_local_content( $keywords_comma_separated, $post_id, $topic_id );
+            // error_log("AI Bot Info: Searching LOCAL with keywords: '{$keywords_comma_separated}' and limit {$local_limit}");
+            // Call local retriever with the full comma-separated string
+            // It handles its own limit internally and returns a formatted string
+            $local_knowledge_string = $this->local_context_retriever->get_relevant_local_content( $keywords_comma_separated, $post_id, $topic_id );
+        }
 
-            // --- Relevant Remote Content (via Helper Plugin or Direct API) ---
-            // Split keywords from the single comma-separated string for iterative search
+        // --- Remote Search (Iterative Keyword Search) ---
+        $ordered_keywords = [];
+        if ( ! empty( $keywords_comma_separated ) ) {
             $ordered_keywords = array_map('trim', explode(',', $keywords_comma_separated));
             $ordered_keywords = array_filter($ordered_keywords); // Remove any empty elements
+        }
+
+        if ( ! empty( $ordered_keywords ) ) {
+            // error_log('AI Bot Info: Starting iterative REMOTE search with keywords: ' . implode(', ', $ordered_keywords));
 
             foreach ( $ordered_keywords as $keyword ) {
-                if ( $remote_results_count >= $configured_remote_limit ) {
-                    // error_log("AI Bot Info: Reached remote limit ($configured_remote_limit), stopping fallback search.");
-                    break; // Stop searching if we've hit the configured limit
+                $remote_needed = $remote_limit - count($remote_knowledge_results);
+                if ( $remote_needed <= 0 ) {
+                    // error_log('AI Bot Info: Remote limit reached. Stopping keyword iteration for remote search.');
+                    break; // Stop if remote limit is already met
                 }
 
-                // Calculate how many more results we need
-                $needed_limit = $configured_remote_limit - $remote_results_count;
+                // error_log("AI Bot Info: Searching REMOTE for keyword '{$keyword}' with limit {$remote_needed}");
+                // Call remote retriever with SINGLE keyword and NEEDED limit
+                $results_this_keyword_remote = $this->remote_context_retriever->get_remote_context( $keyword, $remote_needed );
 
-                // Use new logging prefix
-                // error_log("AI Bot Info: Attempting remote context for keyword '{$keyword}' with needed limit {$needed_limit}");
-
-                // Pass the keyword and needed limit to the remote retriever
-                $results_this_keyword = $this->remote_context_retriever->get_remote_context( $keyword, $needed_limit );
-
-                if ( is_array( $results_this_keyword ) && ! empty( $results_this_keyword ) ) {
-                    // Use new logging prefix
-                    // error_log( "AI Bot Info: Received " . count($results_this_keyword) . " results for keyword '{$keyword}'." );
-
-                    foreach ( $results_this_keyword as $result ) {
-                        if ( $remote_results_count >= $configured_remote_limit ) {
-                            // Use new logging prefix
-                            // error_log("AI Bot Info: Reached remote limit ({$configured_remote_limit}) within keyword '{$keyword}', breaking inner loop.");
-                            break 2; // Break out of both loops if limit reached
-                        }
-
-                        // Basic check for expected structure and URL
-                        if ( isset( $result['url'] ) && isset( $result['string'] ) && ! empty( $result['url'] ) ) {
-                            $url = $result['url'];
-                            // Check if this URL has already been added
-                            if ( ! in_array( $url, $fetched_remote_urls ) ) {
-                                $final_remote_results[] = $result['string']; // Add the formatted string
-                                $fetched_remote_urls[] = $url; // Track the URL
-                                $remote_results_count++;
-                                // Use new logging prefix
-                                // error_log("AI Bot Info: Added remote result #{$remote_results_count} (URL: {$url})");
-                            } else {
-                                // Use new logging prefix
-                                // error_log("AI Bot Info: Skipped duplicate remote URL: {$url}");
+                // Process remote results (returned as array ['url' => ..., 'string' => ...])
+                if ( is_array($results_this_keyword_remote) && ! empty( $results_this_keyword_remote ) ) {
+                    foreach ($results_this_keyword_remote as $remote_result) {
+                        // Check if we still need results and if result has expected structure
+                        if ( count($remote_knowledge_results) < $remote_limit && isset($remote_result['url'], $remote_result['string']) ) {
+                            if ( ! in_array($remote_result['url'], $fetched_remote_urls) ) {
+                                $remote_knowledge_results[] = $remote_result['string'];
+                                $fetched_remote_urls[] = $remote_result['url'];
                             }
-                        } else {
-                            // Use new logging prefix
-                            // error_log("AI Bot Warning: Received invalid remote result format for keyword '{$keyword}': " . print_r($result, true));
                         }
+                        if (count($remote_knowledge_results) >= $remote_limit) break; // Break inner loop if limit reached
                     }
-                } else {
-                    // Use new logging prefix
-                    // error_log("AI Bot Info: No valid remote results found for keyword '{$keyword}'.");
                 }
-            } // End foreach keyword
+                // Check limit again after processing results for the keyword
+                if (count($remote_knowledge_results) >= $remote_limit) {
+                    break;
+                }
+            } // End foreach keyword for remote search
+
         } else {
-            // Use new logging prefix
-            // error_log("AI Bot Info: Skipping context search due to empty keywords.");
+            // error_log('AI Bot Info: No keywords extracted, skipping remote knowledge base search.');
         }
 
-        // --- Combine Context ---
-        $additional_context = "\nAdditional Relevant Context:\n";
-        $has_additional_context = false;
+        // --- Format Combined Knowledge Base Context ---
+        // Initialize the final context section variables if they weren't before (e.g., if no keywords)
+        if (!isset($local_knowledge_context)) { $local_knowledge_context = ""; }
+        if (!isset($remote_knowledge_context)) { $remote_knowledge_context = ""; }
 
-        if ( ! empty( $local_content ) ) {
-            $additional_context .= $local_content . "\n"; // Add local content first
-            $has_additional_context = true;
-        }
-
-        if ( ! empty( $final_remote_results ) ) {
-            // Join the formatted remote result strings
-            $additional_context .= implode( "\n\n", $final_remote_results ) . "\n";
-            $has_additional_context = true;
-        }
-
-        // Append the combined additional context if any was found
-        if ( $has_additional_context ) {
-             $context_string .= $additional_context;
+        $local_knowledge_context .= "--- RELEVANT KNOWLEDGE BASE (LOCAL) ---\n";
+        if ( ! empty( $local_knowledge_string ) ) {
+             // The string from the retriever already includes the 'Relevant Local Content:' header and formatting
+             $local_knowledge_context .= $local_knowledge_string;
         } else {
-            $context_string .= "\nNo additional relevant context was found based on keywords.\n";
+            $local_knowledge_context .= "No relevant local content found matching keywords.\n";
         }
+        $local_knowledge_context .= "\n--- END RELEVANT KNOWLEDGE BASE (LOCAL) ---\n\n";
 
-        // Log the final context string being returned (optional, can be verbose)
-        // error_log("AI Bot Debug: Final Context String for AI: " . $context_string);
+        // Use the requested, clearer heading for the remote section
+        $remote_knowledge_context .= "--- RELEVANT KNOWLEDGE BASE (From the Remote Site) ---\n";
+        if ( ! empty( $remote_knowledge_results ) ) {
+            // The remote retriever already includes source info in each string
+            $remote_knowledge_context .= implode( "\n---\n", $remote_knowledge_results ); // Use simple separator
+        } else {
+             $remote_host = $this->get_remote_hostname();
+             $remote_knowledge_context .= sprintf("No relevant remote content found matching keywords on %s.\n", $remote_host);
+        }
+        // Update the end delimiter to match the start
+        $remote_knowledge_context .= "--- END RELEVANT KNOWLEDGE BASE (From the Remote Site) ---\n\n";
+
+        // --- Combine all context sections ---
+        // Ensure base sections are initialized
+        if (!isset($current_interaction_context)) { $current_interaction_context = ""; }
+        // Use the new conversation history variable
+        if (!isset($conversation_history_context)) { $conversation_history_context = ""; }
+
+        $context_string = $current_interaction_context
+                        . $conversation_history_context // Use the new variable here
+                        . $local_knowledge_context
+                        . $remote_knowledge_context;
 
         return $context_string;
     }
