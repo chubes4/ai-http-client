@@ -111,16 +111,21 @@ class Generate_Bot_Response {
         $current_datetime = current_time( 'mysql' ); // Format: YYYY-MM-DD HH:MM:SS
         $current_date = current_time( 'Y-m-d' ); // Format: YYYY-MM-DD
 
-        // Construct the detailed date/time instruction block
-        $date_instruction = <<<PROMPT
---- MANDATORY TIME CONTEXT ---
-CURRENT DATE & TIME: {$current_datetime}
-RULE: You MUST treat {$current_date} as the definitive 'today' for determining past/present/future tense.
-ACTION: Frame all events relative to {$current_date}. Use past tense for completed events. Use present/future tense appropriately ONLY for events happening on or after {$current_date}.
-CONSTRAINT: DO NOT discuss events completed before {$current_date} as if they are still upcoming.
-KNOWLEDGE CUTOFF: Your internal knowledge cutoff is irrelevant; operate solely based on this date and provided context.
---- END TIME CONTEXT ---
-PROMPT;
+        // Construct the detailed date/time instruction block using sprintf
+        $date_instruction = sprintf(
+            "--- MANDATORY TIME CONTEXT ---\n".
+            "CURRENT DATE & TIME: %s\n".
+            "RULE: You MUST treat %s as the definitive 'today' for determining past/present/future tense.\n".
+            "ACTION: Frame all events relative to %s. Use past tense for completed events. Use present/future tense appropriately ONLY for events happening on or after %s.\n".
+            "CONSTRAINT: DO NOT discuss events completed before %s as if they are still upcoming.\n".
+            "KNOWLEDGE CUTOFF: Your internal knowledge cutoff is irrelevant; operate solely based on this date and provided context.\n".
+            "--- END TIME CONTEXT ---",
+            $current_datetime,
+            $current_date,
+            $current_date,
+            $current_date,
+            $current_date
+        );
 
         // Prepend the date/time instruction block to the system prompt.
         $system_prompt = $date_instruction . "\n\n" . $system_prompt;
