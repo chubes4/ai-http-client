@@ -13,4 +13,7 @@ ai-bot-for-bbpress-helper/
 
 # Optional: Ignore build artifacts if you have a build process
 # build/
-# dist/ 
+# dist/
+
+# Zip archives
+*.zip 
