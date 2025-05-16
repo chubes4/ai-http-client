@@ -172,6 +172,18 @@ class Content_Interaction_Service {
         $topic_title = bbp_get_topic_title( $topic_id );
         $current_interaction_context .= "Forum: " . $forum_title . "\n";
         $current_interaction_context .= "Topic: " . $topic_title . "\n";
+
+        // Get author of the current post (the one that triggered the bot)
+        $triggering_post_author_id = get_post_field( 'post_author', $post_id );
+        $triggering_author_slug = 'anonymous'; // Default
+        if ( $triggering_post_author_id ) {
+            $triggering_author_data = get_userdata( $triggering_post_author_id );
+            if ( $triggering_author_data ) {
+                $triggering_author_slug = "@" . $triggering_author_data->user_nicename;
+            }
+        }
+        $current_interaction_context .= "Author of Current Post (who triggered this response): " . $triggering_author_slug . "\n";
+
         // Add the actual post content that triggered the bot *here*
         $cleaned_post_content = html_entity_decode( wp_strip_all_tags( $post_content ), ENT_QUOTES, 'UTF-8' );
         $cleaned_post_content = str_replace( "\u{00A0}", " ", $cleaned_post_content ); // Replace non-breaking spaces
@@ -286,7 +298,7 @@ class Content_Interaction_Service {
         }
 
         // *** DEBUG LOG: Extracted Keywords ***
-        error_log("AI Bot Debug: Keywords extracted for search: [" . $keywords_comma_separated . "]");
+        // error_log("AI Bot Debug: Keywords extracted for search: [" . $keywords_comma_separated . "]");
         // *** END DEBUG LOG ***
 
         // --- Section 3: Relevant Knowledge Base Search (Coordinator Logic) ---
@@ -393,5 +405,3 @@ class Content_Interaction_Service {
     }
 
 } // End class Content_Interaction_Service
-
-?>

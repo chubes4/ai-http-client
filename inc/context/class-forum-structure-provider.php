@@ -22,7 +22,7 @@ class Forum_Structure_Provider {
     public function get_forum_structure_json() {
         // --- Check if bbPress is active before trying to get forum structure ---
         if ( ! function_exists('bbp_get_forums') ) {
-            error_log("AI Bot Error: bbPress functions not available in current execution context (Cron?). Cannot generate forum structure.");
+            // error_log("AI Bot Error: bbPress functions not available in current execution context (Cron?). Cannot generate forum structure.");
             return null; // Cannot generate without bbPress
         }
 
@@ -67,11 +67,11 @@ class Forum_Structure_Provider {
                     // error_log("AI Bot Debug: bbp_get_forums returned empty results for main forums.");
                 } else {
                     // Log if specific loop functions are missing
-                    error_log("AI Bot Error: Required bbPress functions (bbp_get_forum_title/bbp_get_forum_content) missing inside forum loop.");
+                    // error_log("AI Bot Error: Required bbPress functions (bbp_get_forum_title/bbp_get_forum_content) missing inside forum loop.");
                 }
             } else {
                 // Log if primary query functions are missing
-                error_log("AI Bot Error: Required bbPress functions (bbp_get_forum_post_type/bbp_get_public_status_id) missing for forum query.");
+                // error_log("AI Bot Error: Required bbPress functions (bbp_get_forum_post_type/bbp_get_public_status_id) missing for forum query.");
             }
 
             // Encode as JSON
@@ -83,6 +83,4 @@ class Forum_Structure_Provider {
 
         return $forum_structure_json;
     }
-}
-
-?> 
+} 

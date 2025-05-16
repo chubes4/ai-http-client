@@ -3,7 +3,7 @@ Contributors: chubes
 Tags: bbpress, ai, bot, forum, chatgpt
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -65,6 +65,28 @@ No. It only provides an API endpoint for use by the AI Bot for bbPress plugin.
 
 The endpoint itself is public by default, typical of WordPress REST API endpoints. Security relies on the fact that only the AI Bot for bbPress knows to query it, and it only returns publicly available content (published posts/pages). Access control could be added in future versions if needed.
 
+== External Services ==
+
+This plugin connects to the OpenAI API to generate responses for the AI bot. This is essential for the plugin's core functionality of providing AI-driven replies in bbPress forums.
+
+*   **Service:** OpenAI API (specifically the Chat Completions endpoint).
+*   **Purpose:** To generate intelligent and contextually relevant responses based on forum discussions and configured prompts.
+*   **Data Sent:** When the bot is triggered (by a mention or keyword), the following types of data are sent to the OpenAI API:
+    *   The content of the post that triggered the bot.
+    *   Relevant conversation history from the current topic (including post content and author usernames/slugs).
+    *   Contextual information retrieved from the local WordPress database (titles, snippets, and URLs of relevant posts/pages based on keyword matching).
+    *   If configured, contextual information retrieved from a remote WordPress site via the BBP Bot Helper plugin (titles, snippets, and URLs of relevant posts/pages).
+    *   The system prompt, custom prompt, and temperature settings configured in the plugin's admin page.
+    *   The structure of your bbPress forums (forum names, topic names, and their hierarchy).
+    *   The current date and time.
+*   **When Data is Sent:** Data is sent only when the bot is triggered to generate a response. This occurs after a user posts a new reply or topic that meets the trigger conditions (mentioning the bot or containing a specified keyword).
+*   **OpenAI API Terms of Service:** [https://openai.com/policies/terms-of-service](https://openai.com/policies/terms-of-service)
+*   **OpenAI API Privacy Policy:** [https://openai.com/policies/privacy-policy](https://openai.com/policies/privacy-policy)
+
+It is important to have an active OpenAI API key with sufficient credits for the bot to function. Please review OpenAI's policies to understand how they handle the data sent to their API.
+
+If the "Remote REST Endpoint URL" is configured, the plugin will also send search queries (derived from the conversation) to that endpoint to fetch additional context. This endpoint is typically on another WordPress site you control and that runs the companion "BBP Bot Helper" plugin. No user-specific data is sent to this remote endpoint beyond the search terms. The data received from this endpoint is then included in the information sent to the OpenAI API as described above.
+
 == Screenshots ==
 
 1.  Configuration screen showing the main settings.
@@ -72,6 +94,16 @@ The endpoint itself is public by default, typical of WordPress REST API endpoint
 3.  (Add more descriptions as needed)
 
 == Changelog ==
+
+= 1.0.2 =
+* Address WordPress.org review feedback:
+    * Added 'Requires Plugins: bbpress' header to main plugin file.
+    * Updated readme.txt with detailed 'External Services' disclosure for OpenAI API.
+    * Removed unnecessary PHP closing tags (`?>`) from several files.
+    * Commented out `error_log` and `print_r` development debugging statements.
+    * Replaced `strip_tags()` with `wp_strip_all_tags()` in database agent.
+    * Restored `unset()` for a class property in database agent after filter removal.
+* Enhanced bot response context to more clearly identify the user being replied to.
 
 = 1.0.0 =
 *   Major Refactor: Renamed plugin to "AI Bot for bbPress" and updated internal naming conventions.

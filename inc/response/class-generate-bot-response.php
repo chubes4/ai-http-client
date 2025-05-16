@@ -82,11 +82,20 @@ class Generate_Bot_Response {
         // Get the username (user_login) to use for mentions/prompts
         $bot_username = $bot_user_data->user_login;
 
+        // Get triggering user's information
+        $triggering_username_slug = 'the user'; // Default
+        if ( $reply_author != 0 ) {
+            $triggering_user_data = get_userdata( $reply_author );
+            if ( $triggering_user_data ) {
+                $triggering_username_slug = $triggering_user_data->user_nicename; // Use nicename (slug)
+            }
+        }
+
         try {
             $post_content = ($reply_author == 0) ? bbp_get_topic_content( $post_id ) : bbp_get_reply_content( $post_id );
 
-            // Generate AI response using the dynamic username
-            $response_content = $this->generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id );
+            // Generate AI response using the dynamic username and triggering user's slug
+            $response_content = $this->generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id, $triggering_username_slug );
 
             // Check if response generation resulted in an error
             if ( is_wp_error( $response_content ) ) {
@@ -113,7 +122,7 @@ class Generate_Bot_Response {
     /**
      * Generate AI response using ChatGPT API
      */
-    private function generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id ) {
+    private function generate_ai_response( $bot_username, $post_content, $topic_id, $forum_id, $post_id, $triggering_username_slug ) {
         // Use new option names
         $system_prompt = get_option( 'ai_bot_system_prompt' );
         $custom_prompt = get_option( 'ai_bot_custom_prompt' );
@@ -179,18 +188,22 @@ class Generate_Bot_Response {
         // Reference the new context section headings
         $instruction = sprintf(
             "\n--- Your Response Instructions ---\n".
-            "1. Understand the user query from the 'CURRENT INTERACTION' section.\n".
+            "1. Understand the user query from the 'CURRENT INTERACTION' section. The user who wrote this (and who you are replying to) is @%s.\n".
             "2. Use the chronological 'CONVERSATION HISTORY (Oldest First)' section to understand the flow of discussion and maintain context. The author of each post is identified by their username slug like `[Author: @username-slug]` or `[Author: You (@your-slug)]`.\n".
             "3. Primarily use information from 'RELEVANT KNOWLEDGE BASE (LOCAL)' and 'RELEVANT KNOWLEDGE BASE (REMOTE)' to answer the query, if they contain relevant information.\n".
-            "4. Respond to the user as @%s.\n".
-            "5. **Mentioning Users:** When you need to mention a user from the conversation history, use the exact `@username-slug` format provided in the `[Author: @username-slug]` tag for that user. For example, to mention the user with slug `john-doe`, write `@john-doe`. **Do not** invent slugs or use display names for mentions.\n".
+            "4. You are @%s. Address @%s directly in your reply if appropriate (e.g., 'Hi @%s, ...').\n".
+            "5. **Mentioning Users:** When you need to mention a user from the conversation history, use the exact `@username-slug` format provided in the `[Author: @username-slug]` tag for that user. For example, to mention the user with slug `john-doe`, write `@john-doe`. **Do not** invent slugs or use display names for mentions. If you are addressing the user who triggered you, use @%s.\n".
             "6. Cite the source URL (if provided in the context) primarily when presenting specific facts, figures, or direct quotes from the 'RELEVANT KNOWLEDGE BASE' sections (local or remote) to support your response. For general discussion drawing on the context, citation is less critical.\n".
             "7. Your *entire* response must be formatted using only HTML tags suitable for direct rendering in a web page (e.g., <p>, <b>, <i>, <a>, <ul>, <ol>, <li>). \n".
             "8. **Important:** Do NOT wrap your response in Markdown code fences (like ```html) or any other non-HTML wrappers.\n".
             "9. Prefer local knowledge base information if available and relevant.\n".
             "10. Use the remote knowledge base (from %s) to supplement local information or when local context is insufficient.",
-            $bot_username, // Bot's user_login (as defined earlier in the function)
-            $remote_host   // Use the dynamically fetched hostname
+            $triggering_username_slug, // For instruction 1
+            $bot_username,             // For instruction 4 (who the bot is)
+            $triggering_username_slug, // For instruction 4 (who to address)
+            $triggering_username_slug, // For instruction 4 (example)
+            $triggering_username_slug, // For instruction 5
+            $remote_host               // For instruction 10
         );
 
         // The context_string now contains all structured context sections
@@ -201,7 +214,7 @@ class Generate_Bot_Response {
         $final_prompt = $prompt; // Use the combined prompt
 
         // *** DEBUG LOG: Final Prompt to API ***
-        error_log("AI Bot Debug: Final Prompt being sent to API:\n---\n" . $final_prompt . "\n---");
+        // error_log("AI Bot Debug: Final Prompt being sent to API:\n---\n" . $final_prompt . "\n---");
         // *** END DEBUG LOG ***
 
         // 2. Generate Response using ChatGPT API

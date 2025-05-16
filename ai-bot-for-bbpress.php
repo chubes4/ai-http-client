@@ -3,13 +3,14 @@
  * Plugin Name: AI Bot for bbPress
  * Plugin URI:  https://wordpress.org/plugins/ai-bot-for-bbpress/
  * Description: AI bot for bbPress forums that can be configured to reply to mentions or keywords.
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      Chubes
  * Author URI:  https://chubes.net
  * License:     GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Requires PHP: 7.4
  * Requires at least: 5.0
+ * Requires Plugins: bbpress
  * Text Domain: ai-bot-for-bbpress
  */
 
@@ -141,5 +142,3 @@ if (method_exists($ai_bot_instance, 'init')) {
 
 
 // --- End Service Container Setup ---
-
-?>

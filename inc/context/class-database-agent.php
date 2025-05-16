@@ -180,10 +180,9 @@ class Database_Agent {
         $args = [
             'post_type'      => array( 'post', 'page', bbp_get_topic_post_type(), bbp_get_reply_post_type() ), // Search in posts, pages, topics, and replies
             's'              => $first_keyword, // Use first keyword to activate relevance sorting
-            'posts_per_page' => $limit,
+            'posts_per_page' => -1, // Fetch more results initially for better re-ranking before limiting
             'post_status'    => 'publish', // Only retrieve published content
             'orderby'        => 'relevance', // Change from 'date' to 'relevance'
-            // 'order'          => 'DESC', // Order is less relevant when using 'relevance'
         ];
 
         if ( ! empty( $exclude_post_id ) ) {
@@ -194,23 +193,26 @@ class Database_Agent {
         add_filter( 'posts_where', array( $this, 'build_or_search_where_clause' ), 10, 2 );
 
         // Use WP_Query directly to access the generated SQL query
-        error_log("AI Bot Debug: Running WP_Query with args: " . print_r($args, true)); // Log Args
+        // error_log("AI Bot Debug: Running WP_Query with args: " . print_r($args, true)); // Log Args
         $query = new \WP_Query( $args );
-        error_log("AI Bot Debug: Last SQL Query: " . $query->request); // Log full SQL query
+        // error_log("AI Bot Debug: Last SQL Query: " . $query->request); // Log full SQL query
         $initial_search_results = $query->posts; // Get the posts from the query result
 
         // *** DEBUG LOG: Initial Results ***
-        error_log("AI Bot Debug: Initial DB Results Count: " . count($initial_search_results));
-        if (!empty($initial_search_results)) {
-            error_log("AI Bot Debug: Initial DB Result IDs: " . print_r(wp_list_pluck($initial_search_results, 'ID'), true));
-        }
+        // error_log("AI Bot Debug: Initial DB Results Count: " . count($initial_search_results));
+        // if (!empty($initial_search_results)) {
+            // error_log("AI Bot Debug: Initial DB Result IDs: " . print_r(wp_list_pluck($initial_search_results, 'ID'), true));
+        // }
         // *** END DEBUG LOG ***
 
         // Filter out replies from the current topic
         $filtered_results = [];
         if ( ! empty( $initial_search_results ) && $topic_id > 0 ) {
+            // error_log("AI Bot Debug: Filtering out replies from current topic (ID: {$topic_id}) and the trigger post (ID: {$exclude_post_id}) from search results.");
             // Get the reply post type once
             $reply_post_type = bbp_get_reply_post_type();
+            // error_log("AI Bot Debug: Current Topic ID for filtering: " . $topic_id);
+            // error_log("AI Bot Debug: Excluded Post ID for filtering: " . $exclude_post_id . " | Initial Search Results: " . print_r(wp_list_pluck($initial_search_results, 'ID'), true));
 
             foreach ( $initial_search_results as $post ) {
                 // Keep the post if it's NOT a reply OR if it IS a reply but NOT from the current topic
@@ -226,16 +228,16 @@ class Database_Agent {
                     $reason = [];
                     if ($is_current_topic_reply) { $reason[] = "Is reply in current topic"; }
                     if ($is_current_topic_post) { $reason[] = "Is current topic post"; }
-                    error_log(
-                        sprintf(
-                            "AI Bot Debug: Excluding Post ID: %d | Type: %s | Parent: %s | Current Topic ID: %d | Reason: %s",
-                            $post->ID,
-                            $post->post_type,
-                            $post->post_parent ?? 'N/A',
-                            $topic_id,
-                            implode(' & ', $reason)
-                        )
-                    );
+                    // error_log(
+                        // sprintf(
+                            // "AI Bot Debug: Excluding Post ID: %d | Type: %s | Parent: %s | Current Topic ID: %d | Reason: %s",
+                            // $post->ID,
+                            // $post->post_type,
+                            // $post->post_parent ?? 'N/A',
+                            // $topic_id,
+                            // implode(' & ', $reason)
+                        // )
+                    // );
                     // *** END DEBUG LOG ***
                 }
             }
@@ -245,84 +247,123 @@ class Database_Agent {
         }
 
         // *** DEBUG LOG: Filtered Results ***
-        error_log("AI Bot Debug: Filtered DB Results Count (after topic exclusion): " . count($filtered_results));
-        if (!empty($filtered_results)) {
-             error_log("AI Bot Debug: Filtered DB Result IDs: " . print_r(wp_list_pluck($filtered_results, 'ID'), true));
-        }
+        // error_log("AI Bot Debug: Filtered DB Results Count (after topic exclusion): " . count($filtered_results));
+        // if (!empty($filtered_results)) {
+             // error_log("AI Bot Debug: Filtered DB Result IDs: " . print_r(wp_list_pluck($filtered_results, 'ID'), true));
+        // }
         // *** END DEBUG LOG ***
 
-        // Remove the filter immediately after the query
+        // Remove the filter to avoid affecting other queries
         remove_filter( 'posts_where', array( $this, 'build_or_search_where_clause' ), 10 );
         unset( $this->current_search_keywords ); // Clean up stored keywords
 
-        // Log the search parameters for debugging
-        $keywords_list = implode(", ", explode(", ", $keywords_comma_separated)); // For logging
-        // error_log("AI Bot Info: Searching local content with keywords: [{$keywords_list}], Limit: {$limit}, Exclude Post: {$exclude_post_id}, Exclude Topic: {$topic_id}");
-
-        if ( empty($keywords_comma_separated) ) {
-            // error_log("AI Bot Warning: Empty keywords provided for local content search.");
-            return []; // Return empty array if no valid keywords
+        // Perform re-ranking based on keyword density if needed
+        if (!empty($filtered_results)) {
+            // error_log("AI Bot Debug: Re-ranking " . count($filtered_results) . " results based on keyword density.");
+            $final_results_after_reranking = $this->rerank_results_by_keyword_density($filtered_results, $this->current_search_keywords);
+            // error_log("AI Bot Debug: Results after re-ranking (IDs): " . print_r(wp_list_pluck($final_results_after_reranking, 'ID'), true));
+            return array_slice($final_results_after_reranking, 0, $limit); // Ensure limit is respected after re-ranking
         }
 
-        return $filtered_results;
+        // error_log("AI Bot Debug: No results to re-rank or return.");
+        return $filtered_results; // Return filtered (and implicitly limited by original query)
     }
 
     /**
-     * Builds a custom WHERE clause for WP_Query to search for OR matches across comma-separated phrases.
+     * Build the WHERE clause for searching multiple keywords with OR logic.
      *
-     * @global wpdb $wpdb WordPress database abstraction object.
-     * @param string   $where The WHERE clause of the query.
-     * @param WP_Query $query  The WP_Query object.
+     * @param string   $where The current WHERE clause.
+     * @param WP_Query $query The WP_Query object.
      * @return string The modified WHERE clause.
      */
     public function build_or_search_where_clause( $where, $query ) {
         global $wpdb;
 
-        // Check if our keywords are set for the current query context
-        if ( empty( $this->current_search_keywords ) ) {
-            return $where; // Do nothing if keywords aren't set
+        // Ensure we only modify the main query for our specific search
+        if ( empty( $this->current_search_keywords ) || ! $query->is_main_query() && ! $query->get('s') ) {
+            return $where;
         }
 
-        // Split comma-separated keywords/phrases, trim whitespace
-        // Use preg_split for potentially more robust splitting (e.g., comma + space)
         $search_terms = preg_split('/\s*,\s*/', $this->current_search_keywords, -1, PREG_SPLIT_NO_EMPTY);
-        // $search_terms = array_map( 'trim', explode( ',', $this->current_search_keywords ) );
-        // $search_terms = array_filter( $search_terms ); // Remove empty entries (already handled by preg_split flag)
+        $search_terms = array_map( 'trim', $search_terms );
+        $search_terms = array_filter( $search_terms );
 
         if ( empty( $search_terms ) ) {
-            return $where; // Do nothing if no valid terms
+            return $where; // No valid search terms
         }
 
-        $or_clauses = [];
+        $search_where = '';
         foreach ( $search_terms as $term ) {
-            // Escape the term ONCE for use in LIKE
-            $escaped_term = $wpdb->esc_like( $term );
-
-            // Manually add wildcards and construct the LIKE conditions for title and content
-            $title_like = "wp_posts.post_title LIKE '%" . $escaped_term . "%'";
-            $content_like = "wp_posts.post_content LIKE '%" . $escaped_term . "%'";
-
-            // Combine the title and content conditions for this term with OR
-            $or_clauses[] = "({$title_like} OR {$content_like})";
+            $term_escaped = $wpdb->esc_like( $term );
+            if ( ! empty( $search_where ) ) {
+                $search_where .= " OR ";
+            }
+            // Search in post_title OR post_content
+            $search_where .= $wpdb->prepare(
+                "({$wpdb->posts}.post_title LIKE %s OR {$wpdb->posts}.post_content LIKE %s)",
+                '%' . $term_escaped . '%',
+                '%' . $term_escaped . '%'
+            );
         }
 
-        if ( ! empty( $or_clauses ) ) {
-            // Combine all term clauses with OR
-            $search_where = ' ( ' . implode( ' OR ', $or_clauses ) . ' ) ';
-            // Append our custom OR conditions to the existing WHERE clause
-            $where .= " AND " . $search_where;
+        if ( ! empty( $search_where ) ) {
+            $where .= " AND (" . $search_where . ")";
         }
 
         // *** DEBUG LOG: WHERE Clause ***
         // Log just the dynamically added part for clarity
-        if (!empty($search_where)) {
-             error_log("AI Bot Debug: SQL WHERE Clause Addition: AND " . $search_where);
-        } else {
-             error_log("AI Bot Debug: SQL WHERE Clause Addition: None (No valid search terms)");
-        }
+        // if (!empty($search_where)) {
+            // error_log("AI Bot Debug: SQL WHERE Clause Addition: AND " . $search_where);
+        // } else {
+            // error_log("AI Bot Debug: SQL WHERE Clause Addition: None (No valid search terms)");
+        // }
         // *** END DEBUG LOG ***
 
         return $where;
+    }
+
+    private function rerank_results_by_keyword_density($results, $keywords_comma_separated) {
+        if (empty($results) || empty($keywords_comma_separated)) {
+            return $results;
+        }
+
+        $keywords = array_map('trim', explode(',', strtolower($keywords_comma_separated)));
+        $keywords = array_filter($keywords);
+
+        if (empty($keywords)) {
+            return $results;
+        }
+
+        $scored_results = [];
+        foreach ($results as $post) {
+            $score = 0;
+            $content_lower = strtolower(wp_strip_all_tags($post->post_title . " " . $post->post_content));
+
+            foreach ($keywords as $keyword) {
+                $score += substr_count($content_lower, $keyword);
+            }
+            $scored_results[] = ['post' => $post, 'score' => $score];
+        }
+
+        // Sort by score descending, then by date descending as a tie-breaker
+        usort($scored_results, function ($a, $b) {
+            if ($b['score'] == $a['score']) {
+                // Tie-breaker: more recent posts first
+                return strtotime($b['post']->post_date) - strtotime($a['post']->post_date);
+            }
+            return $b['score'] <=> $a['score'];
+        });
+
+        // Extract the post objects in the new order
+        $reranked_posts = array_map(function($item) { return $item['post']; }, $scored_results);
+
+        // // *** DEBUG LOG: Reranked Results ***
+        // $top_result_id = !empty($reranked_posts) ? $reranked_posts[0]->ID : 'None';
+        // $top_score = !empty($scored_results) ? $scored_results[0]['score'] : 'N/A';
+        // // error_log("AI Bot Debug: Top result for re-ranking: Post ID " . $top_result_id . " with score " . $top_score);
+        // // *** END DEBUG LOG ***
+
+        return $reranked_posts;
     }
 
     // Property to hold keywords temporarily for the filter closure

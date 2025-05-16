@@ -112,10 +112,7 @@ class ChatGPT_API {
 
         // Success case
         $final_content = wp_kses_post( $response_data['choices'][0]['message']['content'] ); // Sanitize output
-        // Log the final extracted content - Keep this one as it confirms success
         // error_log( 'AI Bot Info: Final Extracted Content: ' . $final_content );
         return $final_content;
     }
 }
-
-?>
