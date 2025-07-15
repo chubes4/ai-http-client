@@ -26,20 +26,6 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
      */
     protected $base_url = 'https://api.x.ai/v1';
 
-    /**
-     * Available models for Grok
-     * @var array
-     */
-    protected $available_models = array(
-        'grok-3' => 'Grok 3 - Latest flagship model with superior reasoning',
-        'grok-3-fast' => 'Grok 3 Fast - Optimized for speed',
-        'grok-3-mini' => 'Grok 3 Mini - Compact and efficient',
-        'grok-3-mini-fast' => 'Grok 3 Mini Fast - Fastest option',
-        'grok-2-1212' => 'Grok 2 - Previous generation',
-        'grok-2-vision-1212' => 'Grok 2 Vision - Multi-modal capabilities',
-        'grok-beta' => 'Grok Beta - Development version',
-        'grok-vision-beta' => 'Grok Vision Beta - Vision capabilities'
-    );
 
     /**
      * API key for authentication
@@ -48,19 +34,11 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
     private $api_key;
 
     /**
-     * Constructor
-     *
-     * @param array $config Configuration array
+     * Initialize provider-specific settings
+     * Override in child classes
      */
-    public function __construct($config = array()) {
-        parent::__construct($config);
-        
-        $this->api_key = $config['api_key'] ?? '';
-        
-        // Set default model if not provided
-        if (empty($this->model)) {
-            $this->model = 'grok-3';
-        }
+    protected function init() {
+        $this->api_key = $this->get_config('api_key', '');
     }
 
     /**
@@ -130,7 +108,21 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
      * @return array Available models
      */
     public function get_available_models() {
-        return $this->available_models;
+        if (!$this->is_configured()) {
+            return array();
+        }
+
+        try {
+            // Fetch live models from Grok API using dedicated module
+            return AI_HTTP_Grok_Model_Fetcher::fetch_models(
+                $this->base_url,
+                $this->get_auth_headers()
+            );
+
+        } catch (Exception $e) {
+            // Return empty array if API call fails - no fallbacks
+            return array();
+        }
     }
 
     /**
@@ -143,13 +135,32 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
     }
 
     /**
+     * Get authentication headers for API requests
+     *
+     * @return array Authentication headers
+     */
+    protected function get_auth_headers() {
+        return array(
+            'Authorization' => 'Bearer ' . $this->api_key
+        );
+    }
+
+    /**
+     * Get the API endpoint URL for this provider
+     *
+     * @return string API endpoint URL
+     */
+    protected function get_api_endpoint() {
+        return $this->base_url . '/chat/completions';
+    }
+
+    /**
      * Get model-specific configuration
      *
      * @param string $model Model name
      * @return array Model configuration
      */
     public function get_model_config($model = null) {
-        $model = $model ?: $this->model;
         
         $config = array(
             'max_tokens' => 4096,
@@ -223,12 +234,6 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
                 'type' => 'password',
                 'required' => true,
                 'description' => 'Your X.AI API key from console.x.ai'
-            ),
-            'model' => array(
-                'label' => 'Default Model',
-                'type' => 'select',
-                'options' => $this->available_models,
-                'default' => 'grok-3'
             )
         );
     }

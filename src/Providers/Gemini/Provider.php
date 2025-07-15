@@ -54,118 +54,22 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
 
     public function get_available_models() {
         if (!$this->is_configured()) {
-            return $this->get_fallback_models();
+            return array();
         }
 
         try {
-            // Gemini has a models list endpoint
-            $models = $this->model_fetcher->fetch_models(
-                'gemini',
-                $this->base_url . '/models',
-                $this->get_auth_headers(),
-                array($this, 'parse_models_response')
+            // Fetch live models from Gemini API using dedicated module
+            return AI_HTTP_Gemini_Model_Fetcher::fetch_models(
+                $this->base_url,
+                $this->get_auth_headers()
             );
 
-            return !empty($models) ? $models : $this->get_fallback_models();
-
         } catch (Exception $e) {
-            // Return fallback models if API call fails
-            return $this->get_fallback_models();
+            // Return empty array if API call fails - no fallbacks
+            return array();
         }
     }
 
-    /**
-     * Parse Gemini models API response
-     *
-     * @param array $response Raw API response
-     * @return array Parsed models list
-     */
-    public function parse_models_response($response) {
-        $models = array();
-
-        if (!isset($response['models']) || !is_array($response['models'])) {
-            return $this->get_fallback_models();
-        }
-
-        foreach ($response['models'] as $model) {
-            if (!isset($model['name'])) {
-                continue;
-            }
-
-            // Extract model ID from full name (e.g., "models/gemini-2.0-flash" -> "gemini-2.0-flash")
-            $model_id = str_replace('models/', '', $model['name']);
-            
-            // Only include generative models (filter out embedding models)
-            if ($this->is_generative_model($model_id)) {
-                $models[$model_id] = $this->get_model_display_name($model_id);
-            }
-        }
-
-        // Ensure we have some models, fallback if API returned empty
-        return !empty($models) ? $models : $this->get_fallback_models();
-    }
-
-    /**
-     * Check if model ID is a generative model
-     *
-     * @param string $model_id Model ID
-     * @return bool True if it's a generative model
-     */
-    private function is_generative_model($model_id) {
-        $generative_patterns = array('gemini-', 'bison-', 'chat-bison');
-        $exclude_patterns = array('embedding', 'aqa');
-
-        // Exclude non-generative models
-        foreach ($exclude_patterns as $pattern) {
-            if (strpos($model_id, $pattern) !== false) {
-                return false;
-            }
-        }
-
-        // Include known generative model patterns
-        foreach ($generative_patterns as $pattern) {
-            if (strpos($model_id, $pattern) !== false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get display name for model
-     *
-     * @param string $model_id Model ID
-     * @return string Display name
-     */
-    private function get_model_display_name($model_id) {
-        $display_names = array(
-            'gemini-2.0-flash' => 'Gemini 2.0 Flash',
-            'gemini-2.5-flash' => 'Gemini 2.5 Flash',
-            'gemini-1.5-flash' => 'Gemini 1.5 Flash',
-            'gemini-1.5-pro' => 'Gemini 1.5 Pro',
-            'gemini-1.5-flash-8b' => 'Gemini 1.5 Flash 8B',
-            'gemini-pro' => 'Gemini Pro',
-            'gemini-pro-vision' => 'Gemini Pro Vision'
-        );
-
-        return isset($display_names[$model_id]) ? $display_names[$model_id] : ucfirst(str_replace('-', ' ', $model_id));
-    }
-
-    /**
-     * Get fallback models when API is unavailable
-     *
-     * @return array Fallback models list
-     */
-    private function get_fallback_models() {
-        return array(
-            'gemini-2.0-flash' => 'Gemini 2.0 Flash',
-            'gemini-2.5-flash' => 'Gemini 2.5 Flash',
-            'gemini-1.5-flash' => 'Gemini 1.5 Flash',
-            'gemini-1.5-pro' => 'Gemini 1.5 Pro',
-            'gemini-1.5-flash-8b' => 'Gemini 1.5 Flash 8B'
-        );
-    }
 
     public function test_connection() {
         if (!$this->is_configured()) {
@@ -281,40 +185,4 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
         return $request;
     }
 
-    /**
-     * Get pricing information for Gemini models
-     *
-     * @param string $model Model name
-     * @return array Pricing info
-     */
-    public function get_model_pricing($model = null) {
-        $pricing = array(
-            'gemini-2.0-flash' => array(
-                'input' => 0.00015,   // per 1K tokens (estimated)
-                'output' => 0.0006
-            ),
-            'gemini-2.5-flash' => array(
-                'input' => 0.00015,
-                'output' => 0.0006
-            ),
-            'gemini-1.5-flash' => array(
-                'input' => 0.000075,
-                'output' => 0.0003
-            ),
-            'gemini-1.5-flash-8b' => array(
-                'input' => 0.0000375,
-                'output' => 0.00015
-            ),
-            'gemini-1.5-pro' => array(
-                'input' => 0.00125,
-                'output' => 0.005
-            )
-        );
-
-        if ($model) {
-            return isset($pricing[$model]) ? $pricing[$model] : null;
-        }
-
-        return $pricing;
-    }
 }

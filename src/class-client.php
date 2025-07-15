@@ -121,6 +121,59 @@ class AI_HTTP_Client {
     }
 
     /**
+     * Continue conversation with tool results
+     * Supports OpenAI Responses API continuation pattern
+     *
+     * @param string $response_id Previous response ID from AI provider
+     * @param array $tool_results Array of tool results to continue with
+     * @param string $provider_name Optional specific provider to use
+     * @param callable $completion_callback Optional callback for streaming
+     * @return array|string Response from continuation request
+     * @throws Exception If continuation is not supported or fails
+     */
+    public function continue_with_tool_results($response_id, $tool_results, $provider_name = null, $completion_callback = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        
+        // Create provider instance
+        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
+        
+        if (!$provider) {
+            throw new Exception("Provider '{$provider_name}' not available");
+        }
+        
+        if (!$provider->is_configured()) {
+            throw new Exception("Provider '{$provider_name}' not configured");
+        }
+        
+        // Check if provider supports continuation
+        if (!method_exists($provider, 'continue_with_tool_results')) {
+            throw new Exception("Provider '{$provider_name}' does not support continuation");
+        }
+        
+        // Use provider-specific continuation method
+        return $provider->continue_with_tool_results($response_id, $tool_results, $completion_callback);
+    }
+
+    /**
+     * Get last response ID from provider
+     * Used for continuation tracking (OpenAI Responses API)
+     *
+     * @param string $provider_name Optional specific provider to use
+     * @return string|null Response ID or null if not available
+     */
+    public function get_last_response_id($provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        
+        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
+        
+        if (!$provider || !method_exists($provider, 'get_last_response_id')) {
+            return null;
+        }
+        
+        return $provider->get_last_response_id();
+    }
+
+    /**
      * Check if streaming is available
      *
      * @return bool True if streaming is supported
@@ -157,7 +210,8 @@ class AI_HTTP_Client {
         $provider_response = $provider->send_request($provider_request);
         
         // Transform output through provider-specific response normalizer
-        $response_normalizer = AI_HTTP_Normalizer_Factory::get_response_normalizer($provider_name);
+        // Pass provider instance for continuation support (OpenAI response ID tracking)
+        $response_normalizer = AI_HTTP_Normalizer_Factory::get_response_normalizer($provider_name, $provider);
         $normalized_response = $response_normalizer->normalize($provider_response);
         
         return $normalized_response;

@@ -48,24 +48,29 @@ class AI_HTTP_ProviderManager_Component {
     public function render_component($args = array()) {
         $defaults = array(
             'title' => 'AI Provider Configuration',
-            'show_instructions' => true,
+            'components' => array(
+                'core' => array('provider_selector', 'api_key_input', 'model_selector'),
+                'extended' => array()
+            ),
             'show_test_connection' => true,
             'allowed_providers' => array(), // Empty = all providers
             'default_provider' => 'openai',
-            'custom_fields' => array(),
-            'instructions_label' => 'System Instructions',
-            'wrapper_class' => 'ai-http-provider-manager'
+            'wrapper_class' => 'ai-http-provider-manager',
+            'component_configs' => array()
         );
 
         $args = array_merge($defaults, $args);
         $unique_id = 'ai-provider-manager-' . uniqid();
         
         $current_settings = $this->options_manager->get_all_providers();
-        $available_providers = $this->get_available_providers($args['allowed_providers']);
-        
         $selected_provider = isset($current_settings['selected_provider']) 
             ? $current_settings['selected_provider'] 
             : $args['default_provider'];
+
+        $current_values = array_merge(
+            $this->options_manager->get_provider_settings($selected_provider),
+            array('provider' => $selected_provider)
+        );
 
         ob_start();
         ?>
@@ -77,78 +82,95 @@ class AI_HTTP_ProviderManager_Component {
 
             <div class="ai-provider-form">
                 
-                <!-- Provider Selection -->
-                <div class="ai-field-group">
-                    <label for="<?php echo esc_attr($unique_id); ?>_provider">AI Provider:</label>
-                    <select id="<?php echo esc_attr($unique_id); ?>_provider" 
-                            name="ai_provider" 
-                            data-component-id="<?php echo esc_attr($unique_id); ?>">
-                        <?php foreach ($available_providers as $provider_key => $provider_name): ?>
-                            <option value="<?php echo esc_attr($provider_key); ?>" 
-                                    <?php selected($selected_provider, $provider_key); ?>>
-                                <?php echo esc_html($provider_name); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <span class="ai-provider-status" id="<?php echo esc_attr($unique_id); ?>_status">
-                        <?php echo $this->get_provider_status($selected_provider); ?>
-                    </span>
-                </div>
-
-                <!-- API Key Input -->
-                <div class="ai-field-group">
-                    <label for="<?php echo esc_attr($unique_id); ?>_api_key">API Key:</label>
-                    <input type="password" 
-                           id="<?php echo esc_attr($unique_id); ?>_api_key"
-                           name="ai_api_key" 
-                           value="<?php echo esc_attr($this->get_provider_setting($selected_provider, 'api_key')); ?>"
-                           placeholder="Enter your <?php echo esc_attr($selected_provider); ?> API key"
-                           data-component-id="<?php echo esc_attr($unique_id); ?>"
-                           data-provider="<?php echo esc_attr($selected_provider); ?>" />
-                    <button type="button" class="ai-toggle-key-visibility" 
-                            onclick="aiHttpToggleKeyVisibility('<?php echo esc_attr($unique_id); ?>_api_key')">👁</button>
-                </div>
-
-                <!-- Model Selection -->
-                <div class="ai-field-group">
-                    <label for="<?php echo esc_attr($unique_id); ?>_model">Model:</label>
-                    <select id="<?php echo esc_attr($unique_id); ?>_model" 
-                            name="ai_model"
-                            data-component-id="<?php echo esc_attr($unique_id); ?>">
-                        <?php echo $this->render_model_options($selected_provider); ?>
-                    </select>
-                    <button type="button" class="ai-refresh-models" 
-                            onclick="aiHttpRefreshModels('<?php echo esc_attr($unique_id); ?>', '<?php echo esc_attr($selected_provider); ?>')">🔄</button>
-                </div>
-
-                <?php if ($args['show_instructions']): ?>
-                    <!-- Instructions/System Prompt -->
-                    <div class="ai-field-group">
-                        <label for="<?php echo esc_attr($unique_id); ?>_instructions"><?php echo esc_html($args['instructions_label']); ?>:</label>
-                        <textarea id="<?php echo esc_attr($unique_id); ?>_instructions" 
-                                  name="ai_instructions"
-                                  rows="4"
-                                  data-component-id="<?php echo esc_attr($unique_id); ?>"
-                                  placeholder="Enter system instructions for the AI..."><?php 
-                                  echo esc_textarea($this->get_provider_setting($selected_provider, 'instructions')); 
-                                  ?></textarea>
-                    </div>
-                <?php endif; ?>
-
-                <?php if (!empty($args['custom_fields'])): ?>
-                    <!-- Custom Fields -->
-                    <?php foreach ($args['custom_fields'] as $field_key => $field_label): ?>
-                        <div class="ai-field-group">
-                            <label for="<?php echo esc_attr($unique_id . '_' . $field_key); ?>"><?php echo esc_html($field_label); ?>:</label>
-                            <input type="text" 
-                                   id="<?php echo esc_attr($unique_id . '_' . $field_key); ?>"
-                                   name="ai_custom_<?php echo esc_attr($field_key); ?>"
-                                   value="<?php echo esc_attr($this->get_provider_setting($selected_provider, 'custom_' . $field_key)); ?>"
-                                   data-component-id="<?php echo esc_attr($unique_id); ?>"
-                                   data-custom-field="<?php echo esc_attr($field_key); ?>" />
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                <?php
+                // Render core components
+                foreach ($args['components']['core'] as $component_name) {
+                    $component_config = isset($args['component_configs'][$component_name]) 
+                        ? $args['component_configs'][$component_name] 
+                        : array();
+                    
+                    try {
+                        echo AI_HTTP_Component_Registry::render_component(
+                            $component_name,
+                            $unique_id,
+                            $component_config,
+                            $current_values
+                        );
+                    } catch (Exception $e) {
+                        echo '<!-- Error rendering component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
+                    }
+                }
+                
+                // Render extended components
+                foreach ($args['components']['extended'] as $component_name) {
+                    $component_config = isset($args['component_configs'][$component_name]) 
+                        ? $args['component_configs'][$component_name] 
+                        : array();
+                    
+                    try {
+                        echo AI_HTTP_Component_Registry::render_component(
+                            $component_name,
+                            $unique_id,
+                            $component_config,
+                            $current_values
+                        );
+                    } catch (Exception $e) {
+                        echo '<!-- Error rendering component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
+                    }
+                }
+                
+                // Allow plugins to add custom components via filter
+                $custom_components = apply_filters('ai_http_client_custom_components', array(), $args, $current_values);
+                foreach ($custom_components as $component_name) {
+                    $component_config = isset($args['component_configs'][$component_name]) 
+                        ? $args['component_configs'][$component_name] 
+                        : array();
+                    
+                    try {
+                        echo AI_HTTP_Component_Registry::render_component(
+                            $component_name,
+                            $unique_id,
+                            $component_config,
+                            $current_values
+                        );
+                    } catch (Exception $e) {
+                        echo '<!-- Error rendering custom component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
+                    }
+                }
+                
+                // Auto-discover any components registered via filters
+                $all_components = AI_HTTP_Component_Registry::get_all_components();
+                $rendered_components = array_merge(
+                    $args['components']['core'],
+                    $args['components']['extended'],
+                    $custom_components
+                );
+                
+                // Render any discovered components not already rendered
+                foreach ($all_components as $component_name => $component_class) {
+                    if (!in_array($component_name, $rendered_components)) {
+                        // Check if component should be auto-included
+                        $auto_include = apply_filters('ai_http_client_auto_include_component', false, $component_name, $args);
+                        
+                        if ($auto_include) {
+                            $component_config = isset($args['component_configs'][$component_name]) 
+                                ? $args['component_configs'][$component_name] 
+                                : array();
+                            
+                            try {
+                                echo AI_HTTP_Component_Registry::render_component(
+                                    $component_name,
+                                    $unique_id,
+                                    $component_config,
+                                    $current_values
+                                );
+                            } catch (Exception $e) {
+                                echo '<!-- Error rendering auto-discovered component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
+                            }
+                        }
+                    }
+                }
+                ?>
 
                 <?php if ($args['show_test_connection']): ?>
                     <!-- Test Connection -->
@@ -443,6 +465,13 @@ function ai_http_render_global_js() {
             resultSpan.textContent = data.success ? '✓ Connected' : '✗ ' + data.message;
             resultSpan.style.color = data.success ? '#00a32a' : '#d63638';
         });
+    }
+
+    function aiHttpUpdateTemperatureValue(componentId, value) {
+        const valueDisplay = document.getElementById(componentId + '_temperature_value');
+        if (valueDisplay) {
+            valueDisplay.textContent = value;
+        }
     }
     </script>
     <?php

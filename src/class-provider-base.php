@@ -60,7 +60,7 @@ abstract class AI_HTTP_Provider_Base {
      *
      * @param array $request Normalized request data for this provider
      * @param callable $callback Function to call for each streaming chunk
-     * @return void
+     * @return string Full response from streaming request
      */
     public function send_streaming_request($request, $callback) {
         throw new Exception('Streaming not supported by this provider');

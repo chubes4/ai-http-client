@@ -2,8 +2,8 @@
 /**
  * AI HTTP Client - Tool Executor
  * 
- * Single Responsibility: Execute tool calls and route to appropriate handlers
- * Handles built-in tools like web search and provides extension points for custom tools
+ * Single Responsibility: Route tool calls to registered handlers
+ * Provides clean extension points for plugins to register custom tools
  *
  * @package AIHttpClient\Utils
  * @author Chris Huber <https://chubes.net>
@@ -12,13 +12,6 @@
 defined('ABSPATH') || exit;
 
 class AI_HTTP_Tool_Executor {
-
-    /**
-     * Built-in tool handlers
-     */
-    private static $built_in_tools = array(
-        'web_search' => array('AI_HTTP_Web_Search_Client', 'execute_search_tool')
-    );
 
     /**
      * Custom tool handlers registered by plugins
@@ -35,19 +28,13 @@ class AI_HTTP_Tool_Executor {
      */
     public static function execute_tool($tool_name, $arguments = array(), $call_id = null) {
         try {
-            // Check built-in tools first
-            if (isset(self::$built_in_tools[$tool_name])) {
-                $handler = self::$built_in_tools[$tool_name];
-                return call_user_func($handler, $arguments);
-            }
-            
-            // Check custom tools
+            // Check registered custom tools
             if (isset(self::$custom_tools[$tool_name])) {
                 $handler = self::$custom_tools[$tool_name];
                 return call_user_func($handler, $arguments, $call_id);
             }
             
-            // Allow WordPress plugins to handle unknown tools
+            // Allow WordPress plugins to handle tools via filter
             $result = apply_filters('ai_http_client_execute_tool', null, $tool_name, $arguments, $call_id);
             if ($result !== null) {
                 return $result;
@@ -90,15 +77,12 @@ class AI_HTTP_Tool_Executor {
     }
 
     /**
-     * Get all available tools (built-in and custom)
+     * Get all available tools (registered tools only)
      *
      * @return array Available tool names
      */
     public static function get_available_tools() {
-        return array_merge(
-            array_keys(self::$built_in_tools),
-            array_keys(self::$custom_tools)
-        );
+        return array_keys(self::$custom_tools);
     }
 
     /**
@@ -108,8 +92,7 @@ class AI_HTTP_Tool_Executor {
      * @return bool True if tool is available
      */
     public static function is_tool_available($tool_name) {
-        return isset(self::$built_in_tools[$tool_name]) || 
-               isset(self::$custom_tools[$tool_name]) ||
+        return isset(self::$custom_tools[$tool_name]) ||
                has_filter('ai_http_client_execute_tool');
     }
 
@@ -120,13 +103,8 @@ class AI_HTTP_Tool_Executor {
      * @return array|null Tool definition or null if not found
      */
     public static function get_tool_definition($tool_name) {
-        switch ($tool_name) {
-            case 'web_search':
-                return AI_HTTP_Web_Search_Client::get_search_tool_definition();
-            default:
-                // Allow plugins to provide tool definitions
-                return apply_filters('ai_http_client_get_tool_definition', null, $tool_name);
-        }
+        // Allow plugins to provide tool definitions
+        return apply_filters('ai_http_client_get_tool_definition', null, $tool_name);
     }
 
     /**
@@ -136,14 +114,6 @@ class AI_HTTP_Tool_Executor {
      */
     public static function get_all_tool_definitions() {
         $definitions = array();
-        
-        // Built-in tools
-        foreach (array_keys(self::$built_in_tools) as $tool_name) {
-            $definition = self::get_tool_definition($tool_name);
-            if ($definition) {
-                $definitions[$tool_name] = $definition;
-            }
-        }
         
         // Allow plugins to add their tool definitions
         return apply_filters('ai_http_client_get_all_tool_definitions', $definitions);

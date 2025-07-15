@@ -79,13 +79,13 @@ if (!function_exists('ai_http_client_init')) {
         // 2.5. Shared utilities
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/StreamingClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/FileUploadClient.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/WebSearchClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ToolExecutor.php';
         
         
         // 3. Provider implementations (organized by provider)
         // OpenAI Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/ModelFetcher.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/RequestNormalizer.php';
@@ -93,6 +93,7 @@ if (!function_exists('ai_http_client_init')) {
         
         // Anthropic Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/ModelFetcher.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/RequestNormalizer.php';
@@ -100,6 +101,7 @@ if (!function_exists('ai_http_client_init')) {
         
         // Google Gemini Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/ModelFetcher.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/RequestNormalizer.php';
@@ -107,6 +109,7 @@ if (!function_exists('ai_http_client_init')) {
         
         // Grok/X.AI Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/ModelFetcher.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/RequestNormalizer.php';
@@ -114,6 +117,7 @@ if (!function_exists('ai_http_client_init')) {
         
         // OpenRouter Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/ModelFetcher.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/RequestNormalizer.php';
@@ -123,6 +127,20 @@ if (!function_exists('ai_http_client_init')) {
         
         // 4. Main orchestrator client
         require_once AI_HTTP_CLIENT_PATH . '/src/class-client.php';
+        
+        // 4.5. WordPress management components
+        require_once AI_HTTP_CLIENT_PATH . '/src/OptionsManager.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/PromptManager.php';
+        
+        // 4.6. UI Components system
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/ComponentInterface.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/ComponentRegistry.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Core/ProviderSelector.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Core/ApiKeyInput.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Core/ModelSelector.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/TemperatureSlider.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/SystemPromptField.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/ProviderManagerComponent.php';
         
         // 5. Hook into WordPress for any setup needed
         if (function_exists('add_action')) {

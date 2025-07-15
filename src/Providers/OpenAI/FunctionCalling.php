@@ -64,23 +64,6 @@ class AI_HTTP_OpenAI_Function_Calling {
             );
         }
         
-        // Handle Data Machine web search tool format
-        if (isset($tool['type']) && $tool['type'] === 'web_search_preview') {
-            $search_tool = AI_HTTP_Web_Search_Client::get_search_tool_definition();
-            return array(
-                'type' => 'function',
-                'function' => $search_tool
-            );
-        }
-        
-        // Handle standard web search tool
-        if (isset($tool['name']) && $tool['name'] === 'web_search') {
-            $search_tool = AI_HTTP_Web_Search_Client::get_search_tool_definition();
-            return array(
-                'type' => 'function',
-                'function' => $search_tool
-            );
-        }
         
         throw new Exception('Invalid tool definition for OpenAI format');
     }

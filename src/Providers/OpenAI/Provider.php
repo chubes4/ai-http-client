@@ -19,12 +19,11 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     private $api_key;
     private $organization;
     private $base_url = 'https://api.openai.com/v1';
-    private $model_fetcher;
+    private $last_response_id;
 
     protected function init() {
         $this->api_key = $this->get_config('api_key');
         $this->organization = $this->get_config('organization');
-        $this->model_fetcher = new AI_HTTP_Model_Fetcher();
         
         // Allow custom base URL for OpenAI-compatible APIs
         if ($this->get_config('base_url')) {
@@ -56,116 +55,22 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
 
     public function get_available_models() {
         if (!$this->is_configured()) {
-            return $this->get_fallback_models();
+            return array();
         }
 
         try {
-            // Fetch live models from OpenAI API
-            $models = $this->model_fetcher->fetch_models(
-                'openai',
-                $this->base_url . '/models',
-                $this->get_auth_headers(),
-                array($this, 'parse_models_response')
+            // Fetch live models from OpenAI API using dedicated module
+            return AI_HTTP_OpenAI_Model_Fetcher::fetch_models(
+                $this->base_url,
+                $this->get_auth_headers()
             );
 
-            return !empty($models) ? $models : $this->get_fallback_models();
-
         } catch (Exception $e) {
-            // Return fallback models if API call fails
-            return $this->get_fallback_models();
+            // Return empty array if API call fails - no fallbacks
+            return array();
         }
     }
 
-    /**
-     * Parse OpenAI models API response
-     *
-     * @param array $response Raw API response
-     * @return array Parsed models list
-     */
-    public function parse_models_response($response) {
-        $models = array();
-
-        if (!isset($response['data']) || !is_array($response['data'])) {
-            return $this->get_fallback_models();
-        }
-
-        foreach ($response['data'] as $model) {
-            if (!isset($model['id'])) {
-                continue;
-            }
-
-            $model_id = $model['id'];
-            
-            // Only include chat models (filter out embeddings, whisper, etc.)
-            if ($this->is_chat_model($model_id)) {
-                $models[$model_id] = $this->get_model_display_name($model_id);
-            }
-        }
-
-        // Ensure we have some models, fallback if API returned empty
-        return !empty($models) ? $models : $this->get_fallback_models();
-    }
-
-    /**
-     * Check if model ID is a chat model
-     *
-     * @param string $model_id Model ID
-     * @return bool True if it's a chat model
-     */
-    private function is_chat_model($model_id) {
-        $chat_patterns = array('gpt-', 'gpt4', 'chatgpt');
-        $exclude_patterns = array('embedding', 'whisper', 'tts', 'dall-e', 'davinci-edit');
-
-        // Exclude non-chat models
-        foreach ($exclude_patterns as $pattern) {
-            if (strpos($model_id, $pattern) !== false) {
-                return false;
-            }
-        }
-
-        // Include known chat model patterns
-        foreach ($chat_patterns as $pattern) {
-            if (strpos($model_id, $pattern) !== false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get display name for model
-     *
-     * @param string $model_id Model ID
-     * @return string Display name
-     */
-    private function get_model_display_name($model_id) {
-        $display_names = array(
-            'gpt-4' => 'GPT-4',
-            'gpt-4-turbo' => 'GPT-4 Turbo',
-            'gpt-4o' => 'GPT-4o',
-            'gpt-4o-mini' => 'GPT-4o Mini',
-            'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-            'gpt-3.5-turbo-16k' => 'GPT-3.5 Turbo 16K'
-        );
-
-        return isset($display_names[$model_id]) ? $display_names[$model_id] : ucfirst(str_replace('-', ' ', $model_id));
-    }
-
-    /**
-     * Get fallback models when API is unavailable
-     *
-     * @return array Fallback models list
-     */
-    private function get_fallback_models() {
-        return array(
-            'gpt-4o' => 'GPT-4o',
-            'gpt-4o-mini' => 'GPT-4o Mini',
-            'gpt-4-turbo' => 'GPT-4 Turbo',
-            'gpt-4' => 'GPT-4',
-            'gpt-3.5-turbo' => 'GPT-3.5 Turbo'
-        );
-    }
 
     public function test_connection() {
         if (!$this->is_configured()) {
@@ -271,40 +176,69 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
 
 
     /**
-     * Get pricing information for OpenAI models
+     * Continue conversation with tool results using OpenAI Responses API
+     * Based on Wordsurf's continuation pattern
      *
-     * @param string $model Model name
-     * @return array Pricing info
+     * @param string $response_id Previous response ID from OpenAI
+     * @param array $tool_results Array of tool results to continue with
+     * @param callable|null $callback Completion callback for streaming
+     * @return string Full response from continuation request
      */
-    public function get_model_pricing($model = null) {
-        $pricing = array(
-            'gpt-4' => array(
-                'input' => 0.03,   // per 1K tokens
-                'output' => 0.06
-            ),
-            'gpt-4-turbo' => array(
-                'input' => 0.01,
-                'output' => 0.03
-            ),
-            'gpt-4o' => array(
-                'input' => 0.005,
-                'output' => 0.015
-            ),
-            'gpt-4o-mini' => array(
-                'input' => 0.00015,
-                'output' => 0.0006
-            ),
-            'gpt-3.5-turbo' => array(
-                'input' => 0.0015,
-                'output' => 0.002
-            )
-        );
-
-        if ($model) {
-            return isset($pricing[$model]) ? $pricing[$model] : null;
+    public function continue_with_tool_results($response_id, $tool_results, $callback = null) {
+        if (empty($response_id)) {
+            throw new Exception('Response ID is required for continuation');
         }
-
-        return $pricing;
+        
+        // Format tool results as function_call_outputs for OpenAI Responses API
+        $function_call_outputs = array();
+        foreach ($tool_results as $result) {
+            $function_call_outputs[] = array(
+                'type' => 'function_call_output',
+                'call_id' => $result['tool_call_id'],
+                'output' => $result['content']
+            );
+        }
+        
+        $continuation_request = array(
+            'previous_response_id' => $response_id,
+            'input' => $function_call_outputs
+        );
+        
+        $url = $this->get_api_endpoint();
+        
+        if ($callback) {
+            return AI_HTTP_OpenAI_Streaming_Module::send_streaming_request(
+                $url,
+                $continuation_request,
+                $this->get_auth_headers(),
+                $callback,
+                $this->timeout
+            );
+        } else {
+            return $this->make_request($url, $continuation_request);
+        }
     }
+
+    /**
+     * Get the response ID from the last response
+     * Used for continuation tracking
+     *
+     * @return string|null Response ID or null if not available
+     */
+    public function get_last_response_id() {
+        // This will be set by the response normalizer after each request
+        return $this->last_response_id ?? null;
+    }
+
+    /**
+     * Set the response ID from a response
+     * Called by response normalizer
+     *
+     * @param string $response_id Response ID to store
+     */
+    public function set_last_response_id($response_id) {
+        $this->last_response_id = $response_id;
+    }
+
 
 }

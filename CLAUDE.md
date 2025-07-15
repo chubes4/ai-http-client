@@ -62,11 +62,12 @@ Following **Single Responsibility Principle**, each component has one clear job:
 - Handles provider selection via: `ai_http_client_selected_provider`
 - No styling - pure data management
 
-**`AI_HTTP_ProviderManager_Component`** (src/ProviderManagerComponent.php)
-- Renders complete provider configuration interface
-- Self-contained admin component for provider selection and API keys
+**`AI_HTTP_ProviderManager_Component`** (src/Components/ProviderManagerComponent.php)
+- Renders complete provider configuration interface using modular component system
+- Self-contained admin component with customizable UI components
 - Includes AJAX handlers for dynamic model loading
 - **No styles included** - plugin developers handle all CSS
+- Modular component architecture with core/extended components
 - Single static render method: `AI_HTTP_ProviderManager_Component::render()`
 
 **Provider Implementations** (src/Providers/*)
@@ -116,7 +117,13 @@ Following **Single Responsibility Principle**, each component has one clear job:
 - **Entry Point**: `ai-http-client.php` - loads all modular components in dependency order
 - **Core Classes**: `src/class-*.php` - base classes and main orchestrator
 - **Management**: `src/OptionsManager.php` - WordPress options storage
-- **UI Component**: `src/ProviderManagerComponent.php` - admin interface (no styles)
+- **Prompt Utilities**: `src/PromptManager.php` - generic prompt building with WordPress filters
+- **UI Components**: `src/Components/` - modular UI component system
+  - `ComponentInterface.php` - contract for all UI components
+  - `ComponentRegistry.php` - manages component registration and discovery
+  - `ProviderManagerComponent.php` - main UI wrapper component
+  - `Core/` - required UI components (provider selector, API key input, model selector)
+  - `Extended/` - optional UI components (temperature slider, system prompt field)
 - **Providers**: `src/Providers/` - provider management utilities and implementations
   - `src/Providers/ProviderRegistry.php` - discovers and manages providers
   - `src/Providers/ProviderFactory.php` - creates provider instances
@@ -130,9 +137,8 @@ Following **Single Responsibility Principle**, each component has one clear job:
     - `ResponseNormalizer.php` - response transformation
 - **Utils**: `src/Utils/` - shared utility classes
   - `StreamingClient.php` - cURL-based streaming for all providers
-  - `WebSearchClient.php` - universal web search integration
   - `FileUploadClient.php` - file upload handling for multi-modal
-  - `ToolExecutor.php` - centralized tool execution routing
+  - `ToolExecutor.php` - extensible tool execution routing (no built-in tools)
 
 ## Development Notes
 
@@ -146,11 +152,84 @@ Following **Single Responsibility Principle**, each component has one clear job:
 7. Add provider to `ai-http-client.php` loader (5 files to require_once)
 8. **Auto-discovered by ProviderRegistry** - no other changes needed
 
+### Adding Custom UI Components
+1. Create component class implementing `AI_HTTP_Component_Interface`
+2. Register component: `AI_HTTP_Component_Registry::register_component('name', 'Class')`
+3. Use component in UI: `'extended' => ['your_component_name']`
+4. Component values automatically saved to `ai_http_client_providers` option array
+
+### Using Modular UI Components
+```php
+// Basic usage - core components only
+echo AI_HTTP_ProviderManager_Component::render();
+
+// Advanced usage - custom components
+echo AI_HTTP_ProviderManager_Component::render([
+    'components' => [
+        'core' => ['provider_selector', 'api_key_input', 'model_selector'],
+        'extended' => ['temperature_slider', 'system_prompt_field']
+    ],
+    'component_configs' => [
+        'temperature_slider' => ['min' => 0, 'max' => 1, 'default_value' => 0.7]
+    ]
+]);
+```
+
 ### Dependency Injection Pattern
 - All components accept dependencies in constructor
 - Defaults provided for ease of use
 - Enables testing and extensibility
 - Example: `new AI_HTTP_Client($config, $custom_factory, $custom_normalizer)`
+
+### Continuation Support for Agentic Systems
+The library supports conversation continuation with tool results, enabling sophisticated agentic workflows:
+
+```php
+// Basic usage - send request and get response ID
+$response = $client->send_request($request);
+$response_id = $client->get_last_response_id();
+
+// Continue conversation with tool results
+$tool_results = [
+    [
+        'tool_call_id' => 'tool_123',
+        'content' => 'Tool execution result'
+    ]
+];
+
+$continuation = $client->continue_with_tool_results($response_id, $tool_results);
+```
+
+**OpenAI Responses API Support:**
+- Uses `previous_response_id` for continuation
+- Automatic response ID tracking via ResponseNormalizer
+- Streaming continuation support with completion callbacks
+- Compatible with Wordsurf's agentic patterns
+
+**Other Provider Support:**
+- Automatic message history building with tool results
+- Standardized continuation interface across all providers
+- Fallback to conversation rebuilding when continuation API unavailable
+
+### Prompt Building System
+```php
+// Build prompts using utilities with WordPress filters
+$system_prompt = AI_HTTP_Prompt_Manager::build_system_prompt(
+    'You are a helpful assistant',
+    ['user' => 'John', 'site' => 'example.com']
+);
+
+$user_prompt = AI_HTTP_Prompt_Manager::build_user_prompt(
+    'Hello {user}!',
+    ['user' => 'John']
+);
+
+$messages = AI_HTTP_Prompt_Manager::build_messages(
+    $system_prompt,
+    $user_prompt,
+    $conversation_history
+);
+```
 
 ### WordPress Integration
 - Uses WordPress HTTP API (`wp_remote_post`) instead of cURL for compatibility
@@ -165,6 +244,31 @@ Following **Single Responsibility Principle**, each component has one clear job:
 - **Admin Component**: Single component renders complete provider configuration interface
 - **No styling**: Plugin developers handle all CSS/styling needs
 - **Per-provider configuration**: Via WordPress filters for custom providers
+
+### WordPress Filters for Extensibility
+```php
+// Register components automatically
+add_filter('ai_http_client_register_components', function($components) {
+    $components['my_component'] = 'My_Component_Class';
+    return $components;
+});
+
+// Add components to UI
+add_filter('ai_http_client_custom_components', function($components) {
+    $components[] = 'my_component';
+    return $components;
+});
+
+// Customize prompts
+add_filter('ai_http_client_system_prompt', function($prompt, $context) {
+    return $prompt . "\n\nAdditional context: " . json_encode($context);
+}, 10, 2);
+
+// Variable replacement in prompts
+add_filter('ai_http_client_replace_variables', function($text, $variables) {
+    return str_replace(array_keys($variables), array_values($variables), $text);
+}, 10, 2);
+```
 
 ## Development Workflow
 
@@ -236,10 +340,10 @@ All major AI providers now implemented with full feature support:
 
 ### Advanced Features Implemented
 - **Multi-modal Support**: Images, files, PDFs across all compatible providers
-- **Universal Web Search**: Bing, Google, DuckDuckGo integration for fact-checking
 - **File Upload System**: Large file handling with WordPress integration
-- **Tool Execution Engine**: Centralized routing with plugin extensibility
+- **Tool Execution Engine**: Extensible routing system for plugin-defined tools
 - **No Hardcoded Models**: All models fetched dynamically from provider APIs
+- **Clean Extension Points**: WordPress filters for tools, providers, and configuration
 
 ### WordPress Integration Patterns
 - **HTTP API**: Uses `wp_remote_post()` for non-streaming, cURL for streaming
@@ -249,9 +353,9 @@ All major AI providers now implemented with full feature support:
 
 ## Target Plugin Integration
 This library was designed to support 4 specific WordPress plugins:
-1. **data-machine** - Multi-modal processing, file uploads, fact-checking tools
+1. **data-machine** - Multi-modal processing, file uploads, custom tool implementation
 2. **wordsurf** - SSE streaming, OpenAI Responses API, advanced tool calling  
 3. **automatic-cold-outreach** - Simple completions (already supported)
 4. **ai-bot-for-bbpress** - Standard completions (already supported)
 
-All target plugin patterns are now fully implemented and supported.
+All target plugin patterns are now fully implemented and supported. Plugins define their own tools via WordPress filters - no built-in tools included.

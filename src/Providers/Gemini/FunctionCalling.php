@@ -81,25 +81,6 @@ class AI_HTTP_Gemini_Function_Calling {
             );
         }
         
-        // Handle specialized tools (like Data Machine web search)
-        if (isset($tool['type']) && $tool['type'] === 'web_search_preview') {
-            $search_tool = AI_HTTP_Web_Search_Client::get_search_tool_definition();
-            return array(
-                'name' => $search_tool['name'],
-                'description' => $search_tool['description'],
-                'parameters' => $search_tool['parameters']
-            );
-        }
-        
-        // Handle standard web search tool
-        if (isset($tool['name']) && $tool['name'] === 'web_search') {
-            $search_tool = AI_HTTP_Web_Search_Client::get_search_tool_definition();
-            return array(
-                'name' => $search_tool['name'],
-                'description' => $search_tool['description'],
-                'parameters' => $search_tool['parameters']
-            );
-        }
         
         throw new Exception('Invalid tool definition for Gemini format');
     }

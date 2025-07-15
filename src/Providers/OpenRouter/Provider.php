@@ -139,49 +139,17 @@ class AI_HTTP_OpenRouter_Provider extends AI_HTTP_Provider_Base {
             return array();
         }
 
-        // Use cached models if available
-        $cached_models = get_transient('ai_http_openrouter_models');
-        if ($cached_models !== false) {
-            return $cached_models;
-        }
+        try {
+            // Fetch live models from OpenRouter API using dedicated module
+            return AI_HTTP_OpenRouter_Model_Fetcher::fetch_models(
+                $this->base_url,
+                $this->get_auth_headers()
+            );
 
-        // Fetch models from OpenRouter API
-        $models_url = $this->base_url . '/models';
-        $headers = array(
-            'Authorization' => 'Bearer ' . $this->api_key,
-            'Content-Type' => 'application/json'
-        );
-
-        $response = wp_remote_get($models_url, array(
-            'headers' => $headers,
-            'timeout' => 30,
-            'sslverify' => true
-        ));
-
-        if (is_wp_error($response)) {
-            error_log('OpenRouter models fetch error: ' . $response->get_error_message());
+        } catch (Exception $e) {
+            // Return empty array if API call fails - no fallbacks
             return array();
         }
-
-        $response_body = wp_remote_retrieve_body($response);
-        $decoded_response = json_decode($response_body, true);
-
-        if (!$decoded_response || !isset($decoded_response['data'])) {
-            return array();
-        }
-
-        // Format models for our system
-        $formatted_models = array();
-        foreach ($decoded_response['data'] as $model) {
-            if (isset($model['id']) && isset($model['name'])) {
-                $formatted_models[$model['id']] = $model['name'];
-            }
-        }
-
-        // Cache for 1 hour
-        set_transient('ai_http_openrouter_models', $formatted_models, HOUR_IN_SECONDS);
-
-        return $formatted_models;
     }
 
     /**

@@ -12,6 +12,23 @@ A professional WordPress library for unified AI provider communication. Drop-in 
 - ✅ Auto-discovery of providers
 - ✅ Standardized request/response formats
 - ✅ WordPress-native (no Composer, uses `wp_remote_post`)
+- ✅ Dynamic model fetching (no hardcoded models)
+
+## Installation
+
+### Method 1: Git Subtree (Recommended)
+Install as a subtree in your plugin for automatic updates:
+
+```bash
+# From your plugin root directory
+git subtree add --prefix=lib/ai-http-client https://github.com/chubes/ai-http-client.git main --squash
+
+# To update later
+git subtree pull --prefix=lib/ai-http-client https://github.com/chubes/ai-http-client.git main --squash
+```
+
+### Method 2: Direct Download
+Download and place in your plugin's `/lib/ai-http-client/` directory.
 
 ## Quick Start
 
@@ -23,8 +40,19 @@ require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php'
 
 ### 2. Add Admin UI Component
 ```php
-// In your admin page
+// Basic usage
 echo AI_HTTP_ProviderManager_Component::render();
+
+// Customized component
+echo AI_HTTP_ProviderManager_Component::render([
+    'components' => [
+        'core' => ['provider_selector', 'api_key_input', 'model_selector'],
+        'extended' => ['temperature_slider', 'system_prompt_field']
+    ],
+    'component_configs' => [
+        'temperature_slider' => ['min' => 0, 'max' => 1, 'default_value' => 0.7]
+    ]
+]);
 ```
 
 ### 3. Send AI Requests
@@ -43,13 +71,28 @@ if ($response['success']) {
 }
 ```
 
+### 4. Continuation Support (For Agentic Systems)
+```php
+// Send initial request with tools
+$response = $client->send_request([
+    'messages' => [['role' => 'user', 'content' => 'What is the weather?']],
+    'tools' => $tool_schemas
+]);
+
+// Continue with tool results
+$response_id = $client->get_last_response_id();
+$continuation = $client->continue_with_tool_results($response_id, $tool_results);
+```
+
 ## Supported Providers
 
-- **OpenAI** (GPT-4, GPT-3.5 Turbo)
-- **Anthropic** (Claude 3.5 Sonnet, Claude 3 Opus)
-- **Google Gemini** (Coming Soon)
-- **Grok** (Coming Soon)
-- **OpenRouter** (Coming Soon)
+All providers support **dynamic model fetching** - no hardcoded model lists. Models are fetched live from each provider's API.
+
+- **OpenAI** - All models via dynamic API fetching
+- **Anthropic** - All Claude models 
+- **Google Gemini** - All Gemini models via dynamic API fetching
+- **Grok/X.AI** - All Grok models via dynamic API fetching
+- **OpenRouter** - 200+ models via unified API
 
 ## Architecture
 
@@ -59,12 +102,44 @@ if ($response['success']) {
 
 **WordPress-Native** - Uses WordPress HTTP API, options system, and admin patterns
 
+## Component Configuration
+
+The admin UI component is fully configurable:
+
+```php
+// Available core components
+'core' => [
+    'provider_selector',  // Dropdown to select provider
+    'api_key_input',     // Secure API key input
+    'model_selector'     // Dynamic model dropdown
+]
+
+// Available extended components  
+'extended' => [
+    'temperature_slider',    // Temperature control (0-1)
+    'system_prompt_field',   // System prompt textarea
+    'max_tokens_input',      // Max tokens input
+    'top_p_slider'          // Top P control
+]
+
+// Component-specific configs
+'component_configs' => [
+    'temperature_slider' => [
+        'min' => 0,
+        'max' => 1, 
+        'step' => 0.1,
+        'default_value' => 0.7
+    ]
+]
+```
+
 ## Distribution Model
 
 Designed for **git subtree inclusion** like Action Scheduler:
 - No external dependencies
 - Version conflict resolution
 - Multiple plugins can include different versions safely
+- Automatic updates via `git subtree pull`
 
 ## For Advanced Developers Only
 

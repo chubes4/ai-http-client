@@ -34,9 +34,15 @@ class AI_HTTP_Normalizer_Factory {
      * Get response normalizer for specific provider
      *
      * @param string $provider_name Provider name
+     * @param object|null $provider_instance Provider instance for continuation support
      * @return object|null Provider-specific response normalizer
      */
-    public static function get_response_normalizer($provider_name) {
+    public static function get_response_normalizer($provider_name, $provider_instance = null) {
+        // Don't cache if provider instance is provided (for continuation support)
+        if ($provider_instance) {
+            return self::create_response_normalizer($provider_name, $provider_instance);
+        }
+        
         if (!isset(self::$response_normalizers[$provider_name])) {
             self::$response_normalizers[$provider_name] = self::create_response_normalizer($provider_name);
         }
@@ -65,13 +71,14 @@ class AI_HTTP_Normalizer_Factory {
      * Create response normalizer for provider
      *
      * @param string $provider_name Provider name
+     * @param object|null $provider_instance Provider instance for continuation support
      * @return object|null Response normalizer instance
      */
-    private static function create_response_normalizer($provider_name) {
+    private static function create_response_normalizer($provider_name, $provider_instance = null) {
         $class_name = 'AI_HTTP_' . ucfirst($provider_name) . '_Response_Normalizer';
         
         if (class_exists($class_name)) {
-            return new $class_name();
+            return new $class_name($provider_instance);
         }
 
         // Fallback to generic normalizer

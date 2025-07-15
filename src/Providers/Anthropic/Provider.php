@@ -53,26 +53,20 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
 
     public function get_available_models() {
         if (!$this->is_configured()) {
-            return $this->get_fallback_models();
+            return array();
         }
 
-        // Anthropic doesn't have a models endpoint, return known models
-        return $this->get_fallback_models();
-    }
+        try {
+            // Anthropic doesn't have a models endpoint, ModelFetcher will throw exception
+            return AI_HTTP_Anthropic_Model_Fetcher::fetch_models(
+                $this->base_url,
+                $this->get_auth_headers()
+            );
 
-    /**
-     * Get fallback models for Anthropic
-     *
-     * @return array Fallback models list
-     */
-    private function get_fallback_models() {
-        return array(
-            'claude-3-5-sonnet-20241022' => 'Claude 3.5 Sonnet',
-            'claude-3-5-haiku-20241022' => 'Claude 3.5 Haiku',
-            'claude-3-opus-20240229' => 'Claude 3 Opus',
-            'claude-3-sonnet-20240229' => 'Claude 3 Sonnet',
-            'claude-3-haiku-20240307' => 'Claude 3 Haiku'
-        );
+        } catch (Exception $e) {
+            // Return empty array if API call fails - no fallbacks
+            return array();
+        }
     }
 
     public function test_connection() {
@@ -204,41 +198,5 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         return $request;
     }
 
-    /**
-     * Get pricing information for Anthropic models
-     *
-     * @param string $model Model name
-     * @return array Pricing info
-     */
-    public function get_model_pricing($model = null) {
-        $pricing = array(
-            'claude-3-5-sonnet-20241022' => array(
-                'input' => 0.003,   // per 1K tokens
-                'output' => 0.015
-            ),
-            'claude-3-5-haiku-20241022' => array(
-                'input' => 0.0008,
-                'output' => 0.004
-            ),
-            'claude-3-opus-20240229' => array(
-                'input' => 0.015,
-                'output' => 0.075
-            ),
-            'claude-3-sonnet-20240229' => array(
-                'input' => 0.003,
-                'output' => 0.015
-            ),
-            'claude-3-haiku-20240307' => array(
-                'input' => 0.00025,
-                'output' => 0.00125
-            )
-        );
-
-        if ($model) {
-            return isset($pricing[$model]) ? $pricing[$model] : null;
-        }
-
-        return $pricing;
-    }
 
 }
