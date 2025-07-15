@@ -301,6 +301,18 @@ class AI_HTTP_ProviderManager_Component {
                     if (data.success) {
                         resultSpan.textContent = '✓ Settings saved';
                         resultSpan.style.color = '#00a32a';
+                        
+                        // Update provider status after successful save
+                        const apiKeyInput = document.getElementById(componentId + '_api_key');
+                        const providerStatusSpan = document.getElementById(componentId + '_provider_status');
+                        if (providerStatusSpan && apiKeyInput) {
+                            const apiKeyValue = apiKeyInput.value.trim();
+                            if (apiKeyValue) {
+                                providerStatusSpan.innerHTML = '<span style="color: #00a32a;">✓ Configured</span>';
+                            } else {
+                                providerStatusSpan.innerHTML = '<span style="color: #d63638;">⚠ Not configured</span>';
+                            }
+                        }
                     } else {
                         resultSpan.textContent = '✗ Save failed: ' + (data.message || 'Unknown error');
                         resultSpan.style.color = '#d63638';
