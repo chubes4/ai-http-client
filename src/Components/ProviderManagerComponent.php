@@ -20,11 +20,6 @@ class AI_HTTP_ProviderManager_Component {
     public function __construct() {
         $this->options_manager = new AI_HTTP_Options_Manager();
         $this->client = new AI_HTTP_Client();
-        
-        // Register AJAX handlers on first instantiation
-        if (self::$instance_count === 0) {
-            $this->register_ajax_handlers();
-        }
         self::$instance_count++;
     }
 
@@ -149,14 +144,19 @@ class AI_HTTP_ProviderManager_Component {
                 </div>
 
                 <?php if ($args['show_test_connection']): ?>
-                    <!-- Test Connection -->
-                    <div class="ai-field-group">
-                        <button type="button" class="ai-test-connection" 
-                                onclick="aiHttpTestConnection('<?php echo esc_attr($unique_id); ?>')">
-                            Test Connection
-                        </button>
-                        <span class="ai-test-result" id="<?php echo esc_attr($unique_id); ?>_test_result"></span>
-                    </div>
+                    <?php
+                    // Render TestConnection component
+                    try {
+                        echo AI_HTTP_Component_Registry::render_component(
+                            'test_connection',
+                            $unique_id,
+                            [],
+                            $current_values
+                        );
+                    } catch (Exception $e) {
+                        echo '<!-- Error rendering test connection component: ' . esc_html($e->getMessage()) . ' -->';
+                    }
+                    ?>
                 <?php endif; ?>
 
             </div>
@@ -393,86 +393,6 @@ class AI_HTTP_ProviderManager_Component {
     }
 
 
-    /**
-     * Register AJAX handlers
-     */
-    private function register_ajax_handlers() {
-        add_action('wp_ajax_ai_http_save_settings', array($this, 'ajax_save_settings'));
-        add_action('wp_ajax_ai_http_get_models', array($this, 'ajax_get_models'));
-        add_action('wp_ajax_ai_http_test_connection', array($this, 'ajax_test_connection'));
-    }
-
-    /**
-     * AJAX: Save settings
-     */
-    public function ajax_save_settings() {
-        check_ajax_referer('ai_http_nonce', 'nonce');
-        
-        $provider = sanitize_text_field($_POST['ai_provider']);
-        $settings = array(
-            'api_key' => sanitize_text_field($_POST['ai_api_key']),
-            'model' => sanitize_text_field($_POST['ai_model']),
-            'temperature' => isset($_POST['ai_temperature']) ? floatval($_POST['ai_temperature']) : null,
-            'system_prompt' => isset($_POST['ai_system_prompt']) ? sanitize_textarea_field($_POST['ai_system_prompt']) : '',
-            'instructions' => isset($_POST['instructions']) ? sanitize_textarea_field($_POST['instructions']) : ''
-        );
-
-        // Handle custom fields
-        foreach ($_POST as $key => $value) {
-            if (strpos($key, 'custom_') === 0) {
-                $settings[$key] = sanitize_text_field($value);
-            }
-        }
-
-        $this->options_manager->save_provider_settings($provider, $settings);
-        $this->options_manager->set_selected_provider($provider);
-
-        wp_send_json_success('Settings saved');
-    }
-
-    /**
-     * AJAX: Get models for provider
-     */
-    public function ajax_get_models() {
-        check_ajax_referer('ai_http_nonce', 'nonce');
-        
-        $provider = sanitize_text_field($_POST['provider']);
-        
-        try {
-            $models = $this->client->get_models($provider);
-            if (empty($models)) {
-                wp_send_json_error('No models available for ' . $provider . '. Check API key configuration.');
-                return;
-            }
-        } catch (Exception $e) {
-            error_log('AI HTTP Client: Model fetch AJAX failed: ' . $e->getMessage());
-            wp_send_json_error('Failed to fetch models: ' . $e->getMessage());
-            return;
-        }
-        
-        wp_send_json_success($models);
-    }
-
-    /**
-     * AJAX: Test connection
-     */
-    public function ajax_test_connection() {
-        check_ajax_referer('ai_http_nonce', 'nonce');
-        
-        $provider = sanitize_text_field($_POST['provider']);
-        
-        try {
-            $result = $this->client->test_connection($provider);
-        } catch (Exception $e) {
-            error_log('AI HTTP Client: Connection test AJAX failed: ' . $e->getMessage());
-            $result = array(
-                'success' => false,
-                'message' => 'Test failed: ' . $e->getMessage()
-            );
-        }
-        
-        wp_send_json($result);
-    }
 }
 
 // Global JavaScript functions for component functionality

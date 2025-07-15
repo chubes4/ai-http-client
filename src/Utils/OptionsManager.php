@@ -331,4 +331,49 @@ class AI_HTTP_Options_Manager {
         $decoded = base64_decode($encrypted_key);
         return $decoded ^ str_repeat($key, ceil(strlen($decoded) / strlen($key)));
     }
+    
+    /**
+     * Initialize AJAX handlers for settings management
+     */
+    public static function init_ajax_handlers() {
+        add_action('wp_ajax_ai_http_save_settings', [__CLASS__, 'ajax_save_settings']);
+    }
+    
+    /**
+     * AJAX handler for saving settings
+     */
+    public static function ajax_save_settings() {
+        check_ajax_referer('ai_http_nonce', 'nonce');
+        
+        try {
+            $provider = sanitize_text_field($_POST['ai_provider']);
+            $settings = array(
+                'api_key' => sanitize_text_field($_POST['ai_api_key']),
+                'model' => sanitize_text_field($_POST['ai_model']),
+                'temperature' => isset($_POST['ai_temperature']) ? floatval($_POST['ai_temperature']) : null,
+                'system_prompt' => isset($_POST['ai_system_prompt']) ? sanitize_textarea_field($_POST['ai_system_prompt']) : '',
+                'instructions' => isset($_POST['instructions']) ? sanitize_textarea_field($_POST['instructions']) : ''
+            );
+
+            // Handle custom fields
+            foreach ($_POST as $key => $value) {
+                if (strpos($key, 'custom_') === 0) {
+                    $settings[$key] = sanitize_text_field($value);
+                }
+            }
+
+            $options_manager = new self();
+            $options_manager->save_provider_settings($provider, $settings);
+            $options_manager->set_selected_provider($provider);
+
+            wp_send_json_success('Settings saved');
+            
+        } catch (Exception $e) {
+            error_log('AI HTTP Client: Save settings AJAX failed: ' . $e->getMessage());
+            wp_send_json_error('Save failed: ' . $e->getMessage());
+        }
+    }
 }
+
+// Initialize AJAX handlers
+add_action('init', ['AI_HTTP_Options_Manager', 'init_ajax_handlers']);
