@@ -2,10 +2,10 @@
 /**
  * AI HTTP Client - Streaming HTTP Client
  * 
- * Single Responsibility: Handle streaming HTTP requests with cURL
- * Based on proven Wordsurf streaming implementation
+ * Single Responsibility: Handle basic streaming HTTP requests with cURL
+ * Provider-agnostic - each provider handles its own SSE parsing
  *
- * @package AIHttpClient\Streaming
+ * @package AIHttpClient\Utils
  * @author Chris Huber <https://chubes.net>
  */
 
@@ -15,7 +15,7 @@ class AI_HTTP_Streaming_Client {
 
     /**
      * Stream HTTP POST request using cURL with real-time output
-     * Based on Wordsurf's proven streaming implementation
+     * Provider-agnostic - streams raw data directly to output buffer
      *
      * @param string $url Request URL
      * @param array $body Request body
@@ -34,7 +34,6 @@ class AI_HTTP_Streaming_Client {
         $body['stream'] = true;
         
         $full_response = '';
-        $stream_completed = false;
         
         // Convert headers array to cURL format
         $curl_headers = array();
@@ -50,8 +49,8 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_HTTPHEADER => $curl_headers,
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => wp_json_encode($body),
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$stream_completed, $completion_callback) {
-                // Stream the raw data directly to output buffer (like Wordsurf)
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
+                // Stream the raw data directly to output buffer
                 echo $data;
                 
                 // Flush immediately for real-time streaming
@@ -59,11 +58,6 @@ class AI_HTTP_Streaming_Client {
                 
                 // Accumulate for completion callback
                 $full_response .= $data;
-                
-                // Check for stream completion
-                if (strpos($data, 'data: [DONE]') !== false) {
-                    $stream_completed = true;
-                }
                 
                 return strlen($data);
             },
@@ -89,7 +83,7 @@ class AI_HTTP_Streaming_Client {
             throw new Exception("HTTP {$http_code} streaming error");
         }
         
-        // Call completion callback if provided (like Wordsurf)
+        // Call completion callback if provided
         if ($completion_callback && is_callable($completion_callback)) {
             try {
                 call_user_func($completion_callback, $full_response);
@@ -102,7 +96,7 @@ class AI_HTTP_Streaming_Client {
     }
 
     /**
-     * Flush output buffer immediately (from Wordsurf pattern)
+     * Flush output buffer immediately
      */
     private static function flush_output() {
         if (ob_get_level() > 0) {
@@ -118,26 +112,5 @@ class AI_HTTP_Streaming_Client {
      */
     public static function is_streaming_available() {
         return function_exists('curl_init') && function_exists('curl_setopt');
-    }
-
-    /**
-     * Get streaming capability info
-     *
-     * @return array Capability information
-     */
-    public static function get_streaming_info() {
-        $info = [
-            'available' => self::is_streaming_available(),
-            'curl_version' => null,
-            'openssl_version' => null
-        ];
-
-        if (function_exists('curl_version')) {
-            $curl_info = curl_version();
-            $info['curl_version'] = $curl_info['version'] ?? 'unknown';
-            $info['openssl_version'] = $curl_info['ssl_version'] ?? 'unknown';
-        }
-
-        return $info;
     }
 }
