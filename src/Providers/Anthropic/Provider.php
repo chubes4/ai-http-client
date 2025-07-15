@@ -64,7 +64,10 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
             );
 
         } catch (Exception $e) {
-            // Return empty array if API call fails - no fallbacks
+            // Log error for debugging
+            if (function_exists('error_log')) {
+                error_log('AI HTTP Client: Anthropic model fetch failed: ' . $e->getMessage());
+            }
             return array();
         }
     }

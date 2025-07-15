@@ -137,40 +137,16 @@ class AI_HTTP_ProviderManager_Component {
                         echo '<!-- Error rendering custom component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
                     }
                 }
-                
-                // Auto-discover any components registered via filters
-                $all_components = AI_HTTP_Component_Registry::get_all_components();
-                $rendered_components = array_merge(
-                    $args['components']['core'],
-                    $args['components']['extended'],
-                    $custom_components
-                );
-                
-                // Render any discovered components not already rendered
-                foreach ($all_components as $component_name => $component_class) {
-                    if (!in_array($component_name, $rendered_components)) {
-                        // Check if component should be auto-included
-                        $auto_include = apply_filters('ai_http_client_auto_include_component', false, $component_name, $args);
-                        
-                        if ($auto_include) {
-                            $component_config = isset($args['component_configs'][$component_name]) 
-                                ? $args['component_configs'][$component_name] 
-                                : array();
-                            
-                            try {
-                                echo AI_HTTP_Component_Registry::render_component(
-                                    $component_name,
-                                    $unique_id,
-                                    $component_config,
-                                    $current_values
-                                );
-                            } catch (Exception $e) {
-                                echo '<!-- Error rendering auto-discovered component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
-                            }
-                        }
-                    }
-                }
                 ?>
+
+                <!-- Save Button -->
+                <div class="ai-field-group">
+                    <button type="button" class="ai-save-settings" 
+                            onclick="aiHttpSaveSettings('<?php echo esc_attr($unique_id); ?>')">
+                        Save Settings
+                    </button>
+                    <span class="ai-save-result" id="<?php echo esc_attr($unique_id); ?>_save_result"></span>
+                </div>
 
                 <?php if ($args['show_test_connection']): ?>
                     <!-- Test Connection -->
@@ -183,11 +159,6 @@ class AI_HTTP_ProviderManager_Component {
                     </div>
                 <?php endif; ?>
 
-                <!-- Auto-save Status -->
-                <div class="ai-save-status" id="<?php echo esc_attr($unique_id); ?>_save_status" style="display: none;">
-                    Settings saved ✓
-                </div>
-
             </div>
         </div>
 
@@ -195,9 +166,6 @@ class AI_HTTP_ProviderManager_Component {
         <?php echo $this->render_javascript($unique_id); ?>
         </script>
 
-        <style>
-        <?php echo $this->render_basic_styles(); ?>
-        </style>
         
         <?php
         // Ensure global JavaScript functions are available
@@ -287,17 +255,14 @@ class AI_HTTP_ProviderManager_Component {
      */
     private function render_javascript($unique_id) {
         return "
-        // Auto-save on input change
-        document.querySelectorAll('#$unique_id input, #$unique_id select, #$unique_id textarea').forEach(function(input) {
-            input.addEventListener('change', function() {
-                aiHttpAutoSave('$unique_id');
+        // Provider change handler - just refresh models, no auto-save
+        const providerSelect = document.getElementById('{$unique_id}_provider');
+        if (providerSelect) {
+            providerSelect.addEventListener('change', function() {
+                aiHttpProviderChanged('$unique_id', this.value);
             });
-        });
+        }
 
-        // Provider change handler
-        document.getElementById('{$unique_id}_provider').addEventListener('change', function() {
-            aiHttpProviderChanged('$unique_id', this.value);
-        });
         ";
     }
 
@@ -314,7 +279,7 @@ class AI_HTTP_ProviderManager_Component {
         ?>
         <script>
         // Global AI HTTP Client JavaScript functions
-        function aiHttpAutoSave(componentId) {
+        function aiHttpSaveSettings(componentId) {
             const component = document.getElementById(componentId);
             const formData = new FormData();
             
@@ -331,23 +296,31 @@ class AI_HTTP_ProviderManager_Component {
                 method: 'POST',
                 body: formData
             }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    const status = document.getElementById(componentId + '_save_status');
-                    if (status) {
-                        status.style.display = 'block';
-                        setTimeout(() => status.style.display = 'none', 2000);
+                const resultSpan = document.getElementById(componentId + '_save_result');
+                if (resultSpan) {
+                    if (data.success) {
+                        resultSpan.textContent = '✓ Settings saved';
+                        resultSpan.style.color = '#00a32a';
+                    } else {
+                        resultSpan.textContent = '✗ Save failed: ' + (data.message || 'Unknown error');
+                        resultSpan.style.color = '#d63638';
                     }
+                    setTimeout(() => resultSpan.textContent = '', 3000);
                 }
             }).catch(error => {
                 console.error('AI HTTP Client: Save failed', error);
+                const resultSpan = document.getElementById(componentId + '_save_result');
+                if (resultSpan) {
+                    resultSpan.textContent = '✗ Save failed';
+                    resultSpan.style.color = '#d63638';
+                    setTimeout(() => resultSpan.textContent = '', 3000);
+                }
             });
         }
 
         function aiHttpProviderChanged(componentId, provider) {
-            // Update models when provider changes
+            // Update models when provider changes - NO auto-save
             aiHttpRefreshModels(componentId, provider);
-            // Auto-save the provider change
-            setTimeout(() => aiHttpAutoSave(componentId), 500); // Brief delay to let model loading start
         }
 
         function aiHttpToggleKeyVisibility(inputId) {
@@ -419,37 +392,6 @@ class AI_HTTP_ProviderManager_Component {
         <?php
     }
 
-    /**
-     * Render basic styles (minimal, unstyled approach)
-     */
-    private function render_basic_styles() {
-        return "
-        .ai-provider-form .ai-field-group {
-            margin-bottom: 15px;
-        }
-        .ai-provider-form label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .ai-provider-form input, .ai-provider-form select, .ai-provider-form textarea {
-            width: 100%;
-            max-width: 400px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .ai-provider-status {
-            margin-left: 10px;
-            font-size: 14px;
-        }
-        .ai-save-status {
-            color: #00a32a;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        ";
-    }
 
     /**
      * Register AJAX handlers
@@ -543,10 +485,6 @@ function ai_http_render_global_js() {
         });
     }
 
-    function aiHttpProviderChanged(componentId, provider) {
-        // Handle provider change
-        location.reload(); // Simple approach - reload to update UI
-    }
 
     function aiHttpToggleKeyVisibility(inputId) {
         const input = document.getElementById(inputId);
