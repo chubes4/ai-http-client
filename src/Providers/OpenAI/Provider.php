@@ -46,8 +46,30 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         
         // Use completion callback for tool processing (like Wordsurf)
         $completion_callback = function($full_response) use ($callback) {
-            // Future: Add tool processing here
-            // For now, just indicate completion
+            // Process tool calls if any were found in the response
+            $tool_calls = AI_HTTP_Tool_Call_Processor::extract_tool_calls($full_response, 'openai');
+            
+            if (!empty($tool_calls)) {
+                // Send tool results as SSE events (like Wordsurf)
+                foreach ($tool_calls as $tool_call) {
+                    $tool_result = [
+                        'tool_call_id' => $tool_call['id'],
+                        'tool_name' => $tool_call['function']['name'],
+                        'arguments' => $tool_call['function']['arguments'],
+                        'provider' => 'openai'
+                    ];
+                    
+                    echo "event: tool_result\n";
+                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
+                    
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
+                }
+            }
+            
+            // Indicate completion
             if (is_callable($callback)) {
                 call_user_func($callback, "data: [DONE]\n\n");
             }

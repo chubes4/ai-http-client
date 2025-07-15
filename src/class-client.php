@@ -121,6 +121,39 @@ class AI_HTTP_Client {
     }
 
     /**
+     * Check if streaming is available
+     *
+     * @return bool True if streaming is supported
+     */
+    public function is_streaming_available() {
+        return AI_HTTP_Streaming_Client::is_streaming_available();
+    }
+
+    /**
+     * Validate and normalize tools for function calling
+     *
+     * @param array $tools Array of tool definitions
+     * @param string $provider_name Provider to normalize for
+     * @return array Normalized tools
+     */
+    public function normalize_tools($tools, $provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        return AI_HTTP_Tool_Normalizer::normalize_for_provider($tools, $provider_name);
+    }
+
+    /**
+     * Extract tool calls from streaming response
+     *
+     * @param string $streaming_response Full streaming response
+     * @param string $provider_name Provider name
+     * @return array Extracted tool calls
+     */
+    public function extract_tool_calls($streaming_response, $provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        return AI_HTTP_Tool_Call_Processor::extract_tool_calls($streaming_response, $provider_name);
+    }
+
+    /**
      * Process request through the modular pipeline
      *
      * @param array $request Standardized request

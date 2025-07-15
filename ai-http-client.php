@@ -80,6 +80,10 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/Streaming/StreamingClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Streaming/SSEParser.php';
         
+        // 2.6. Tool calling utilities
+        require_once AI_HTTP_CLIENT_PATH . '/src/ToolCalling/ToolCallProcessor.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/ToolCalling/ToolNormalizer.php';
+        
         // 3. Provider implementations (organized by provider)
         // OpenAI Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/Provider.php';

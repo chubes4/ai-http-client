@@ -50,7 +50,7 @@ class AI_HTTP_Anthropic_Request_Normalizer {
 
         // Handle tools for function calling
         if (isset($normalized['tools']) && is_array($normalized['tools'])) {
-            $normalized['tools'] = $this->normalize_tools($normalized['tools']);
+            $normalized['tools'] = AI_HTTP_Tool_Normalizer::normalize_for_provider($normalized['tools'], 'anthropic');
         }
 
         return $normalized;
@@ -88,27 +88,4 @@ class AI_HTTP_Anthropic_Request_Normalizer {
         return $request;
     }
 
-    /**
-     * Normalize tool/function definitions for Anthropic
-     * Anthropic uses a different format for tools than OpenAI
-     *
-     * @param array $tools Tools array
-     * @return array Normalized tools for Anthropic
-     */
-    private function normalize_tools($tools) {
-        $normalized = array();
-
-        foreach ($tools as $tool) {
-            if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
-                // Anthropic tool format
-                $normalized[] = array(
-                    'name' => sanitize_text_field($tool['function']['name']),
-                    'description' => sanitize_textarea_field($tool['function']['description']),
-                    'input_schema' => $tool['function']['parameters'] // Anthropic uses input_schema instead of parameters
-                );
-            }
-        }
-
-        return $normalized;
-    }
 }
