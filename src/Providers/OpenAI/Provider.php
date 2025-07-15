@@ -66,7 +66,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             );
 
         } catch (Exception $e) {
-            // Return empty array if API call fails - no fallbacks
+            // Log error for debugging
+            if (function_exists('error_log')) {
+                error_log('AI HTTP Client: OpenAI model fetch failed: ' . $e->getMessage());
+            }
             return array();
         }
     }
@@ -109,7 +112,13 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     }
 
     public function is_configured() {
-        return !empty($this->api_key);
+        $configured = !empty($this->api_key);
+        
+        if (!$configured && function_exists('error_log')) {
+            error_log('AI HTTP Client: OpenAI provider not configured - missing API key');
+        }
+        
+        return $configured;
     }
 
     protected function get_api_endpoint($model = null) {
