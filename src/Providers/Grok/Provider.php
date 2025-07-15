@@ -150,7 +150,7 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
      *
      * @return string API endpoint URL
      */
-    protected function get_api_endpoint() {
+    protected function get_api_endpoint($model = null) {
         return $this->base_url . '/chat/completions';
     }
 
