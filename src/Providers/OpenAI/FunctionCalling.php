@@ -34,38 +34,33 @@ class AI_HTTP_OpenAI_Function_Calling {
     }
 
     /**
-     * Normalize a single tool to OpenAI format
+     * Normalize a single tool to OpenAI Responses API format
      *
      * @param array $tool Tool definition
-     * @return array OpenAI-formatted tool
+     * @return array OpenAI Responses API formatted tool
      */
     private static function normalize_single_tool($tool) {
-        // Handle if tool is already in OpenAI format
+        // Handle if tool is in Chat Completions format (nested function object)
         if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
             return array(
+                'name' => sanitize_text_field($tool['function']['name']),
                 'type' => 'function',
-                'function' => array(
-                    'name' => sanitize_text_field($tool['function']['name']),
-                    'description' => sanitize_textarea_field($tool['function']['description']),
-                    'parameters' => $tool['function']['parameters'] ?? array()
-                )
+                'description' => sanitize_textarea_field($tool['function']['description']),
+                'parameters' => $tool['function']['parameters'] ?? array()
             );
         }
         
-        // Handle direct function definition
+        // Handle direct function definition (already flat)
         if (isset($tool['name']) && isset($tool['description'])) {
             return array(
+                'name' => sanitize_text_field($tool['name']),
                 'type' => 'function',
-                'function' => array(
-                    'name' => sanitize_text_field($tool['name']),
-                    'description' => sanitize_textarea_field($tool['description']),
-                    'parameters' => $tool['parameters'] ?? array()
-                )
+                'description' => sanitize_textarea_field($tool['description']),
+                'parameters' => $tool['parameters'] ?? array()
             );
         }
         
-        
-        throw new Exception('Invalid tool definition for OpenAI format');
+        throw new Exception('Invalid tool definition for OpenAI Responses API format');
     }
 
     /**
