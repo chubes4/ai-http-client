@@ -55,6 +55,18 @@ abstract class AI_HTTP_Provider_Base {
     abstract public function send_request($request);
 
     /**
+     * Send streaming HTTP request to the provider's API
+     * Must be implemented by each provider that supports streaming
+     *
+     * @param array $request Normalized request data for this provider
+     * @param callable $callback Function to call for each streaming chunk
+     * @return void
+     */
+    public function send_streaming_request($request, $callback) {
+        throw new Exception('Streaming not supported by this provider');
+    }
+
+    /**
      * Get available models for this provider
      * Must be implemented by each provider
      *

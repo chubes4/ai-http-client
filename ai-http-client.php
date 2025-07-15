@@ -76,6 +76,10 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/GenericRequestNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/GenericResponseNormalizer.php';
         
+        // 2.5. Streaming utilities
+        require_once AI_HTTP_CLIENT_PATH . '/src/Streaming/StreamingClient.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Streaming/SSEParser.php';
+        
         // 3. Provider implementations (organized by provider)
         // OpenAI Provider
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/Provider.php';

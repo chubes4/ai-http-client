@@ -39,6 +39,35 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         return $this->make_request($url, $request);
     }
 
+    public function send_streaming_request($request, $callback) {
+        $request = $this->sanitize_request($request);
+        
+        $url = $this->get_api_endpoint();
+        
+        // Use completion callback for tool processing (like Wordsurf)
+        $completion_callback = function($full_response) use ($callback) {
+            // Future: Add tool processing here
+            // For now, just indicate completion
+            if (is_callable($callback)) {
+                call_user_func($callback, "data: [DONE]\n\n");
+            }
+        };
+        
+        return AI_HTTP_Streaming_Client::stream_post(
+            $url,
+            $request,
+            array_merge(
+                array(
+                    'Content-Type' => 'application/json',
+                    'User-Agent' => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
+                ),
+                $this->get_auth_headers()
+            ),
+            $completion_callback,
+            $this->timeout
+        );
+    }
+
     public function get_available_models() {
         if (!$this->is_configured()) {
             return $this->get_fallback_models();

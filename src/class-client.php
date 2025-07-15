@@ -84,6 +84,43 @@ class AI_HTTP_Client {
     }
 
     /**
+     * Send streaming request through the system
+     * 
+     * Real-time streaming version of send_request for chat applications
+     * Streams directly to output buffer like Wordsurf for maximum compatibility
+     *
+     * @param array $request Standardized "round plug" input
+     * @param string $provider_name Optional specific provider to use
+     * @param callable $completion_callback Optional callback when streaming completes
+     * @return string Full response from streaming request
+     * @throws Exception If streaming is not supported or fails
+     */
+    public function send_streaming_request($request, $provider_name = null, $completion_callback = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+
+        // Step 1: Validate the round plug input
+        $this->validate_request($request);
+        
+        // Step 2: Create provider instance
+        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
+        
+        if (!$provider) {
+            throw new Exception("Provider '{$provider_name}' not available");
+        }
+        
+        if (!$provider->is_configured()) {
+            throw new Exception("Provider '{$provider_name}' not configured");
+        }
+        
+        // Step 3: Transform input through provider-specific request normalizer
+        $request_normalizer = AI_HTTP_Normalizer_Factory::get_request_normalizer($provider_name);
+        $provider_request = $request_normalizer->normalize($request);
+        
+        // Step 4: Send streaming request through provider (streams to output buffer)
+        return $provider->send_streaming_request($provider_request, $completion_callback);
+    }
+
+    /**
      * Process request through the modular pipeline
      *
      * @param array $request Standardized request
