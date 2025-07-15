@@ -140,6 +140,7 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/Core/ModelSelector.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/TemperatureSlider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/SystemPromptField.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/TestConnection.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/ProviderManagerComponent.php';
         
         // 5. Hook into WordPress for any setup needed
