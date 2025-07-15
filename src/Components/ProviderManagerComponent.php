@@ -408,11 +408,13 @@ class AI_HTTP_ProviderManager_Component {
     public function ajax_save_settings() {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
-        $provider = sanitize_text_field($_POST['provider']);
+        $provider = sanitize_text_field($_POST['ai_provider']);
         $settings = array(
-            'api_key' => sanitize_text_field($_POST['api_key']),
-            'model' => sanitize_text_field($_POST['model']),
-            'instructions' => sanitize_textarea_field($_POST['instructions'])
+            'api_key' => sanitize_text_field($_POST['ai_api_key']),
+            'model' => sanitize_text_field($_POST['ai_model']),
+            'temperature' => isset($_POST['ai_temperature']) ? floatval($_POST['ai_temperature']) : null,
+            'system_prompt' => isset($_POST['ai_system_prompt']) ? sanitize_textarea_field($_POST['ai_system_prompt']) : '',
+            'instructions' => isset($_POST['instructions']) ? sanitize_textarea_field($_POST['instructions']) : ''
         );
 
         // Handle custom fields
@@ -435,7 +437,18 @@ class AI_HTTP_ProviderManager_Component {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
         $provider = sanitize_text_field($_POST['provider']);
-        $models = $this->client->get_models($provider);
+        
+        try {
+            $models = $this->client->get_models($provider);
+            if (empty($models)) {
+                wp_send_json_error('No models available for ' . $provider . '. Check API key configuration.');
+                return;
+            }
+        } catch (Exception $e) {
+            error_log('AI HTTP Client: Model fetch AJAX failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to fetch models: ' . $e->getMessage());
+            return;
+        }
         
         wp_send_json_success($models);
     }
@@ -447,7 +460,16 @@ class AI_HTTP_ProviderManager_Component {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
         $provider = sanitize_text_field($_POST['provider']);
-        $result = $this->client->test_connection($provider);
+        
+        try {
+            $result = $this->client->test_connection($provider);
+        } catch (Exception $e) {
+            error_log('AI HTTP Client: Connection test AJAX failed: ' . $e->getMessage());
+            $result = array(
+                'success' => false,
+                'message' => 'Test failed: ' . $e->getMessage()
+            );
+        }
         
         wp_send_json($result);
     }
