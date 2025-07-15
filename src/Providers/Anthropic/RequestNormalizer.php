@@ -22,10 +22,7 @@ class AI_HTTP_Anthropic_Request_Normalizer {
     public function normalize($standard_request) {
         $normalized = $standard_request;
 
-        // Set default model if not provided
-        if (!isset($normalized['model'])) {
-            $normalized['model'] = 'claude-3-haiku-20240307';
-        }
+        // Model will be set by automatic model detection if not provided
 
         // Anthropic requires max_tokens
         if (!isset($normalized['max_tokens'])) {
@@ -45,6 +42,11 @@ class AI_HTTP_Anthropic_Request_Normalizer {
             $normalized['top_p'] = max(0, min(1, floatval($normalized['top_p'])));
         }
 
+        // Handle multi-modal content (images, files) in messages
+        if (isset($normalized['messages']) && is_array($normalized['messages'])) {
+            $normalized['messages'] = $this->normalize_messages($normalized['messages']);
+        }
+
         // Extract system messages to separate system field
         $normalized = $this->extract_system_message($normalized);
 
@@ -54,6 +56,134 @@ class AI_HTTP_Anthropic_Request_Normalizer {
         }
 
         return $normalized;
+    }
+
+    /**
+     * Normalize messages to handle multi-modal content (images, files)
+     * Based on Anthropic's vision capabilities and content block format
+     *
+     * @param array $messages Array of message objects
+     * @return array Anthropic-formatted messages with multi-modal support
+     */
+    private function normalize_messages($messages) {
+        $normalized = array();
+
+        foreach ($messages as $message) {
+            if (!isset($message['role']) || !isset($message['content'])) {
+                $normalized[] = $message; // Pass through if missing required fields
+                continue;
+            }
+
+            $normalized_message = array(
+                'role' => $message['role']
+            );
+
+            // Handle multi-modal content for Anthropic
+            if (isset($message['images']) || isset($message['image_urls']) || isset($message['files'])) {
+                $normalized_message['content'] = $this->build_anthropic_multimodal_content($message);
+            } else {
+                // Standard text content
+                $normalized_message['content'] = $message['content'];
+            }
+
+            // Preserve other Anthropic-specific fields
+            foreach ($message as $key => $value) {
+                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files'))) {
+                    $normalized_message[$key] = $value;
+                }
+            }
+
+            $normalized[] = $normalized_message;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Build multi-modal content array for Anthropic Vision models
+     * Anthropic uses content blocks format
+     *
+     * @param array $message Message with multi-modal content
+     * @return array Anthropic multi-modal content format
+     */
+    private function build_anthropic_multimodal_content($message) {
+        $content = array();
+
+        // Add text content first
+        if (!empty($message['content'])) {
+            $content[] = array(
+                'type' => 'text',
+                'text' => $message['content']
+            );
+        }
+
+        // Handle image URLs
+        if (isset($message['image_urls']) && is_array($message['image_urls'])) {
+            foreach ($message['image_urls'] as $image_url) {
+                $content[] = array(
+                    'type' => 'image',
+                    'source' => array(
+                        'type' => 'url',
+                        'url' => $image_url
+                    )
+                );
+            }
+        }
+
+        // Handle base64 images
+        if (isset($message['images']) && is_array($message['images'])) {
+            foreach ($message['images'] as $image) {
+                if (is_string($image)) {
+                    // Check if it's base64 data URL
+                    if (strpos($image, 'data:') === 0) {
+                        // Extract media type and base64 data
+                        if (preg_match('/^data:([^;]+);base64,(.+)$/', $image, $matches)) {
+                            $content[] = array(
+                                'type' => 'image',
+                                'source' => array(
+                                    'type' => 'base64',
+                                    'media_type' => $matches[1],
+                                    'data' => $matches[2]
+                                )
+                            );
+                        }
+                    } else {
+                        // Assume it's a URL
+                        $content[] = array(
+                            'type' => 'image',
+                            'source' => array(
+                                'type' => 'url',
+                                'url' => $image
+                            )
+                        );
+                    }
+                } elseif (is_array($image) && isset($image['url'])) {
+                    // Structured image object
+                    $content[] = array(
+                        'type' => 'image',
+                        'source' => array(
+                            'type' => 'url',
+                            'url' => $image['url']
+                        )
+                    );
+                }
+            }
+        }
+
+        // Handle file references (Anthropic doesn't support direct file uploads like OpenAI)
+        if (isset($message['files']) && is_array($message['files'])) {
+            foreach ($message['files'] as $file) {
+                if (isset($file['type']) && $file['type'] === 'file_url') {
+                    // Convert file reference to text mention
+                    $content[] = array(
+                        'type' => 'text',
+                        'text' => '[File: ' . (isset($file['name']) ? $file['name'] : 'uploaded file') . ']'
+                    );
+                }
+            }
+        }
+
+        return $content;
     }
 
     /**

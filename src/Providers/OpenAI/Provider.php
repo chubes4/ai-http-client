@@ -3,7 +3,8 @@
  * AI HTTP Client - OpenAI Provider
  * 
  * Single Responsibility: Handle OpenAI API communication
- * Supports Chat Completions API with streaming and function calling.
+ * Uses Responses API (/v1/responses) as the primary endpoint.
+ * Based on Wordsurf's working implementation.
  *
  * @package AIHttpClient\Providers
  * @author Chris Huber <https://chubes.net>
@@ -44,48 +45,11 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         
         $url = $this->get_api_endpoint();
         
-        // Use completion callback for tool processing (like Wordsurf)
-        $completion_callback = function($full_response) use ($callback) {
-            // Process tool calls if any were found in the response
-            $tool_calls = $this->extract_tool_calls($full_response);
-            
-            if (!empty($tool_calls)) {
-                // Send tool results as SSE events (like Wordsurf)
-                foreach ($tool_calls as $tool_call) {
-                    $tool_result = [
-                        'tool_call_id' => $tool_call['id'],
-                        'tool_name' => $tool_call['function']['name'],
-                        'arguments' => $tool_call['function']['arguments'],
-                        'provider' => 'openai'
-                    ];
-                    
-                    echo "event: tool_result\n";
-                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
-                    
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-            }
-            
-            // Indicate completion
-            if (is_callable($callback)) {
-                call_user_func($callback, "data: [DONE]\n\n");
-            }
-        };
-        
-        return AI_HTTP_Streaming_Client::stream_post(
+        return AI_HTTP_OpenAI_Streaming_Module::send_streaming_request(
             $url,
             $request,
-            array_merge(
-                array(
-                    'Content-Type' => 'application/json',
-                    'User-Agent' => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
-                ),
-                $this->get_auth_headers()
-            ),
-            $completion_callback,
+            $this->get_auth_headers(),
+            $callback,
             $this->timeout
         );
     }
@@ -244,7 +208,7 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     }
 
     protected function get_api_endpoint() {
-        return $this->base_url . '/chat/completions';
+        return $this->base_url . '/responses';
     }
 
     protected function get_auth_headers() {
@@ -260,7 +224,8 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     }
 
     /**
-     * OpenAI-specific request sanitization
+     * OpenAI Responses API specific request sanitization
+     * Based on Wordsurf's working implementation
      *
      * @param array $request Request data
      * @return array Sanitized request
@@ -268,10 +233,13 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     protected function sanitize_request($request) {
         $request = parent::sanitize_request($request);
 
-        // Ensure required fields
-        if (!isset($request['model'])) {
-            $request['model'] = 'gpt-3.5-turbo';
+        // Convert standard format to Responses API format
+        if (isset($request['messages'])) {
+            $request['input'] = $request['messages'];
+            unset($request['messages']);
         }
+
+        // Model will be set by automatic model detection if not provided
 
         // Validate temperature
         if (isset($request['temperature'])) {
@@ -290,36 +258,17 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
 
         // Handle function calling
         if (isset($request['tools']) && is_array($request['tools'])) {
-            $request['tools'] = $this->sanitize_tools($request['tools']);
+            $request['tools'] = AI_HTTP_OpenAI_Function_Calling::sanitize_tools($request['tools']);
+        }
+
+        // Handle tool choice
+        if (isset($request['tool_choice'])) {
+            $request['tool_choice'] = AI_HTTP_OpenAI_Function_Calling::validate_tool_choice($request['tool_choice']);
         }
 
         return $request;
     }
 
-    /**
-     * Sanitize function/tool definitions
-     *
-     * @param array $tools Tools array
-     * @return array Sanitized tools
-     */
-    private function sanitize_tools($tools) {
-        $sanitized = array();
-
-        foreach ($tools as $tool) {
-            if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
-                $sanitized[] = array(
-                    'type' => 'function',
-                    'function' => array(
-                        'name' => sanitize_text_field($tool['function']['name']),
-                        'description' => sanitize_textarea_field($tool['function']['description']),
-                        'parameters' => $tool['function']['parameters'] // JSON schema - minimal sanitization
-                    )
-                );
-            }
-        }
-
-        return $sanitized;
-    }
 
     /**
      * Get pricing information for OpenAI models
@@ -358,53 +307,4 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         return $pricing;
     }
 
-    /**
-     * Extract tool calls from OpenAI streaming response
-     *
-     * @param string $full_response Complete streaming response
-     * @return array Tool calls found in response
-     */
-    private function extract_tool_calls($full_response) {
-        $tool_calls = array();
-        
-        // Parse SSE events (like Wordsurf does)
-        $event_blocks = explode("\n\n", trim($full_response));
-        
-        foreach ($event_blocks as $block) {
-            if (empty(trim($block))) {
-                continue;
-            }
-            
-            $lines = explode("\n", $block);
-            $current_data = '';
-            
-            foreach ($lines as $line) {
-                if (preg_match('/^data: (.+)$/', trim($line), $matches)) {
-                    $current_data .= trim($matches[1]);
-                }
-            }
-            
-            if (!empty($current_data) && $current_data !== '[DONE]') {
-                $decoded = json_decode($current_data, true);
-                if ($decoded && isset($decoded['choices'][0]['delta']['tool_calls'])) {
-                    $delta_tool_calls = $decoded['choices'][0]['delta']['tool_calls'];
-                    
-                    foreach ($delta_tool_calls as $tool_call) {
-                        if (isset($tool_call['function']['name'])) {
-                            $tool_calls[] = array(
-                                'id' => $tool_call['id'] ?? uniqid('tool_'),
-                                'type' => 'function',
-                                'function' => array(
-                                    'name' => $tool_call['function']['name'],
-                                    'arguments' => $tool_call['function']['arguments'] ?? '{}'
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        
-        return $tool_calls;
-    }
 }

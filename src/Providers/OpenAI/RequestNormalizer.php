@@ -23,10 +23,7 @@ class AI_HTTP_Openai_Request_Normalizer {
         // OpenAI uses our standard format, just validate and set defaults
         $normalized = $standard_request;
 
-        // Set default model if not provided
-        if (!isset($normalized['model'])) {
-            $normalized['model'] = 'gpt-3.5-turbo';
-        }
+        // Model will be set by automatic model detection if not provided
 
         // Validate and constrain parameters
         if (isset($normalized['temperature'])) {
@@ -41,12 +38,131 @@ class AI_HTTP_Openai_Request_Normalizer {
             $normalized['top_p'] = max(0, min(1, floatval($normalized['top_p'])));
         }
 
+        // Handle multi-modal content (images, files) in messages
+        if (isset($normalized['messages']) && is_array($normalized['messages'])) {
+            $normalized['messages'] = $this->normalize_messages($normalized['messages']);
+        }
+
         // Handle function calling tools
         if (isset($normalized['tools']) && is_array($normalized['tools'])) {
             $normalized['tools'] = $this->normalize_tools($normalized['tools']);
         }
 
         return $normalized;
+    }
+
+    /**
+     * Normalize messages to handle multi-modal content (images, files)
+     * Based on Data Machine's working implementation
+     *
+     * @param array $messages Array of message objects
+     * @return array OpenAI-formatted messages with multi-modal support
+     */
+    private function normalize_messages($messages) {
+        $normalized = array();
+
+        foreach ($messages as $message) {
+            if (!isset($message['role']) || !isset($message['content'])) {
+                $normalized[] = $message; // Pass through if missing required fields
+                continue;
+            }
+
+            $normalized_message = array(
+                'role' => $message['role']
+            );
+
+            // Handle multi-modal content
+            if (isset($message['images']) || isset($message['image_urls']) || isset($message['files'])) {
+                $normalized_message['content'] = $this->build_multimodal_content($message);
+            } else {
+                // Standard text content
+                $normalized_message['content'] = $message['content'];
+            }
+
+            // Preserve other OpenAI-specific fields (tool_calls, tool_call_id, etc.)
+            foreach ($message as $key => $value) {
+                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files'))) {
+                    $normalized_message[$key] = $value;
+                }
+            }
+
+            $normalized[] = $normalized_message;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Build multi-modal content array for OpenAI vision models
+     * Based on Data Machine's image handling patterns
+     *
+     * @param array $message Message with multi-modal content
+     * @return array OpenAI multi-modal content format
+     */
+    private function build_multimodal_content($message) {
+        $content = array();
+
+        // Add text content first
+        if (!empty($message['content'])) {
+            $content[] = array(
+                'type' => 'text',
+                'text' => $message['content']
+            );
+        }
+
+        // Handle image URLs (Data Machine pattern)
+        if (isset($message['image_urls']) && is_array($message['image_urls'])) {
+            foreach ($message['image_urls'] as $image_url) {
+                $content[] = array(
+                    'type' => 'image_url',
+                    'image_url' => array(
+                        'url' => $image_url,
+                        'detail' => 'auto' // Can be 'low', 'high', or 'auto'
+                    )
+                );
+            }
+        }
+
+        // Handle base64 images (alternative format)
+        if (isset($message['images']) && is_array($message['images'])) {
+            foreach ($message['images'] as $image) {
+                if (is_string($image)) {
+                    // Direct base64 or URL
+                    $url = strpos($image, 'data:') === 0 ? $image : $image;
+                    $content[] = array(
+                        'type' => 'image_url',
+                        'image_url' => array(
+                            'url' => $url,
+                            'detail' => 'auto'
+                        )
+                    );
+                } elseif (is_array($image) && isset($image['url'])) {
+                    // Structured image object
+                    $content[] = array(
+                        'type' => 'image_url',
+                        'image_url' => array(
+                            'url' => $image['url'],
+                            'detail' => isset($image['detail']) ? $image['detail'] : 'auto'
+                        )
+                    );
+                }
+            }
+        }
+
+        // Handle file references (for PDF processing like Data Machine)
+        if (isset($message['files']) && is_array($message['files'])) {
+            foreach ($message['files'] as $file) {
+                if (isset($file['type']) && $file['type'] === 'file_url') {
+                    // File URL reference (for uploaded files)
+                    $content[] = array(
+                        'type' => 'text',
+                        'text' => '[File: ' . (isset($file['name']) ? $file['name'] : 'uploaded file') . ']'
+                    );
+                }
+            }
+        }
+
+        return $content;
     }
 
     /**

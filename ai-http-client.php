@@ -78,18 +78,46 @@ if (!function_exists('ai_http_client_init')) {
         
         // 2.5. Shared utilities
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/StreamingClient.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/FileUploadClient.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/WebSearchClient.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ToolExecutor.php';
         
         
         // 3. Provider implementations (organized by provider)
         // OpenAI Provider
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/RequestNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/ResponseNormalizer.php';
         
         // Anthropic Provider
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/FunctionCalling.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/Provider.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/RequestNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/ResponseNormalizer.php';
+        
+        // Google Gemini Provider
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/FunctionCalling.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/Provider.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/RequestNormalizer.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/ResponseNormalizer.php';
+        
+        // Grok/X.AI Provider
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/FunctionCalling.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/Provider.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/RequestNormalizer.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/ResponseNormalizer.php';
+        
+        // OpenRouter Provider
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/StreamingModule.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/FunctionCalling.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/Provider.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/RequestNormalizer.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/ResponseNormalizer.php';
         
         // Additional providers can be added here or auto-discovered
         

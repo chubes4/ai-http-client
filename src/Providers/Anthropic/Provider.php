@@ -42,48 +42,11 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         
         $url = $this->get_api_endpoint();
         
-        // Use completion callback for tool processing
-        $completion_callback = function($full_response) use ($callback) {
-            // Process tool calls if any were found in the response
-            $tool_calls = $this->extract_tool_calls($full_response);
-            
-            if (!empty($tool_calls)) {
-                // Send tool results as SSE events
-                foreach ($tool_calls as $tool_call) {
-                    $tool_result = [
-                        'tool_call_id' => $tool_call['id'],
-                        'tool_name' => $tool_call['function']['name'],
-                        'arguments' => $tool_call['function']['arguments'],
-                        'provider' => 'anthropic'
-                    ];
-                    
-                    echo "event: tool_result\n";
-                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
-                    
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-            }
-            
-            // Indicate completion
-            if (is_callable($callback)) {
-                call_user_func($callback, "data: [DONE]\n\n");
-            }
-        };
-        
-        return AI_HTTP_Streaming_Client::stream_post(
+        return AI_HTTP_Anthropic_Streaming_Module::send_streaming_request(
             $url,
             $request,
-            array_merge(
-                array(
-                    'Content-Type' => 'application/json',
-                    'User-Agent' => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
-                ),
-                $this->get_auth_headers()
-            ),
-            $completion_callback,
+            $this->get_auth_headers(),
+            $callback,
             $this->timeout
         );
     }
@@ -172,10 +135,7 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
     protected function sanitize_request($request) {
         $request = parent::sanitize_request($request);
 
-        // Ensure required fields
-        if (!isset($request['model'])) {
-            $request['model'] = 'claude-3-haiku-20240307';
-        }
+        // Model will be set by automatic model detection if not provided
 
         // Anthropic requires max_tokens
         if (!isset($request['max_tokens'])) {
@@ -199,6 +159,16 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
 
         // Handle system prompts - Anthropic uses separate system field
         $request = $this->extract_system_message($request);
+
+        // Handle function calling tools
+        if (isset($request['tools']) && is_array($request['tools'])) {
+            $request['tools'] = AI_HTTP_Anthropic_Function_Calling::sanitize_tools($request['tools']);
+        }
+
+        // Handle tool choice
+        if (isset($request['tool_choice'])) {
+            $request['tool_choice'] = AI_HTTP_Anthropic_Function_Calling::validate_tool_choice($request['tool_choice']);
+        }
 
         return $request;
     }
@@ -271,51 +241,4 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         return $pricing;
     }
 
-    /**
-     * Extract tool calls from Anthropic streaming response
-     *
-     * @param string $full_response Complete streaming response
-     * @return array Tool calls found in response
-     */
-    private function extract_tool_calls($full_response) {
-        $tool_calls = array();
-        
-        // Parse SSE events for Anthropic
-        $event_blocks = explode("\n\n", trim($full_response));
-        
-        foreach ($event_blocks as $block) {
-            if (empty(trim($block))) {
-                continue;
-            }
-            
-            $lines = explode("\n", $block);
-            $current_data = '';
-            
-            foreach ($lines as $line) {
-                if (preg_match('/^data: (.+)$/', trim($line), $matches)) {
-                    $current_data .= trim($matches[1]);
-                }
-            }
-            
-            if (!empty($current_data)) {
-                $decoded = json_decode($current_data, true);
-                if ($decoded && isset($decoded['content'])) {
-                    foreach ($decoded['content'] as $content_block) {
-                        if (isset($content_block['type']) && $content_block['type'] === 'tool_use') {
-                            $tool_calls[] = array(
-                                'id' => $content_block['id'] ?? uniqid('tool_'),
-                                'type' => 'function',
-                                'function' => array(
-                                    'name' => $content_block['name'],
-                                    'arguments' => wp_json_encode($content_block['input'] ?? array())
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        
-        return $tool_calls;
-    }
 }
