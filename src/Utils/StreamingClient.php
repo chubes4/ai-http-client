@@ -80,6 +80,10 @@ class AI_HTTP_Streaming_Client {
         }
 
         if ($http_code >= 400) {
+            // Log the actual error response for debugging
+            if (function_exists('error_log')) {
+                error_log("AI HTTP Client: HTTP {$http_code} error response: " . $full_response);
+            }
             throw new Exception("HTTP {$http_code} streaming error");
         }
         
