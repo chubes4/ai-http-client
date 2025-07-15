@@ -45,7 +45,7 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         // Use completion callback for tool processing
         $completion_callback = function($full_response) use ($callback) {
             // Process tool calls if any were found in the response
-            $tool_calls = AI_HTTP_Tool_Call_Processor::extract_tool_calls($full_response, 'anthropic');
+            $tool_calls = $this->extract_tool_calls($full_response);
             
             if (!empty($tool_calls)) {
                 // Send tool results as SSE events
@@ -269,5 +269,53 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         }
 
         return $pricing;
+    }
+
+    /**
+     * Extract tool calls from Anthropic streaming response
+     *
+     * @param string $full_response Complete streaming response
+     * @return array Tool calls found in response
+     */
+    private function extract_tool_calls($full_response) {
+        $tool_calls = array();
+        
+        // Parse SSE events for Anthropic
+        $event_blocks = explode("\n\n", trim($full_response));
+        
+        foreach ($event_blocks as $block) {
+            if (empty(trim($block))) {
+                continue;
+            }
+            
+            $lines = explode("\n", $block);
+            $current_data = '';
+            
+            foreach ($lines as $line) {
+                if (preg_match('/^data: (.+)$/', trim($line), $matches)) {
+                    $current_data .= trim($matches[1]);
+                }
+            }
+            
+            if (!empty($current_data)) {
+                $decoded = json_decode($current_data, true);
+                if ($decoded && isset($decoded['content'])) {
+                    foreach ($decoded['content'] as $content_block) {
+                        if (isset($content_block['type']) && $content_block['type'] === 'tool_use') {
+                            $tool_calls[] = array(
+                                'id' => $content_block['id'] ?? uniqid('tool_'),
+                                'type' => 'function',
+                                'function' => array(
+                                    'name' => $content_block['name'],
+                                    'arguments' => wp_json_encode($content_block['input'] ?? array())
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $tool_calls;
     }
 }

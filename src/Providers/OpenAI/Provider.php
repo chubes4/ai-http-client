@@ -47,7 +47,7 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         // Use completion callback for tool processing (like Wordsurf)
         $completion_callback = function($full_response) use ($callback) {
             // Process tool calls if any were found in the response
-            $tool_calls = AI_HTTP_Tool_Call_Processor::extract_tool_calls($full_response, 'openai');
+            $tool_calls = $this->extract_tool_calls($full_response);
             
             if (!empty($tool_calls)) {
                 // Send tool results as SSE events (like Wordsurf)
@@ -356,5 +356,55 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         }
 
         return $pricing;
+    }
+
+    /**
+     * Extract tool calls from OpenAI streaming response
+     *
+     * @param string $full_response Complete streaming response
+     * @return array Tool calls found in response
+     */
+    private function extract_tool_calls($full_response) {
+        $tool_calls = array();
+        
+        // Parse SSE events (like Wordsurf does)
+        $event_blocks = explode("\n\n", trim($full_response));
+        
+        foreach ($event_blocks as $block) {
+            if (empty(trim($block))) {
+                continue;
+            }
+            
+            $lines = explode("\n", $block);
+            $current_data = '';
+            
+            foreach ($lines as $line) {
+                if (preg_match('/^data: (.+)$/', trim($line), $matches)) {
+                    $current_data .= trim($matches[1]);
+                }
+            }
+            
+            if (!empty($current_data) && $current_data !== '[DONE]') {
+                $decoded = json_decode($current_data, true);
+                if ($decoded && isset($decoded['choices'][0]['delta']['tool_calls'])) {
+                    $delta_tool_calls = $decoded['choices'][0]['delta']['tool_calls'];
+                    
+                    foreach ($delta_tool_calls as $tool_call) {
+                        if (isset($tool_call['function']['name'])) {
+                            $tool_calls[] = array(
+                                'id' => $tool_call['id'] ?? uniqid('tool_'),
+                                'type' => 'function',
+                                'function' => array(
+                                    'name' => $tool_call['function']['name'],
+                                    'arguments' => $tool_call['function']['arguments'] ?? '{}'
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $tool_calls;
     }
 }

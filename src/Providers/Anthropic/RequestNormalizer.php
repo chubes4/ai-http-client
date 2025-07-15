@@ -50,7 +50,7 @@ class AI_HTTP_Anthropic_Request_Normalizer {
 
         // Handle tools for function calling
         if (isset($normalized['tools']) && is_array($normalized['tools'])) {
-            $normalized['tools'] = AI_HTTP_Tool_Normalizer::normalize_for_provider($normalized['tools'], 'anthropic');
+            $normalized['tools'] = $this->normalize_tools($normalized['tools']);
         }
 
         return $normalized;
@@ -86,6 +86,54 @@ class AI_HTTP_Anthropic_Request_Normalizer {
         $request['messages'] = $filtered_messages;
 
         return $request;
+    }
+
+    /**
+     * Normalize tools for Anthropic format
+     *
+     * @param array $tools Array of tool definitions
+     * @return array Anthropic-formatted tools
+     */
+    private function normalize_tools($tools) {
+        $normalized = array();
+
+        foreach ($tools as $tool) {
+            try {
+                $normalized[] = $this->normalize_single_tool($tool);
+            } catch (Exception $e) {
+                error_log('Anthropic tool normalization error: ' . $e->getMessage());
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Normalize a single tool to Anthropic format
+     *
+     * @param array $tool Tool definition
+     * @return array Anthropic-formatted tool
+     */
+    private function normalize_single_tool($tool) {
+        // Handle if tool is in OpenAI format
+        if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
+            return array(
+                'name' => sanitize_text_field($tool['function']['name']),
+                'description' => sanitize_textarea_field($tool['function']['description']),
+                'input_schema' => $tool['function']['parameters'] ?? array()
+            );
+        }
+        
+        // Handle direct function definition
+        if (isset($tool['name']) && isset($tool['description'])) {
+            return array(
+                'name' => sanitize_text_field($tool['name']),
+                'description' => sanitize_textarea_field($tool['description']),
+                'input_schema' => $tool['parameters'] ?? $tool['input_schema'] ?? array()
+            );
+        }
+        
+        throw new Exception('Invalid tool definition for Anthropic format');
     }
 
 }
