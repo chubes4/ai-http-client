@@ -198,6 +198,11 @@ class AI_HTTP_ProviderManager_Component {
         <style>
         <?php echo $this->render_basic_styles(); ?>
         </style>
+        
+        <?php
+        // Ensure global JavaScript functions are available
+        $this->render_required_javascript();
+        ?>
         <?php
 
         return ob_get_clean();
@@ -294,6 +299,124 @@ class AI_HTTP_ProviderManager_Component {
             aiHttpProviderChanged('$unique_id', this.value);
         });
         ";
+    }
+
+    /**
+     * Ensure required JavaScript functions are available
+     * This ensures the component works even if admin_footer hook doesn't run
+     */
+    private function render_required_javascript() {
+        static $js_rendered = false;
+        if ($js_rendered) return;
+        $js_rendered = true;
+        
+        $nonce = wp_create_nonce('ai_http_nonce');
+        ?>
+        <script>
+        // Global AI HTTP Client JavaScript functions
+        function aiHttpAutoSave(componentId) {
+            const component = document.getElementById(componentId);
+            const formData = new FormData();
+            
+            formData.append('action', 'ai_http_save_settings');
+            formData.append('nonce', '<?php echo esc_js($nonce); ?>');
+            
+            component.querySelectorAll('input, select, textarea').forEach(function(input) {
+                if (input.name) {
+                    formData.append(input.name, input.value);
+                }
+            });
+
+            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    const status = document.getElementById(componentId + '_save_status');
+                    if (status) {
+                        status.style.display = 'block';
+                        setTimeout(() => status.style.display = 'none', 2000);
+                    }
+                }
+            }).catch(error => {
+                console.error('AI HTTP Client: Save failed', error);
+            });
+        }
+
+        function aiHttpProviderChanged(componentId, provider) {
+            // Update models when provider changes
+            aiHttpRefreshModels(componentId, provider);
+            // Auto-save the provider change
+            setTimeout(() => aiHttpAutoSave(componentId), 500); // Brief delay to let model loading start
+        }
+
+        function aiHttpToggleKeyVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }
+        }
+
+        function aiHttpRefreshModels(componentId, provider) {
+            const modelSelect = document.getElementById(componentId + '_model');
+            if (!modelSelect) return;
+            
+            modelSelect.innerHTML = '<option value="">Loading models...</option>';
+            
+            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=ai_http_get_models&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    modelSelect.innerHTML = '';
+                    Object.entries(data.data).forEach(([key, value]) => {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.textContent = value;
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    modelSelect.innerHTML = '<option value="">Error loading models</option>';
+                }
+            }).catch(error => {
+                console.error('AI HTTP Client: Model fetch failed', error);
+                modelSelect.innerHTML = '<option value="">Error loading models</option>';
+            });
+        }
+
+        function aiHttpTestConnection(componentId) {
+            const providerElement = document.getElementById(componentId + '_provider');
+            const resultSpan = document.getElementById(componentId + '_test_result');
+            
+            if (!providerElement || !resultSpan) return;
+            
+            const provider = providerElement.value;
+            resultSpan.textContent = 'Testing...';
+            resultSpan.style.color = '#666';
+            
+            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=ai_http_test_connection&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+            }).then(response => response.json()).then(data => {
+                resultSpan.textContent = data.success ? '✓ Connected' : '✗ ' + (data.message || 'Connection failed');
+                resultSpan.style.color = data.success ? '#00a32a' : '#d63638';
+            }).catch(error => {
+                console.error('AI HTTP Client: Connection test failed', error);
+                resultSpan.textContent = '✗ Test failed';
+                resultSpan.style.color = '#d63638';
+            });
+        }
+
+        function aiHttpUpdateTemperatureValue(componentId, value) {
+            const valueDisplay = document.getElementById(componentId + '_temperature_value');
+            if (valueDisplay) {
+                valueDisplay.textContent = value;
+            }
+        }
+        </script>
+        <?php
     }
 
     /**
