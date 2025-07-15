@@ -182,4 +182,39 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
             return '<option value="">Error loading models</option>';
         }
     }
+    
+    /**
+     * Initialize AJAX handlers for model fetching
+     */
+    public static function init_ajax_handlers() {
+        add_action('wp_ajax_ai_http_get_models', [__CLASS__, 'ajax_get_models']);
+    }
+    
+    /**
+     * AJAX handler for getting models
+     */
+    public static function ajax_get_models() {
+        check_ajax_referer('ai_http_nonce', 'nonce');
+        
+        $provider = sanitize_text_field($_POST['provider']);
+        
+        try {
+            $client = new AI_HTTP_Client();
+            $models = $client->get_models($provider);
+            
+            if (empty($models)) {
+                wp_send_json_error('No models available for ' . $provider . '. Check API key configuration.');
+                return;
+            }
+            
+            wp_send_json_success($models);
+            
+        } catch (Exception $e) {
+            error_log('AI HTTP Client: Model fetch AJAX failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to fetch models: ' . $e->getMessage());
+        }
+    }
 }
+
+// Initialize AJAX handlers
+add_action('init', ['AI_HTTP_Core_ModelSelector', 'init_ajax_handlers']);
