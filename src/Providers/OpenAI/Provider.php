@@ -160,9 +160,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             $request['temperature'] = max(0, min(2, floatval($request['temperature'])));
         }
 
-        // Validate max_tokens
+        // Convert max_tokens to max_output_tokens for Responses API
         if (isset($request['max_tokens'])) {
-            $request['max_tokens'] = max(1, intval($request['max_tokens']));
+            $request['max_output_tokens'] = max(1, intval($request['max_tokens']));
+            unset($request['max_tokens']);
         }
 
         // Validate top_p
