@@ -154,6 +154,30 @@ if (!function_exists('ai_http_client_init')) {
         if (function_exists('do_action')) {
             do_action('ai_http_client_loaded');
         }
+        
+        // Auto-register provider configuration filters from OptionsManager
+        ai_http_client_register_options_filters();
+    }
+    
+    /**
+     * Register WordPress filters to provide configuration from OptionsManager
+     */
+    function ai_http_client_register_options_filters() {
+        if (!class_exists('AI_HTTP_Options_Manager')) {
+            return;
+        }
+        
+        $options_manager = new AI_HTTP_Options_Manager();
+        
+        // Register filters for each available provider
+        $providers = ['openai', 'anthropic', 'gemini', 'grok', 'openrouter'];
+        
+        foreach ($providers as $provider) {
+            add_filter("ai_http_client_{$provider}_config", function($config) use ($options_manager, $provider) {
+                $provider_settings = $options_manager->get_provider_settings($provider);
+                return array_merge($config, $provider_settings);
+            });
+        }
     }
 }
 
