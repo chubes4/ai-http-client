@@ -122,16 +122,19 @@ class AI_HTTP_Client {
 
     /**
      * Continue conversation with tool results
-     * Supports OpenAI Responses API continuation pattern
+     * Supports provider-specific continuation patterns:
+     * - OpenAI: Uses response_id with Responses API continuation
+     * - Anthropic: Uses conversation_history array (response_id parameter repurposed)
+     * - Others: Will use conversation_history rebuilding pattern
      *
-     * @param string $response_id Previous response ID from AI provider
+     * @param string|array $response_id_or_history Response ID (OpenAI) or conversation history (Anthropic/others)
      * @param array $tool_results Array of tool results to continue with
      * @param string $provider_name Optional specific provider to use
      * @param callable $completion_callback Optional callback for streaming
      * @return array|string Response from continuation request
      * @throws Exception If continuation is not supported or fails
      */
-    public function continue_with_tool_results($response_id, $tool_results, $provider_name = null, $completion_callback = null) {
+    public function continue_with_tool_results($response_id_or_history, $tool_results, $provider_name = null, $completion_callback = null) {
         $provider_name = $provider_name ?: $this->config['default_provider'];
         
         // Create provider instance
@@ -151,7 +154,7 @@ class AI_HTTP_Client {
         }
         
         // Use provider-specific continuation method
-        return $provider->continue_with_tool_results($response_id, $tool_results, $completion_callback);
+        return $provider->continue_with_tool_results($response_id_or_history, $tool_results, $completion_callback);
     }
 
     /**

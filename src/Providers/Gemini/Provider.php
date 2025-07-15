@@ -185,4 +185,157 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
         return $request;
     }
 
+    /**
+     * Continue conversation with tool results using Gemini's contents history pattern
+     * Gemini handles continuation by rebuilding the conversation with functionCall and functionResponse parts
+     *
+     * @param array $conversation_history Previous conversation messages
+     * @param array $tool_results Array of tool results to continue with
+     * @param callable|null $callback Completion callback for streaming
+     * @return array Response from continuation request
+     */
+    public function continue_with_tool_results($conversation_history, $tool_results, $callback = null) {
+        if (empty($conversation_history)) {
+            throw new Exception('Conversation history is required for Gemini continuation');
+        }
+        
+        if (empty($tool_results)) {
+            throw new Exception('Tool results are required for continuation');
+        }
+        
+        // Rebuild conversation with tool results in Gemini format
+        $contents = $this->rebuild_gemini_conversation_with_tool_results($conversation_history, $tool_results);
+        
+        // Create continuation request in Gemini format
+        $continuation_request = array(
+            'contents' => $contents,
+            'generationConfig' => array(
+                'maxOutputTokens' => 1000 // Default, can be overridden
+            )
+        );
+        
+        // Add tools if they were in the original conversation
+        if ($this->conversation_has_tools($conversation_history)) {
+            $continuation_request['tools'] = $this->extract_tools_from_conversation($conversation_history);
+        }
+        
+        if ($callback) {
+            return $this->send_streaming_request($continuation_request, $callback);
+        } else {
+            return $this->send_request($continuation_request);
+        }
+    }
+
+    /**
+     * Rebuild conversation history with tool results in Gemini format
+     * Converts standardized tool results to Gemini's functionCall/functionResponse format
+     *
+     * @param array $conversation_history Original conversation messages
+     * @param array $tool_results Tool execution results
+     * @return array Rebuilt conversation in Gemini contents format
+     */
+    private function rebuild_gemini_conversation_with_tool_results($conversation_history, $tool_results) {
+        $contents = array();
+        
+        // Convert conversation history to Gemini contents format
+        foreach ($conversation_history as $message) {
+            if (isset($message['role']) && $message['role'] === 'system') {
+                // System messages are handled separately in Gemini - skip for now
+                continue;
+            }
+            
+            $role = $message['role'] === 'assistant' ? 'model' : 'user';
+            
+            $contents[] = array(
+                'role' => $role,
+                'parts' => array(
+                    array('text' => $message['content'])
+                )
+            );
+        }
+        
+        // Find the last model message and add functionCall parts
+        $last_content_index = count($contents) - 1;
+        if ($last_content_index >= 0 && $contents[$last_content_index]['role'] === 'model') {
+            // Add functionCall parts for each tool that was called
+            foreach ($tool_results as $result) {
+                if (isset($result['tool_call_id']) && isset($result['tool_name'])) {
+                    $contents[$last_content_index]['parts'][] = array(
+                        'functionCall' => array(
+                            'name' => $result['tool_name'],
+                            'args' => $result['tool_input'] ?? array()
+                        )
+                    );
+                }
+            }
+        }
+        
+        // Add user message with functionResponse parts
+        $function_response_parts = array();
+        foreach ($tool_results as $result) {
+            $function_response_parts[] = array(
+                'functionResponse' => array(
+                    'name' => $result['tool_name'],
+                    'response' => array(
+                        'content' => $result['content']
+                    )
+                )
+            );
+        }
+        
+        if (!empty($function_response_parts)) {
+            $contents[] = array(
+                'role' => 'user',
+                'parts' => $function_response_parts
+            );
+        }
+        
+        return $contents;
+    }
+
+    /**
+     * Check if conversation history contains tools
+     *
+     * @param array $conversation_history Conversation messages
+     * @return bool True if tools were used in conversation
+     */
+    private function conversation_has_tools($conversation_history) {
+        // This is a simplified check - in practice, you'd want to track if tools were used
+        // For now, assume if we're doing continuation, tools were probably involved
+        return true;
+    }
+
+    /**
+     * Extract tools from conversation history (placeholder)
+     * In practice, you'd need to store and retrieve the original tool schemas
+     *
+     * @param array $conversation_history Conversation messages
+     * @return array Tool schemas
+     */
+    private function extract_tools_from_conversation($conversation_history) {
+        // Placeholder - in practice, tool schemas should be stored with conversation
+        // For now, return empty array and let the calling code provide tools
+        return array();
+    }
+
+    /**
+     * Get the last response ID (not applicable for Gemini - uses conversation rebuilding)
+     * Gemini doesn't have response IDs like OpenAI, so this returns null
+     *
+     * @return null Always returns null for Gemini
+     */
+    public function get_last_response_id() {
+        return null;
+    }
+
+    /**
+     * Set the last response ID (not applicable for Gemini)
+     * Gemini doesn't use response IDs, so this is a no-op
+     *
+     * @param string $response_id Response ID (ignored)
+     */
+    public function set_last_response_id($response_id) {
+        // Gemini doesn't use response IDs - no-op
+    }
+
 }

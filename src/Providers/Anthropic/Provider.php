@@ -198,5 +198,135 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         return $request;
     }
 
+    /**
+     * Continue conversation with tool results using Anthropic's message history pattern
+     * Anthropic handles continuation by rebuilding the conversation with tool_use and tool_result content blocks
+     *
+     * @param array $conversation_history Previous conversation messages
+     * @param array $tool_results Array of tool results to continue with
+     * @param callable|null $callback Completion callback for streaming
+     * @return array Response from continuation request
+     */
+    public function continue_with_tool_results($conversation_history, $tool_results, $callback = null) {
+        if (empty($conversation_history)) {
+            throw new Exception('Conversation history is required for Anthropic continuation');
+        }
+        
+        if (empty($tool_results)) {
+            throw new Exception('Tool results are required for continuation');
+        }
+        
+        // Rebuild conversation with tool results
+        $messages = $this->rebuild_conversation_with_tool_results($conversation_history, $tool_results);
+        
+        // Create continuation request
+        $continuation_request = array(
+            'messages' => $messages,
+            'max_tokens' => 1000 // Default, can be overridden
+        );
+        
+        // Extract system message if present in original conversation
+        $continuation_request = $this->extract_system_message($continuation_request);
+        
+        if ($callback) {
+            return $this->send_streaming_request($continuation_request, $callback);
+        } else {
+            return $this->send_request($continuation_request);
+        }
+    }
+
+    /**
+     * Rebuild conversation history with tool results in Anthropic format
+     * Converts standardized tool results to Anthropic's tool_use/tool_result content blocks
+     *
+     * @param array $conversation_history Original conversation messages
+     * @param array $tool_results Tool execution results
+     * @return array Rebuilt conversation with tool results
+     */
+    private function rebuild_conversation_with_tool_results($conversation_history, $tool_results) {
+        $messages = array();
+        
+        // Process conversation history
+        foreach ($conversation_history as $message) {
+            if (isset($message['role']) && $message['role'] === 'system') {
+                // System messages will be extracted separately
+                continue;
+            }
+            
+            // Add regular message
+            $messages[] = array(
+                'role' => $message['role'],
+                'content' => $message['content']
+            );
+        }
+        
+        // Find the last assistant message and add tool results
+        $last_message_index = count($messages) - 1;
+        if ($last_message_index >= 0 && $messages[$last_message_index]['role'] === 'assistant') {
+            // Convert last assistant message content to array format if it's a string
+            $last_content = $messages[$last_message_index]['content'];
+            if (is_string($last_content)) {
+                $messages[$last_message_index]['content'] = array(
+                    array(
+                        'type' => 'text',
+                        'text' => $last_content
+                    )
+                );
+            }
+            
+            // Add tool_use blocks for each tool call that was made
+            foreach ($tool_results as $result) {
+                if (isset($result['tool_call_id']) && isset($result['tool_name'])) {
+                    // Add the tool_use block to assistant message
+                    $messages[$last_message_index]['content'][] = array(
+                        'type' => 'tool_use',
+                        'id' => $result['tool_call_id'],
+                        'name' => $result['tool_name'],
+                        'input' => $result['tool_input'] ?? array()
+                    );
+                }
+            }
+        }
+        
+        // Add user message with tool results
+        $tool_result_content = array();
+        foreach ($tool_results as $result) {
+            $tool_result_content[] = array(
+                'type' => 'tool_result',
+                'tool_use_id' => $result['tool_call_id'],
+                'content' => $result['content']
+            );
+        }
+        
+        if (!empty($tool_result_content)) {
+            $messages[] = array(
+                'role' => 'user',
+                'content' => $tool_result_content
+            );
+        }
+        
+        return $messages;
+    }
+
+    /**
+     * Get the last response ID (not applicable for Anthropic - uses conversation rebuilding)
+     * Anthropic doesn't have response IDs like OpenAI, so this returns null
+     *
+     * @return null Always returns null for Anthropic
+     */
+    public function get_last_response_id() {
+        return null;
+    }
+
+    /**
+     * Set the last response ID (not applicable for Anthropic)
+     * Anthropic doesn't use response IDs, so this is a no-op
+     *
+     * @param string $response_id Response ID (ignored)
+     */
+    public function set_last_response_id($response_id) {
+        // Anthropic doesn't use response IDs - no-op
+    }
+
 
 }

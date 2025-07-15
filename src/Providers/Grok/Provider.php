@@ -284,4 +284,89 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
             'message' => $response['success'] ? 'Connection successful' : ($response['error'] ?? 'Unknown error')
         );
     }
+
+    /**
+     * Continue conversation with tool results using OpenAI-compatible message history pattern
+     * Grok uses OpenAI-compatible API, so we rebuild conversation with standard tool messages
+     *
+     * @param array $conversation_history Previous conversation messages
+     * @param array $tool_results Array of tool results to continue with
+     * @param callable|null $callback Completion callback for streaming
+     * @return array Response from continuation request
+     */
+    public function continue_with_tool_results($conversation_history, $tool_results, $callback = null) {
+        if (empty($conversation_history)) {
+            throw new Exception('Conversation history is required for Grok continuation');
+        }
+        
+        if (empty($tool_results)) {
+            throw new Exception('Tool results are required for continuation');
+        }
+        
+        // Rebuild conversation with tool results in OpenAI-compatible format
+        $messages = $this->rebuild_openai_compatible_conversation($conversation_history, $tool_results);
+        
+        // Create continuation request
+        $continuation_request = array(
+            'messages' => $messages,
+            'max_tokens' => 1000 // Default, can be overridden
+        );
+        
+        if ($callback) {
+            return $this->send_streaming_request($continuation_request, $callback);
+        } else {
+            return $this->send_request($continuation_request);
+        }
+    }
+
+    /**
+     * Rebuild conversation history with tool results in OpenAI-compatible format
+     * Converts standardized tool results to OpenAI-style tool messages
+     *
+     * @param array $conversation_history Original conversation messages
+     * @param array $tool_results Tool execution results
+     * @return array Rebuilt conversation with tool results
+     */
+    private function rebuild_openai_compatible_conversation($conversation_history, $tool_results) {
+        $messages = array();
+        
+        // Add all conversation history
+        foreach ($conversation_history as $message) {
+            $messages[] = array(
+                'role' => $message['role'],
+                'content' => $message['content']
+            );
+        }
+        
+        // Add tool result messages in OpenAI format
+        foreach ($tool_results as $result) {
+            $messages[] = array(
+                'role' => 'tool',
+                'tool_call_id' => $result['tool_call_id'],
+                'content' => $result['content']
+            );
+        }
+        
+        return $messages;
+    }
+
+    /**
+     * Get the last response ID (not applicable for Grok - uses conversation rebuilding)
+     * Grok doesn't have response IDs like OpenAI Responses API, so this returns null
+     *
+     * @return null Always returns null for Grok
+     */
+    public function get_last_response_id() {
+        return null;
+    }
+
+    /**
+     * Set the last response ID (not applicable for Grok)
+     * Grok doesn't use response IDs, so this is a no-op
+     *
+     * @param string $response_id Response ID (ignored)
+     */
+    public function set_last_response_id($response_id) {
+        // Grok doesn't use response IDs - no-op
+    }
 }

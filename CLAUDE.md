@@ -185,31 +185,44 @@ echo AI_HTTP_ProviderManager_Component::render([
 The library supports conversation continuation with tool results, enabling sophisticated agentic workflows:
 
 ```php
-// Basic usage - send request and get response ID
+// OpenAI: Use response ID from Responses API
 $response = $client->send_request($request);
 $response_id = $client->get_last_response_id();
-
-// Continue conversation with tool results
-$tool_results = [
-    [
-        'tool_call_id' => 'tool_123',
-        'content' => 'Tool execution result'
-    ]
-];
-
 $continuation = $client->continue_with_tool_results($response_id, $tool_results);
+
+// Anthropic: Use conversation history array
+$conversation_history = [
+    ['role' => 'user', 'content' => 'What is the weather?'],
+    ['role' => 'assistant', 'content' => 'I need to check the weather.']
+];
+$continuation = $client->continue_with_tool_results($conversation_history, $tool_results, 'anthropic');
 ```
 
-**OpenAI Responses API Support:**
-- Uses `previous_response_id` for continuation
-- Automatic response ID tracking via ResponseNormalizer
-- Streaming continuation support with completion callbacks
-- Compatible with Wordsurf's agentic patterns
+**Provider-Specific Continuation Patterns:**
 
-**Other Provider Support:**
-- Automatic message history building with tool results
-- Standardized continuation interface across all providers
-- Fallback to conversation rebuilding when continuation API unavailable
+**OpenAI Responses API:**
+- Uses `previous_response_id` for true API continuation
+- Server maintains conversation state
+- Most efficient - no message rebuilding required
+- Automatic response ID tracking via ResponseNormalizer
+
+**Anthropic Messages API:**
+- Uses conversation history rebuilding with tool_use/tool_result content blocks
+- Converts standardized tool results to Anthropic's specific format
+- Handles system message extraction and content block structuring
+- Compatible with Claude's tool calling patterns
+
+**Google Gemini API:**
+- Uses conversation history rebuilding with functionCall/functionResponse parts
+- Converts standardized tool results to Gemini's contents format
+- Handles role mapping (assistant → model) and parts structure
+- Compatible with Gemini's 2025 API patterns
+
+**Grok/X.AI & OpenRouter:**
+- Use conversation history rebuilding with OpenAI-compatible tool messages
+- Add tool results as `role: tool` messages with `tool_call_id`
+- Compatible with standard OpenAI Chat Completions format
+- Unified continuation interface across both providers
 
 ### Prompt Building System
 ```php
