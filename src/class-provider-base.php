@@ -96,7 +96,7 @@ abstract class AI_HTTP_Provider_Base {
      *
      * @return string API endpoint URL
      */
-    abstract protected function get_api_endpoint();
+    abstract protected function get_api_endpoint($model = null);
 
     /**
      * Get authentication headers for requests

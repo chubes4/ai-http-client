@@ -112,7 +112,7 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         return !empty($this->api_key);
     }
 
-    protected function get_api_endpoint() {
+    protected function get_api_endpoint($model = null) {
         return $this->base_url . '/responses';
     }
 

@@ -115,11 +115,11 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
         return !empty($this->api_key);
     }
 
-    protected function get_api_endpoint($model) {
+    protected function get_api_endpoint($model = null) {
         return $this->base_url . '/models/' . $model . ':generateContent';
     }
 
-    protected function get_streaming_api_endpoint($model) {
+    protected function get_streaming_api_endpoint($model = null) {
         return $this->base_url . '/models/' . $model . ':streamGenerateContent';
     }
 

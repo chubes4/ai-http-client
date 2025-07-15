@@ -229,4 +229,147 @@ class AI_HTTP_Prompt_Manager {
         
         return $formatted;
     }
+    
+    /**
+     * Register tool definition for modular prompts
+     *
+     * @param string $tool_name Tool identifier
+     * @param string $definition Tool description/instructions
+     * @param array $config Optional tool configuration
+     */
+    public static function register_tool_definition($tool_name, $definition, $config = []) {
+        $tool_definitions = get_option('ai_http_client_tool_definitions', []);
+        
+        $tool_definitions[$tool_name] = [
+            'definition' => $definition,
+            'config' => $config,
+            'registered_by' => apply_filters('ai_http_client_current_plugin', 'unknown')
+        ];
+        
+        update_option('ai_http_client_tool_definitions', $tool_definitions);
+        
+        // Allow plugins to hook into tool registration
+        do_action('ai_http_client_tool_registered', $tool_name, $definition, $config);
+    }
+    
+    /**
+     * Build tool section based on enabled tools
+     *
+     * @param array $enabled_tools Array of enabled tool names
+     * @return string Formatted tool section
+     */
+    public static function build_tool_section($enabled_tools = []) {
+        if (empty($enabled_tools)) {
+            $enabled_tools = self::get_enabled_tools();
+        }
+        
+        if (empty($enabled_tools)) {
+            return '';
+        }
+        
+        $tool_definitions = get_option('ai_http_client_tool_definitions', []);
+        $enabled_definitions = [];
+        
+        foreach ($enabled_tools as $tool_name) {
+            if (isset($tool_definitions[$tool_name])) {
+                $enabled_definitions[$tool_name] = $tool_definitions[$tool_name]['definition'];
+            }
+        }
+        
+        if (empty($enabled_definitions)) {
+            return '';
+        }
+        
+        $tool_section = "# Available Tools\n\n" . implode("\n\n", $enabled_definitions);
+        
+        // Allow plugins to modify tool section
+        return apply_filters('ai_http_client_tool_section', $tool_section, $enabled_tools, $enabled_definitions);
+    }
+    
+    /**
+     * Get enabled tools from options
+     *
+     * @param string $context Optional context for different tool sets
+     * @return array Array of enabled tool names
+     */
+    public static function get_enabled_tools($context = 'default') {
+        $option_key = $context === 'default' ? 'ai_http_client_enabled_tools' : "ai_http_client_enabled_tools_{$context}";
+        $enabled_tools = get_option($option_key, []);
+        
+        // Allow plugins to modify enabled tools
+        return apply_filters('ai_http_client_enabled_tools', $enabled_tools, $context);
+    }
+    
+    /**
+     * Set enabled tools
+     *
+     * @param array $tools Array of tool names to enable
+     * @param string $context Optional context for different tool sets
+     */
+    public static function set_enabled_tools($tools, $context = 'default') {
+        $option_key = $context === 'default' ? 'ai_http_client_enabled_tools' : "ai_http_client_enabled_tools_{$context}";
+        update_option($option_key, $tools);
+        
+        // Allow plugins to hook into tool enabling
+        do_action('ai_http_client_tools_enabled', $tools, $context);
+    }
+    
+    /**
+     * Get all registered tool definitions
+     *
+     * @return array All tool definitions
+     */
+    public static function get_all_tool_definitions() {
+        $tool_definitions = get_option('ai_http_client_tool_definitions', []);
+        
+        // Allow plugins to add runtime tool definitions
+        return apply_filters('ai_http_client_all_tool_definitions', $tool_definitions);
+    }
+    
+    /**
+     * Build enhanced system prompt with modular sections
+     *
+     * @param string $base_prompt Base system prompt
+     * @param array $context Context data
+     * @param array $options Modular prompt options
+     * @return string Complete system prompt
+     */
+    public static function build_modular_system_prompt($base_prompt, $context = [], $options = []) {
+        $defaults = [
+            'include_tools' => true,
+            'enabled_tools' => [],
+            'tool_context' => 'default',
+            'sections' => []
+        ];
+        
+        $options = array_merge($defaults, $options);
+        
+        // Start with base prompt processing
+        $prompt = self::build_system_prompt($base_prompt, $context);
+        
+        // Add custom sections
+        if (!empty($options['sections'])) {
+            foreach ($options['sections'] as $section_name => $section_content) {
+                $section_content = apply_filters("ai_http_client_section_{$section_name}", $section_content, $context);
+                if (!empty($section_content)) {
+                    $prompt .= "\n\n" . $section_content;
+                }
+            }
+        }
+        
+        // Add tools section if enabled
+        if ($options['include_tools']) {
+            $enabled_tools = !empty($options['enabled_tools']) ? 
+                $options['enabled_tools'] : 
+                self::get_enabled_tools($options['tool_context']);
+                
+            $tool_section = self::build_tool_section($enabled_tools);
+            if (!empty($tool_section)) {
+                $prompt .= "\n\n" . $tool_section;
+            }
+        }
+        
+        // Allow final prompt modification
+        return apply_filters('ai_http_client_modular_system_prompt', $prompt, $base_prompt, $context, $options);
+    }
 }
