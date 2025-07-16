@@ -219,9 +219,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
      * @param string $response_id Previous response ID from OpenAI
      * @param array $tool_results Array of tool results to continue with
      * @param callable|null $callback Completion callback for streaming
+     * @param array|null $continuation_data Additional continuation data (model, etc.)
      * @return string Full response from continuation request
      */
-    public function continue_with_tool_results($response_id, $tool_results, $callback = null) {
+    public function continue_with_tool_results($response_id, $tool_results, $callback = null, $continuation_data = null) {
         if (empty($response_id)) {
             throw new Exception('Response ID is required for continuation');
         }
@@ -240,6 +241,14 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             'previous_response_id' => $response_id,
             'input' => $function_call_outputs
         );
+        
+        // Add model parameter if available in continuation data
+        if ($continuation_data && isset($continuation_data['model'])) {
+            $continuation_request['model'] = $continuation_data['model'];
+        } else {
+            // Fallback to provider config if no model in continuation data
+            $continuation_request['model'] = $this->config['model'] ?? 'gpt-4o-mini';
+        }
         
         $url = $this->get_api_endpoint();
         

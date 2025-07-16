@@ -60,7 +60,8 @@ class AI_HTTP_OpenAI_Continuation_Handler {
         }
 
         // Use provider's continuation method with streaming support
-        return $provider->continue_with_tool_results($response_id, $tool_results, $callback);
+        // Pass continuation data so provider can access model and other parameters
+        return $provider->continue_with_tool_results($response_id, $tool_results, $callback, $continuation_data);
     }
     
     /**
