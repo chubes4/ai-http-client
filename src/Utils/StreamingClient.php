@@ -34,6 +34,8 @@ class AI_HTTP_Streaming_Client {
         error_log('AI HTTP Client: Starting streaming request to: ' . $url);
         error_log('AI HTTP Client: Request body: ' . wp_json_encode($body));
         error_log('AI HTTP Client: Request headers: ' . wp_json_encode($headers));
+        error_log('AI HTTP Client: cURL version: ' . curl_version()['version']);
+        error_log('AI HTTP Client: CURLOPT_RETURNTRANSFER will be set to: false');
 
         // Ensure streaming is enabled
         $body['stream'] = true;
@@ -56,6 +58,9 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => wp_json_encode($body),
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
+                // Always log that WRITEFUNCTION was called - this will tell us if it's being invoked
+                error_log("AI HTTP Client: WRITEFUNCTION CALLED!");
+                
                 $chunk_count++;
                 $data_length = strlen($data);
                 
