@@ -201,12 +201,72 @@ abstract class AI_HTTP_Provider_Base {
     }
 
     /**
+     * Get parameter requirements for this provider
+     * Override in child classes to define provider-specific requirements
+     *
+     * @return array Parameter requirements with keys:
+     *   - 'required': array of required parameters
+     *   - 'optional': array of optional parameters  
+     *   - 'defaults': array of default values for required parameters without UI component
+     *   - 'minimums': array of minimum values for numeric parameters
+     *   - 'maximums': array of maximum values for numeric parameters
+     */
+    protected function get_parameter_requirements() {
+        return array(
+            'required' => array(),
+            'optional' => array('temperature', 'max_tokens', 'top_p'),
+            'defaults' => array(),
+            'minimums' => array(),
+            'maximums' => array()
+        );
+    }
+
+    /**
+     * Handle parameter requirements based on provider specifications
+     * 
+     * @param array $request Request data
+     * @return array Request with proper parameter handling
+     */
+    protected function handle_parameter_requirements($request) {
+        $requirements = $this->get_parameter_requirements();
+        
+        // Handle required parameters
+        foreach ($requirements['required'] as $param) {
+            if (!isset($request[$param])) {
+                // Check if there's a default value
+                if (isset($requirements['defaults'][$param])) {
+                    $request[$param] = $requirements['defaults'][$param];
+                }
+                // If no default and required, throw error
+                else {
+                    throw new Exception("Required parameter '{$param}' is missing");
+                }
+            }
+        }
+        
+        // Apply minimums and maximums
+        foreach ($request as $param => $value) {
+            if (isset($requirements['minimums'][$param]) && is_numeric($value)) {
+                $request[$param] = max($requirements['minimums'][$param], $value);
+            }
+            if (isset($requirements['maximums'][$param]) && is_numeric($value)) {
+                $request[$param] = min($requirements['maximums'][$param], $value);
+            }
+        }
+        
+        return $request;
+    }
+
+    /**
      * Sanitize and validate request data
      *
      * @param array $request Request data
      * @return array Sanitized request
      */
     protected function sanitize_request($request) {
+        // Handle parameter requirements first
+        $request = $this->handle_parameter_requirements($request);
+        
         // Basic sanitization - override in child classes for provider-specific needs
         if (isset($request['messages'])) {
             foreach ($request['messages'] as &$message) {

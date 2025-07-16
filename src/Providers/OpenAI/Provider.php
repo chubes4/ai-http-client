@@ -104,8 +104,8 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
                         'role' => 'user',
                         'content' => 'Test connection'
                     )
-                ),
-                'max_tokens' => 5
+                )
+                // No max_tokens - let OpenAI use default (unlimited)
             );
 
             $response = $this->send_request($test_request);
@@ -151,6 +151,29 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     }
 
     /**
+     * Define OpenAI Responses API parameter requirements
+     */
+    protected function get_parameter_requirements() {
+        return array(
+            'required' => array(), // No required parameters for OpenAI
+            'optional' => array('temperature', 'max_tokens', 'top_p', 'tools', 'tool_choice'),
+            'defaults' => array(
+                // Only set defaults if parameter is provided but too low
+                // Don't force parameters that aren't required
+            ),
+            'minimums' => array(
+                'temperature' => 0,
+                'max_tokens' => 16, // Responses API minimum
+                'top_p' => 0
+            ),
+            'maximums' => array(
+                'temperature' => 2,
+                'top_p' => 1
+            )
+        );
+    }
+
+    /**
      * OpenAI Responses API specific request sanitization
      * Based on Wordsurf's working implementation
      *
@@ -166,22 +189,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             unset($request['messages']);
         }
 
-        // Model will be set by automatic model detection if not provided
-
-        // Validate temperature
-        if (isset($request['temperature'])) {
-            $request['temperature'] = max(0, min(2, floatval($request['temperature'])));
-        }
-
         // Convert max_tokens to max_output_tokens for Responses API
         if (isset($request['max_tokens'])) {
-            $request['max_output_tokens'] = max(1, intval($request['max_tokens']));
+            $request['max_output_tokens'] = $request['max_tokens'];
             unset($request['max_tokens']);
-        }
-
-        // Validate top_p
-        if (isset($request['top_p'])) {
-            $request['top_p'] = max(0, min(1, floatval($request['top_p'])));
         }
 
         // Handle function calling
