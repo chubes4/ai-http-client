@@ -269,14 +269,22 @@ abstract class AI_HTTP_Provider_Base {
         
         // Basic sanitization - override in child classes for provider-specific needs
         if (isset($request['messages'])) {
-            foreach ($request['messages'] as &$message) {
+            error_log('AI HTTP Client Provider Base DEBUG: Sanitizing messages - count: ' . count($request['messages']));
+            foreach ($request['messages'] as $index => &$message) {
+                error_log('AI HTTP Client Provider Base DEBUG: Message ' . $index . ' before sanitization: ' . json_encode($message));
                 if (isset($message['content'])) {
+                    $original_content = $message['content'];
                     $message['content'] = sanitize_textarea_field($message['content']);
+                    if ($original_content !== $message['content']) {
+                        error_log('AI HTTP Client Provider Base DEBUG: Content sanitization changed content for message ' . $index);
+                    }
                 }
                 if (isset($message['role'])) {
                     $message['role'] = sanitize_text_field($message['role']);
                 }
+                error_log('AI HTTP Client Provider Base DEBUG: Message ' . $index . ' after sanitization: ' . json_encode($message));
             }
+            error_log('AI HTTP Client Provider Base DEBUG: All messages after sanitization: ' . json_encode($request['messages']));
         }
 
         if (isset($request['model'])) {
