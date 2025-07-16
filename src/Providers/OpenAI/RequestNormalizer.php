@@ -31,6 +31,9 @@ class AI_HTTP_Openai_Request_Normalizer {
                 $normalized['model'] = $model;
             }
         }
+        
+        // Enable OpenAI conversation state storage for continuation support
+        $normalized['store'] = true;
 
         // Validate and constrain parameters
         if (isset($normalized['temperature'])) {
