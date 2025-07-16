@@ -63,7 +63,7 @@ class AI_HTTP_Streaming_Client {
             },
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_RETURNTRANSFER => true, // Need this true to ensure proper data handling
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
