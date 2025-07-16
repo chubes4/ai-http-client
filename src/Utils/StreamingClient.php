@@ -53,10 +53,14 @@ class AI_HTTP_Streaming_Client {
         $curl_headers[] = 'Accept: text/event-stream';
 
         $ch = curl_init($url);
+        
+        // Encode JSON data
+        $json_data = function_exists('wp_json_encode') ? wp_json_encode($body) : json_encode($body);
+        
         curl_setopt_array($ch, [
             CURLOPT_HTTPHEADER => $curl_headers,
-            CURLOPT_POST => 1,
-            CURLOPT_POSTFIELDS => wp_json_encode($body),
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => $json_data,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
                 // Stream directly to output (frontend gets real-time data)
                 echo $data;
