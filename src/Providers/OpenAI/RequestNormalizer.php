@@ -78,11 +78,14 @@ class AI_HTTP_Openai_Request_Normalizer {
                 'role' => $message['role']
             );
 
-            // Handle multi-modal content
-            if (isset($message['images']) || isset($message['image_urls']) || isset($message['files'])) {
+            // For Responses API, always use simple text content unless explicitly multimodal
+            // Only use multimodal format if there are actual images/files
+            if ((isset($message['images']) && !empty($message['images'])) || 
+                (isset($message['image_urls']) && !empty($message['image_urls'])) || 
+                (isset($message['files']) && !empty($message['files']))) {
                 $normalized_message['content'] = $this->build_multimodal_content($message);
             } else {
-                // Standard text content
+                // Standard text content for Responses API
                 $normalized_message['content'] = $message['content'];
             }
 
@@ -109,10 +112,10 @@ class AI_HTTP_Openai_Request_Normalizer {
     private function build_multimodal_content($message) {
         $content = array();
 
-        // Add text content first
+        // Add text content first - use 'message' type for Responses API
         if (!empty($message['content'])) {
             $content[] = array(
-                'type' => 'text',
+                'type' => 'message',
                 'text' => $message['content']
             );
         }
