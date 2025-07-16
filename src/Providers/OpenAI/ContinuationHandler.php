@@ -157,12 +157,20 @@ class AI_HTTP_OpenAI_Continuation_Handler {
                 }
             }
             
-            // Also try response.completed event
+            // Also try response.completed event (response ID is nested in response.response.id)
             if ($event_type === 'response.completed' && !empty($current_data)) {
                 $decoded = json_decode($current_data, true);
-                if (json_last_error() === JSON_ERROR_NONE && isset($decoded['id'])) {
-                    error_log("AI HTTP Client: Successfully extracted response ID from response.completed: " . $decoded['id']);
-                    return $decoded['id'];
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // Check nested response.id structure
+                    if (isset($decoded['response']['id'])) {
+                        error_log("AI HTTP Client: Successfully extracted response ID from response.completed: " . $decoded['response']['id']);
+                        return $decoded['response']['id'];
+                    }
+                    // Fallback to direct id field
+                    if (isset($decoded['id'])) {
+                        error_log("AI HTTP Client: Successfully extracted response ID from response.completed (direct): " . $decoded['id']);
+                        return $decoded['id'];
+                    }
                 }
             }
             

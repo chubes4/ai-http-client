@@ -66,8 +66,6 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_POSTFIELDS => $json_data,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
                 $chunk_count++;
-                error_log("AI HTTP Client: Chunk {$chunk_count} - Length: " . strlen($data) . " bytes");
-                error_log("AI HTTP Client: Chunk {$chunk_count} - Content preview: " . substr($data, 0, 200));
                 
                 // Echo the data directly to the client for real-time streaming (original pattern)
                 echo $data;
