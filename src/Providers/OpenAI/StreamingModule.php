@@ -24,34 +24,11 @@ class AI_HTTP_OpenAI_Streaming_Module {
      * @return string Full response from streaming request
      */
     public static function send_streaming_request($url, $request, $headers, $completion_callback = null, $timeout = 60) {
-        // Use completion callback for tool processing (like Wordsurf)
+        // Pass the full response to the completion callback so consumers can handle their own tool processing
         $wrapped_callback = function($full_response) use ($completion_callback) {
-            // Process tool calls if any were found in the response
-            $tool_calls = self::extract_tool_calls($full_response);
-            
-            if (!empty($tool_calls)) {
-                // Send tool results as SSE events (like Wordsurf)
-                foreach ($tool_calls as $tool_call) {
-                    $tool_result = array(
-                        'tool_call_id' => $tool_call['id'],
-                        'tool_name' => $tool_call['function']['name'],
-                        'arguments' => $tool_call['function']['arguments'],
-                        'provider' => 'openai'
-                    );
-                    
-                    echo "event: tool_result\n";
-                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
-                    
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-            }
-            
-            // Indicate completion
+            // Let the consumer (like Wordsurf) handle tool processing themselves
             if (is_callable($completion_callback)) {
-                call_user_func($completion_callback, "data: [DONE]\n\n");
+                call_user_func($completion_callback, $full_response);
             }
         };
         
