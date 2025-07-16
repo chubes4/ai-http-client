@@ -100,6 +100,7 @@ class AI_HTTP_Client {
 
         // Step 1: Validate the round plug input
         $this->validate_request($request);
+        error_log('AI HTTP Client DEBUG: Request after validation: ' . json_encode($request));
         
         // Step 2: Create provider instance
         $provider = $this->provider_factory->create_provider($provider_name, $this->config);

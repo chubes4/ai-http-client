@@ -31,9 +31,7 @@ class AI_HTTP_Generic_Request_Normalizer {
             $normalized['model'] = 'default';
         }
 
-        if (!isset($normalized['max_tokens'])) {
-            $normalized['max_tokens'] = 1000;
-        }
+        // Don't set max_tokens default - let provider or user decide
 
         return $normalized;
     }
