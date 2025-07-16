@@ -90,6 +90,8 @@ class AI_HTTP_Streaming_Client {
         // Call completion callback if provided
         if ($completion_callback && is_callable($completion_callback)) {
             try {
+                error_log('AI HTTP Client: Calling completion callback with ' . strlen($full_response) . ' bytes of data');
+                error_log('AI HTTP Client: Full response preview: ' . substr($full_response, 0, 200) . '...');
                 call_user_func($completion_callback, $full_response);
             } catch (Exception $e) {
                 error_log('AI HTTP Client streaming completion callback error: ' . $e->getMessage());

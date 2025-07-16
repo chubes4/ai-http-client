@@ -129,8 +129,8 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/class-client.php';
         
         // 4.5. WordPress management components
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/OptionsManager.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/PromptManager.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/OptionsManager.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/PromptManager.php';
         
         // 4.6. UI Components system
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/ComponentInterface.php';
