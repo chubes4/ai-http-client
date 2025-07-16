@@ -17,20 +17,74 @@ class AI_HTTP_OpenAI_Function_Calling {
      * Sanitize function/tool definitions for OpenAI Responses API
      *
      * @param array $tools Tools array
-     * @return array Sanitized tools
+     * @return array Sanitized tools with error tracking
      */
     public static function sanitize_tools($tools) {
         $sanitized = array();
+        $errors = array();
 
-        foreach ($tools as $tool) {
+        foreach ($tools as $index => $tool) {
             try {
-                $sanitized[] = self::normalize_single_tool($tool);
+                $normalized_tool = self::normalize_single_tool($tool);
+                
+                // Validate the normalized tool
+                if (self::validate_tool_definition($normalized_tool)) {
+                    $sanitized[] = $normalized_tool;
+                } else {
+                    $error = 'Tool validation failed for tool at index ' . $index;
+                    $errors[] = $error;
+                    error_log('OpenAI tool validation error: ' . $error);
+                }
+                
             } catch (Exception $e) {
-                error_log('OpenAI tool normalization error: ' . $e->getMessage());
+                $error = 'Tool normalization failed at index ' . $index . ': ' . $e->getMessage();
+                $errors[] = $error;
+                error_log('OpenAI tool normalization error: ' . $error);
             }
         }
 
+        // Log summary if there were errors
+        if (!empty($errors)) {
+            error_log('OpenAI tool sanitization completed with ' . count($errors) . ' errors. Successfully processed ' . count($sanitized) . ' tools.');
+        }
+
         return $sanitized;
+    }
+    
+    /**
+     * Validate a tool definition for completeness and correctness
+     *
+     * @param array $tool Tool definition
+     * @return bool True if valid
+     */
+    private static function validate_tool_definition($tool) {
+        // Check required fields
+        if (!isset($tool['name']) || empty($tool['name'])) {
+            return false;
+        }
+        
+        if (!isset($tool['description']) || empty($tool['description'])) {
+            return false;
+        }
+        
+        // Check name format (must be valid function name)
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $tool['name'])) {
+            return false;
+        }
+        
+        // Validate parameters if present
+        if (isset($tool['parameters'])) {
+            if (!is_array($tool['parameters'])) {
+                return false;
+            }
+            
+            // Check for required schema structure
+            if (isset($tool['parameters']['type']) && $tool['parameters']['type'] !== 'object') {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /**
@@ -100,16 +154,65 @@ class AI_HTTP_OpenAI_Function_Calling {
         $messages = array();
         
         foreach ($tool_calls as $tool_call) {
-            if (isset($tool_call['tool_call_id']) && isset($tool_call['result'])) {
-                $messages[] = array(
-                    'role' => 'tool',
-                    'tool_call_id' => $tool_call['tool_call_id'],
-                    'content' => is_string($tool_call['result']) ? $tool_call['result'] : wp_json_encode($tool_call['result'])
-                );
+            try {
+                if (isset($tool_call['tool_call_id']) && isset($tool_call['result'])) {
+                    $content = self::format_tool_result_content($tool_call['result']);
+                    
+                    if ($content !== null) {
+                        $messages[] = array(
+                            'role' => 'tool',
+                            'tool_call_id' => sanitize_text_field($tool_call['tool_call_id']),
+                            'content' => $content
+                        );
+                    } else {
+                        error_log('OpenAI tool result formatting failed for tool_call_id: ' . $tool_call['tool_call_id']);
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('OpenAI tool call message building error: ' . $e->getMessage());
             }
         }
         
         return $messages;
+    }
+    
+    /**
+     * Format tool result content for OpenAI consumption
+     *
+     * @param mixed $result Tool execution result
+     * @return string|null Formatted content or null if formatting fails
+     */
+    private static function format_tool_result_content($result) {
+        try {
+            if (is_string($result)) {
+                return $result;
+            }
+            
+            if (is_array($result)) {
+                // Handle structured tool results
+                if (isset($result['success']) && isset($result['error']) && !$result['success']) {
+                    return 'Error: ' . $result['error'];
+                }
+                
+                if (isset($result['content'])) {
+                    return is_string($result['content']) ? $result['content'] : wp_json_encode($result['content']);
+                }
+                
+                if (isset($result['results'])) {
+                    return is_string($result['results']) ? $result['results'] : wp_json_encode($result['results']);
+                }
+                
+                // Fallback to JSON encoding
+                return wp_json_encode($result);
+            }
+            
+            // Convert other types to string
+            return (string) $result;
+            
+        } catch (Exception $e) {
+            error_log('OpenAI tool result content formatting error: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
