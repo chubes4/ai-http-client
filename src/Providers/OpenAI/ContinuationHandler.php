@@ -147,11 +147,30 @@ class AI_HTTP_OpenAI_Continuation_Handler {
                 error_log("AI HTTP Client: Found event type '{$event_type}' with data: " . substr($current_data, 0, 200) . "...");
             }
             
-            // Look for response.created event which contains the response ID
+            // Look for any event that contains the response ID
+            // Try response.created first (standard format)
             if ($event_type === 'response.created' && !empty($current_data)) {
                 $decoded = json_decode($current_data, true);
                 if (json_last_error() === JSON_ERROR_NONE && isset($decoded['id'])) {
-                    error_log("AI HTTP Client: Successfully extracted response ID: " . $decoded['id']);
+                    error_log("AI HTTP Client: Successfully extracted response ID from response.created: " . $decoded['id']);
+                    return $decoded['id'];
+                }
+            }
+            
+            // Also try response.completed event
+            if ($event_type === 'response.completed' && !empty($current_data)) {
+                $decoded = json_decode($current_data, true);
+                if (json_last_error() === JSON_ERROR_NONE && isset($decoded['id'])) {
+                    error_log("AI HTTP Client: Successfully extracted response ID from response.completed: " . $decoded['id']);
+                    return $decoded['id'];
+                }
+            }
+            
+            // Try any other event that might contain an ID
+            if (!empty($current_data)) {
+                $decoded = json_decode($current_data, true);
+                if (json_last_error() === JSON_ERROR_NONE && isset($decoded['id'])) {
+                    error_log("AI HTTP Client: Successfully extracted response ID from event '{$event_type}': " . $decoded['id']);
                     return $decoded['id'];
                 }
             }
