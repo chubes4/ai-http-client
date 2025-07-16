@@ -26,7 +26,7 @@ class AI_HTTP_Streaming_Client {
      * @return string Full raw response from API
      * @throws Exception If cURL is not available or request fails
      */
-    public static function stream_post($url, $body, $headers, $streaming_callback = null, $timeout = 60, $provider = null) {
+    public static function stream_post($url, $body, $headers, $completion_callback = null, $timeout = 60, $provider = null) {
         if (!function_exists('curl_init')) {
             throw new Exception('cURL is required for streaming requests');
         }
@@ -70,18 +70,15 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => $json_data,
             CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count, $streaming_callback) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count, $completion_callback) {
                 $chunk_count++;
                 
-                // If a streaming callback is provided, use it to process the data
-                if ($streaming_callback && is_callable($streaming_callback)) {
-                    // Let the callback handle the streaming output
-                    call_user_func($streaming_callback, $data);
+                // Call the callback for real-time processing if provided
+                if ($completion_callback && is_callable($completion_callback)) {
+                    call_user_func($completion_callback, $data);
                 } else {
-                    // Fallback: just pass through the data
+                    // Fallback: just echo the data
                     echo $data;
-                    
-                    // Flush the output buffer to ensure the data is sent immediately
                     if (ob_get_level() > 0) {
                         ob_flush();
                     }
@@ -122,6 +119,8 @@ class AI_HTTP_Streaming_Client {
             throw new Exception("HTTP {$http_code} streaming error: " . substr($full_response, 0, 200));
         }
 
+        // Completion callback is called during streaming, not after
+        
         // Simple pattern: just return the full response for external processing
         return $full_response;
     }

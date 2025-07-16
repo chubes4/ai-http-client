@@ -192,26 +192,32 @@ class AI_HTTP_Anthropic_Request_Normalizer {
      * @return array Request with system message extracted
      */
     private function extract_system_message($request) {
-        if (!isset($request['messages']) || !is_array($request['messages'])) {
-            return $request;
-        }
-
         $system_content = '';
-        $filtered_messages = array();
+        
+        // Handle system_instruction field first (takes precedence)
+        if (isset($request['system_instruction'])) {
+            $system_content = $request['system_instruction'];
+            unset($request['system_instruction']);
+        }
+        
+        // Handle system messages in messages array
+        if (isset($request['messages']) && is_array($request['messages'])) {
+            $filtered_messages = array();
 
-        foreach ($request['messages'] as $message) {
-            if (isset($message['role']) && $message['role'] === 'system') {
-                $system_content .= $message['content'] . "\n";
-            } else {
-                $filtered_messages[] = $message;
+            foreach ($request['messages'] as $message) {
+                if (isset($message['role']) && $message['role'] === 'system') {
+                    $system_content .= ($system_content ? "\n" : '') . $message['content'];
+                } else {
+                    $filtered_messages[] = $message;
+                }
             }
+
+            $request['messages'] = $filtered_messages;
         }
 
         if (!empty($system_content)) {
             $request['system'] = trim($system_content);
         }
-
-        $request['messages'] = $filtered_messages;
 
         return $request;
     }

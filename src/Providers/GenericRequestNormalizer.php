@@ -26,6 +26,9 @@ class AI_HTTP_Generic_Request_Normalizer {
         // Basic sanitization
         $normalized = $this->sanitize_request($standard_request);
 
+        // Extract system instruction from messages and move to separate field
+        $normalized = $this->extract_system_instruction($normalized);
+
         // Apply generic defaults
         if (!isset($normalized['model'])) {
             $normalized['model'] = 'default';
@@ -86,6 +89,47 @@ class AI_HTTP_Generic_Request_Normalizer {
 
         if (isset($request['temperature'])) {
             $request['temperature'] = max(0, min(2, floatval($request['temperature'])));
+        }
+
+        return $request;
+    }
+
+    /**
+     * Extract system instruction from messages and move to separate field
+     * This ensures consistent handling across all providers
+     *
+     * @param array $request Request with messages
+     * @return array Request with system_instruction field and filtered messages
+     */
+    private function extract_system_instruction($request) {
+        if (!isset($request['messages']) || !is_array($request['messages'])) {
+            return $request;
+        }
+
+        $system_instruction = '';
+        $filtered_messages = array();
+
+        foreach ($request['messages'] as $message) {
+            if (!isset($message['role']) || !isset($message['content'])) {
+                continue;
+            }
+
+            // Extract system messages
+            if ($message['role'] === 'system') {
+                $system_instruction .= $message['content'] . "\n";
+                continue;
+            }
+
+            // Keep non-system messages
+            $filtered_messages[] = $message;
+        }
+
+        // Update request with filtered messages
+        $request['messages'] = $filtered_messages;
+
+        // Add system instruction if found
+        if (!empty(trim($system_instruction))) {
+            $request['system_instruction'] = trim($system_instruction);
         }
 
         return $request;

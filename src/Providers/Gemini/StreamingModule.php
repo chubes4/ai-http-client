@@ -30,32 +30,10 @@ class AI_HTTP_Gemini_Streaming_Module {
         
         // Use completion callback for tool processing
         $wrapped_callback = function($full_response) use ($completion_callback) {
-            // Process tool calls if any were found in the response
-            $tool_calls = self::extract_tool_calls($full_response);
-            
-            if (!empty($tool_calls)) {
-                // Send tool results as SSE events
-                foreach ($tool_calls as $tool_call) {
-                    $tool_result = array(
-                        'tool_call_id' => $tool_call['id'],
-                        'tool_name' => $tool_call['function']['name'],
-                        'arguments' => $tool_call['function']['arguments'],
-                        'provider' => 'gemini'
-                    );
-                    
-                    echo "event: tool_result\n";
-                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
-                    
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-            }
-            
-            // Indicate completion
+            // Just call the completion callback - tool processing happens in WordPress
+            // The StreamingModule should NOT send tool results, only WordPress should
             if (is_callable($completion_callback)) {
-                call_user_func($completion_callback, "data: [DONE]\n\n");
+                call_user_func($completion_callback, $full_response);
             }
         };
         
@@ -90,13 +68,10 @@ class AI_HTTP_Gemini_Streaming_Module {
                                 flush();
                             }
                             
-                            // Send completion marker if done
-                            if ($normalized['done']) {
-                                echo "data: [DONE]\n\n";
-                                if (ob_get_level() > 0) {
-                                    ob_flush();
-                                }
-                                flush();
+                            // When done, trigger tool processing via wrapped callback
+                            if ($normalized['done'] && $wrapped_callback && is_callable($wrapped_callback)) {
+                                error_log('AI HTTP Client: Triggering tool processing via wrapped_callback');
+                                $wrapped_callback($data);
                             }
                         } catch (Exception $e) {
                             error_log('AI HTTP Client: Error in normalize_callback: ' . $e->getMessage());
@@ -117,7 +92,7 @@ class AI_HTTP_Gemini_Streaming_Module {
                 ),
                 $headers
             ),
-            $normalize_callback,
+            $normalize_callback,    // Handles both streaming AND completion
             $timeout,
             'gemini'
         );
@@ -131,10 +106,12 @@ class AI_HTTP_Gemini_Streaming_Module {
      * @return array Tool calls found in response
      */
     public static function extract_tool_calls($full_response) {
+        error_log('AI HTTP Client DEBUG: Gemini extract_tool_calls called with response length: ' . strlen($full_response));
         $tool_calls = array();
         
         // Parse SSE events for Gemini
         $event_blocks = explode("\n\n", trim($full_response));
+        error_log('AI HTTP Client DEBUG: Found ' . count($event_blocks) . ' event blocks');
         
         foreach ($event_blocks as $block) {
             if (empty(trim($block))) {
@@ -158,12 +135,16 @@ class AI_HTTP_Gemini_Streaming_Module {
                 $decoded = json_decode($current_data, true);
                 
                 if ($decoded && isset($decoded['candidates'])) {
+                    error_log('AI HTTP Client DEBUG: Found candidates in decoded data');
                     foreach ($decoded['candidates'] as $candidate) {
                         if (isset($candidate['content']['parts'])) {
+                            error_log('AI HTTP Client DEBUG: Found ' . count($candidate['content']['parts']) . ' parts');
                             foreach ($candidate['content']['parts'] as $part) {
                                 // Check for function call parts
                                 if (isset($part['functionCall'])) {
+                                    error_log('AI HTTP Client DEBUG: Found functionCall: ' . json_encode($part['functionCall']));
                                     $tool_calls[] = self::format_gemini_tool_call($part['functionCall']);
+                                    error_log('AI HTTP Client DEBUG: Formatted tool call: ' . json_encode(end($tool_calls)));
                                 }
                             }
                         }
@@ -172,6 +153,7 @@ class AI_HTTP_Gemini_Streaming_Module {
             }
         }
         
+        error_log('AI HTTP Client DEBUG: extract_tool_calls returning ' . count($tool_calls) . ' tool calls');
         return $tool_calls;
     }
 
@@ -187,7 +169,7 @@ class AI_HTTP_Gemini_Streaming_Module {
             'type' => 'function',
             'function' => array(
                 'name' => $function_call['name'],
-                'arguments' => wp_json_encode($function_call['args'] ?? array())
+                'arguments' => json_encode($function_call['args'] ?? array())
             )
         );
     }

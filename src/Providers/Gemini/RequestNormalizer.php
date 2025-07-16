@@ -99,7 +99,6 @@ class AI_HTTP_Gemini_Request_Normalizer {
      */
     private function convert_messages_to_contents($messages) {
         $contents = array();
-        $system_instruction = '';
 
         foreach ($messages as $message) {
             if (!isset($message['role']) || !isset($message['content'])) {
@@ -109,9 +108,8 @@ class AI_HTTP_Gemini_Request_Normalizer {
             $role = $message['role'];
             $content = $message['content'];
 
-            // Handle system messages separately - they become systemInstruction
+            // Skip system messages - they should be handled as systemInstruction
             if ($role === 'system') {
-                $system_instruction .= $content . "\n";
                 continue;
             }
 

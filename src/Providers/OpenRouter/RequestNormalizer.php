@@ -28,6 +28,21 @@ class AI_HTTP_OpenRouter_Request_Normalizer {
             $normalized['model'] = $standard_request['model'];
         }
 
+        // Handle system instruction by prepending as system message
+        if (isset($standard_request['system_instruction'])) {
+            $system_message = [
+                'role' => 'system',
+                'content' => $standard_request['system_instruction']
+            ];
+            
+            // Prepend system message to messages array
+            if (isset($standard_request['messages']) && is_array($standard_request['messages'])) {
+                array_unshift($standard_request['messages'], $system_message);
+            } else {
+                $standard_request['messages'] = [$system_message];
+            }
+        }
+
         // Convert messages to OpenRouter format (OpenAI-compatible)
         if (isset($standard_request['messages']) && is_array($standard_request['messages'])) {
             $normalized['messages'] = $this->normalize_messages($standard_request['messages']);

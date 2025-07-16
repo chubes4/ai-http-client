@@ -48,6 +48,24 @@ class AI_HTTP_Openai_Request_Normalizer {
             $normalized['top_p'] = max(0, min(1, floatval($normalized['top_p'])));
         }
 
+        // Handle system instruction by prepending as system message
+        if (isset($normalized['system_instruction'])) {
+            $system_message = [
+                'role' => 'system',
+                'content' => $normalized['system_instruction']
+            ];
+            
+            // Prepend system message to messages array
+            if (isset($normalized['messages']) && is_array($normalized['messages'])) {
+                array_unshift($normalized['messages'], $system_message);
+            } else {
+                $normalized['messages'] = [$system_message];
+            }
+            
+            // Remove system_instruction as OpenAI doesn't use it directly
+            unset($normalized['system_instruction']);
+        }
+
         // Handle multi-modal content (images, files) in messages
         if (isset($normalized['messages']) && is_array($normalized['messages'])) {
             $normalized['messages'] = $this->normalize_messages($normalized['messages']);

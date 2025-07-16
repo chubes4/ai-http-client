@@ -26,32 +26,10 @@ class AI_HTTP_Anthropic_Streaming_Module {
     public static function send_streaming_request($url, $request, $headers, $completion_callback = null, $timeout = 60) {
         // Use completion callback for tool processing
         $wrapped_callback = function($full_response) use ($completion_callback) {
-            // Process tool calls if any were found in the response
-            $tool_calls = self::extract_tool_calls($full_response);
-            
-            if (!empty($tool_calls)) {
-                // Send tool results as SSE events
-                foreach ($tool_calls as $tool_call) {
-                    $tool_result = array(
-                        'tool_call_id' => $tool_call['id'],
-                        'tool_name' => $tool_call['function']['name'],
-                        'arguments' => $tool_call['function']['arguments'],
-                        'provider' => 'anthropic'
-                    );
-                    
-                    echo "event: tool_result\n";
-                    echo "data: " . wp_json_encode($tool_result) . "\n\n";
-                    
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-            }
-            
-            // Indicate completion
+            // Just call the completion callback - tool processing happens in WordPress
+            // The StreamingModule should NOT send tool results, only WordPress should
             if (is_callable($completion_callback)) {
-                call_user_func($completion_callback, "data: [DONE]\n\n");
+                call_user_func($completion_callback, $full_response);
             }
         };
         

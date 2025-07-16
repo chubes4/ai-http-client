@@ -68,6 +68,55 @@ class AI_HTTP_Generic_Stream_Normalizer {
     }
     
     /**
+     * Normalize tool call to universal format
+     *
+     * @param array $tool_call Provider-specific tool call data
+     * @param string $provider Provider name
+     * @return array Normalized tool call
+     */
+    private static function normalize_tool_call($tool_call, $provider) {
+        switch ($provider) {
+            case 'openai':
+                return array(
+                    'call_id' => $tool_call['id'] ?? '',
+                    'name' => $tool_call['function']['name'] ?? '',
+                    'arguments' => $tool_call['function']['arguments'] ?? '{}'
+                );
+            case 'gemini':
+                return array(
+                    'call_id' => $tool_call['name'] ?? uniqid('gemini_'),
+                    'name' => $tool_call['name'] ?? '',
+                    'arguments' => json_encode($tool_call['args'] ?? array())
+                );
+            case 'anthropic':
+                return array(
+                    'call_id' => $tool_call['id'] ?? '',
+                    'name' => $tool_call['name'] ?? '',
+                    'arguments' => json_encode($tool_call['input'] ?? array())
+                );
+            case 'grok':
+                return array(
+                    'call_id' => $tool_call['id'] ?? '',
+                    'name' => $tool_call['function']['name'] ?? '',
+                    'arguments' => $tool_call['function']['arguments'] ?? '{}'
+                );
+            case 'openrouter':
+                return array(
+                    'call_id' => $tool_call['id'] ?? '',
+                    'name' => $tool_call['function']['name'] ?? '',
+                    'arguments' => $tool_call['function']['arguments'] ?? '{}'
+                );
+            default:
+                // Generic format - try to match common structures
+                return array(
+                    'call_id' => $tool_call['id'] ?? $tool_call['call_id'] ?? uniqid('tool_'),
+                    'name' => $tool_call['name'] ?? $tool_call['function']['name'] ?? '',
+                    'arguments' => $tool_call['arguments'] ?? $tool_call['function']['arguments'] ?? json_encode($tool_call['args'] ?? array())
+                );
+        }
+    }
+    
+    /**
      * Create a standard "done" chunk
      *
      * @param string $provider Provider name
@@ -98,7 +147,7 @@ class AI_HTTP_Generic_Stream_Normalizer {
             case 'gemini':
                 error_log('AI HTTP Client: About to call normalize_gemini_chunk');
                 $result = self::normalize_gemini_chunk($chunk);
-                error_log('AI HTTP Client: normalize_gemini_chunk returned: ' . wp_json_encode($result));
+                error_log('AI HTTP Client: normalize_gemini_chunk returned: ' . json_encode($result));
                 return $result;
             case 'anthropic':
                 return self::normalize_anthropic_chunk($chunk);
@@ -132,7 +181,9 @@ class AI_HTTP_Generic_Stream_Normalizer {
         }
         
         if (isset($chunk['choices'][0]['delta']['tool_calls'])) {
-            $tool_calls = $chunk['choices'][0]['delta']['tool_calls'];
+            foreach ($chunk['choices'][0]['delta']['tool_calls'] as $tool_call) {
+                $tool_calls[] = self::normalize_tool_call($tool_call, 'openai');
+            }
         }
         
         return array(
@@ -166,7 +217,7 @@ class AI_HTTP_Generic_Stream_Normalizer {
                     $content .= $part['text'];
                 }
                 if (isset($part['functionCall'])) {
-                    $tool_calls[] = $part['functionCall'];
+                    $tool_calls[] = self::normalize_tool_call($part['functionCall'], 'gemini');
                 }
             }
         }
@@ -209,7 +260,9 @@ class AI_HTTP_Generic_Stream_Normalizer {
         }
         
         if (isset($chunk['delta']['tool_calls'])) {
-            $tool_calls = $chunk['delta']['tool_calls'];
+            foreach ($chunk['delta']['tool_calls'] as $tool_call) {
+                $tool_calls[] = self::normalize_tool_call($tool_call, 'anthropic');
+            }
         }
         
         return array(

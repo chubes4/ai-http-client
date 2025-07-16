@@ -18,6 +18,7 @@ class AI_HTTP_Normalizer_Factory {
 
     /**
      * Get request normalizer for specific provider
+     * Returns a wrapper that applies generic normalization first, then provider-specific
      *
      * @param string $provider_name Provider name
      * @return object|null Provider-specific request normalizer
