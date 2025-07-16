@@ -7,6 +7,9 @@
 - File upload utilities for large PDFs
 - Basic streaming infrastructure
 - Request normalization for OpenAI patterns
+- **OpenAI Responses API continuation streaming fix** - Tool results now properly returned to chat
+- **Dedicated SSE Parser module** - Universal SSE parsing for all providers following SRP
+- **OpenAI continuation request handling** - Separate streaming path for tool result continuations
 
 ❌ **Missing Critical Components:**
 

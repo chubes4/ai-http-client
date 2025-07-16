@@ -78,6 +78,7 @@ if (!function_exists('ai_http_client_init')) {
         
         // 2.5. Shared utilities
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/StreamingClient.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/SSEParser.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/FileUploadClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ToolExecutor.php';
         
