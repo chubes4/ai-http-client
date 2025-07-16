@@ -23,7 +23,14 @@ class AI_HTTP_Openai_Request_Normalizer {
         // OpenAI uses our standard format, just validate and set defaults
         $normalized = $standard_request;
 
-        // Model will be set by automatic model detection if not provided
+        // Inject model from provider configuration if not provided
+        if (!isset($normalized['model'])) {
+            $options_manager = new AI_HTTP_Options_Manager();
+            $model = $options_manager->get_provider_setting('openai', 'model');
+            if ($model) {
+                $normalized['model'] = $model;
+            }
+        }
 
         // Validate and constrain parameters
         if (isset($normalized['temperature'])) {

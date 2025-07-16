@@ -341,6 +341,42 @@ class AI_HTTP_Client {
     }
 
     /**
+     * Extract tool calls from streaming response in provider-agnostic way
+     * 
+     * This provides the "round plug in round hole" interface for tool extraction
+     * regardless of which AI provider generated the response
+     *
+     * @param string $full_response Full streaming response from provider
+     * @param string $provider_name Optional specific provider name
+     * @return array Standardized tool calls array
+     */
+    public function extract_tool_calls($full_response, $provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        
+        // Get provider-specific streaming module
+        $module_class = 'AI_HTTP_' . ucfirst($provider_name) . '_Streaming_Module';
+        
+        if (class_exists($module_class) && method_exists($module_class, 'extract_tool_calls')) {
+            $extraction_result = call_user_func([$module_class, 'extract_tool_calls'], $full_response);
+            
+            // Standardize the result format - some providers return array, others return object with tool_calls key
+            if (is_array($extraction_result)) {
+                // If it's a simple array, assume it's the tool calls
+                if (isset($extraction_result['tool_calls'])) {
+                    return $extraction_result['tool_calls'];
+                }
+                return $extraction_result;
+            }
+            
+            return array();
+        }
+        
+        // Log warning if provider doesn't support tool extraction
+        error_log("AI HTTP Client: Provider '{$provider_name}' does not support tool call extraction");
+        return array();
+    }
+
+    /**
      * Get client configuration
      *
      * @return array Current configuration
