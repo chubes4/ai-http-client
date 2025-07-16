@@ -112,16 +112,37 @@ class AI_HTTP_OpenAI_Streaming_Module {
     private static function validate_streaming_request($request) {
         // Check required fields
         if (!isset($request['messages']) || !is_array($request['messages'])) {
+            error_log('AI HTTP Client DEBUG: Request validation failed - missing or invalid messages array');
             return false;
         }
         
         if (empty($request['messages'])) {
+            error_log('AI HTTP Client DEBUG: Request validation failed - empty messages array');
             return false;
         }
         
-        // Validate message format
-        foreach ($request['messages'] as $message) {
-            if (!isset($message['role']) || !isset($message['content'])) {
+        // Validate message format - be flexible with additional fields
+        foreach ($request['messages'] as $index => $message) {
+            if (!isset($message['role'])) {
+                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} missing role");
+                return false;
+            }
+            
+            if (!isset($message['content'])) {
+                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} missing content");
+                return false;
+            }
+            
+            // Validate role is one of the expected values
+            $valid_roles = array('user', 'assistant', 'system', 'tool');
+            if (!in_array($message['role'], $valid_roles)) {
+                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} has invalid role: {$message['role']}");
+                return false;
+            }
+            
+            // Content should be string or array (for multi-modal)
+            if (!is_string($message['content']) && !is_array($message['content'])) {
+                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} content is not string or array");
                 return false;
             }
         }
