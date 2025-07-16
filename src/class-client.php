@@ -100,6 +100,7 @@ class AI_HTTP_Client {
 
         // Step 1: Validate the round plug input
         $this->validate_request($request);
+        error_log('AI HTTP Client DEBUG: Request after validation: ' . json_encode($request));
         
         // Step 2: Create provider instance
         $provider = $this->provider_factory->create_provider($provider_name, $this->config);
@@ -115,6 +116,7 @@ class AI_HTTP_Client {
         // Step 3: Transform input through provider-specific request normalizer
         $request_normalizer = AI_HTTP_Normalizer_Factory::get_request_normalizer($provider_name);
         $provider_request = $request_normalizer->normalize($request);
+        error_log('AI HTTP Client DEBUG: Request after normalization: ' . json_encode($provider_request));
         
         // Step 4: Send streaming request through provider (streams to output buffer)
         return $provider->send_streaming_request($provider_request, $completion_callback);

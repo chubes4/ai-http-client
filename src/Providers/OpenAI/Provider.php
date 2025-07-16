@@ -41,8 +41,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
 
     public function send_streaming_request($request, $callback = null) {
         error_log('AI HTTP Client OpenAI Provider: Starting simple streaming request');
+        error_log('AI HTTP Client OpenAI Provider DEBUG: Request before sanitization: ' . json_encode($request));
         
         $request = $this->sanitize_request($request);
+        error_log('AI HTTP Client OpenAI Provider DEBUG: Request after sanitization: ' . json_encode($request));
         $url = $this->get_api_endpoint();
         $headers = $this->get_auth_headers();
         
