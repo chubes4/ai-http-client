@@ -30,10 +30,16 @@ class AI_HTTP_Streaming_Client {
             throw new Exception('cURL is required for streaming requests');
         }
 
+        // Comprehensive request logging
+        error_log('AI HTTP Client: Starting streaming request to: ' . $url);
+        error_log('AI HTTP Client: Request body: ' . wp_json_encode($body));
+        error_log('AI HTTP Client: Request headers: ' . wp_json_encode($headers));
+
         // Ensure streaming is enabled
         $body['stream'] = true;
         
         $full_response = '';
+        $chunk_count = 0;
         
         // Convert headers array to cURL format
         $curl_headers = array();
@@ -49,7 +55,13 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_HTTPHEADER => $curl_headers,
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => wp_json_encode($body),
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
+                $chunk_count++;
+                $data_length = strlen($data);
+                
+                // Log each chunk for debugging
+                error_log("AI HTTP Client: Received chunk {$chunk_count}, {$data_length} bytes: " . substr($data, 0, 100) . '...');
+                
                 // Stream the raw data directly to output buffer
                 echo $data;
                 
@@ -59,7 +71,7 @@ class AI_HTTP_Streaming_Client {
                 // Accumulate for completion callback
                 $full_response .= $data;
                 
-                return strlen($data);
+                return $data_length;
             },
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
@@ -73,9 +85,18 @@ class AI_HTTP_Streaming_Client {
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $curl_info = curl_getinfo($ch);
         curl_close($ch);
 
+        // Comprehensive response logging
+        error_log('AI HTTP Client: cURL completed. HTTP code: ' . $http_code);
+        error_log('AI HTTP Client: cURL error: ' . ($error ?: 'none'));
+        error_log('AI HTTP Client: Total chunks received: ' . $chunk_count);
+        error_log('AI HTTP Client: Total response length: ' . strlen($full_response) . ' bytes');
+        error_log('AI HTTP Client: cURL info: ' . wp_json_encode($curl_info));
+
         if ($result === false) {
+            error_log('AI HTTP Client: cURL exec failed with error: ' . $error);
             throw new Exception('cURL streaming error: ' . $error);
         }
 
