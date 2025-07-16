@@ -38,10 +38,7 @@ class AI_HTTP_OpenAI_Streaming_Module {
                     return self::send_continuation_streaming_request($url, $request, $headers, $completion_callback, $timeout);
                 }
                 
-                // Validate request before sending
-                if (!self::validate_streaming_request($request)) {
-                    throw new Exception('Invalid streaming request format');
-                }
+                // Let the API validate the request format - cleaner than duplicating validation logic
                 
                 // Pass the full response to the completion callback so consumers can handle their own tool processing
                 $wrapped_callback = function($full_response) use ($completion_callback) {
@@ -110,39 +107,42 @@ class AI_HTTP_OpenAI_Streaming_Module {
      * @return bool True if valid
      */
     private static function validate_streaming_request($request) {
+        // OpenAI Responses API uses 'input' instead of 'messages'
+        $messages_field = isset($request['input']) ? 'input' : 'messages';
+        
         // Check required fields
-        if (!isset($request['messages']) || !is_array($request['messages'])) {
-            error_log('AI HTTP Client DEBUG: Request validation failed - missing or invalid messages array');
+        if (!isset($request[$messages_field]) || !is_array($request[$messages_field])) {
+            error_log("AI HTTP Client DEBUG: Request validation failed - missing or invalid {$messages_field} array");
             return false;
         }
         
-        if (empty($request['messages'])) {
-            error_log('AI HTTP Client DEBUG: Request validation failed - empty messages array');
+        if (empty($request[$messages_field])) {
+            error_log("AI HTTP Client DEBUG: Request validation failed - empty {$messages_field} array");
             return false;
         }
         
         // Validate message format - be flexible with additional fields
-        foreach ($request['messages'] as $index => $message) {
+        foreach ($request[$messages_field] as $index => $message) {
             if (!isset($message['role'])) {
-                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} missing role");
+                error_log("AI HTTP Client DEBUG: Request validation failed - {$messages_field}[{$index}] missing role");
                 return false;
             }
             
             if (!isset($message['content'])) {
-                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} missing content");
+                error_log("AI HTTP Client DEBUG: Request validation failed - {$messages_field}[{$index}] missing content");
                 return false;
             }
             
             // Validate role is one of the expected values
             $valid_roles = array('user', 'assistant', 'system', 'tool');
             if (!in_array($message['role'], $valid_roles)) {
-                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} has invalid role: {$message['role']}");
+                error_log("AI HTTP Client DEBUG: Request validation failed - {$messages_field}[{$index}] has invalid role: {$message['role']}");
                 return false;
             }
             
             // Content should be string or array (for multi-modal)
             if (!is_string($message['content']) && !is_array($message['content'])) {
-                error_log("AI HTTP Client DEBUG: Request validation failed - message {$index} content is not string or array");
+                error_log("AI HTTP Client DEBUG: Request validation failed - {$messages_field}[{$index}] content is not string or array");
                 return false;
             }
         }
