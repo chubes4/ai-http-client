@@ -88,10 +88,17 @@ class AI_HTTP_Openai_Request_Normalizer {
                 // Standard text content for Responses API
                 $normalized_message['content'] = $message['content'];
             }
+            
+            // Convert frontend "type":"text" to Responses API "type":"message"
+            if (isset($message['type']) && $message['type'] === 'text') {
+                $normalized_message['type'] = 'message';
+            } elseif (isset($message['type'])) {
+                $normalized_message['type'] = $message['type'];
+            }
 
             // Preserve other OpenAI-specific fields (tool_calls, tool_call_id, etc.)
             foreach ($message as $key => $value) {
-                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files'))) {
+                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files', 'type'))) {
                     $normalized_message[$key] = $value;
                 }
             }
