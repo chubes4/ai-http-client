@@ -24,10 +24,8 @@ class AI_HTTP_Anthropic_Request_Normalizer {
 
         // Model will be set by automatic model detection if not provided
 
-        // Anthropic requires max_tokens
-        if (!isset($normalized['max_tokens'])) {
-            $normalized['max_tokens'] = 1000;
-        }
+        // Note: Anthropic requires max_tokens, but let user decide when to set it
+        // Only validate if provided, don't force a default
 
         // Validate and constrain parameters for Anthropic (0.0 to 1.0)
         if (isset($normalized['temperature'])) {

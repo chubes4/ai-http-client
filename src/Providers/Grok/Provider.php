@@ -309,7 +309,7 @@ class AI_HTTP_Grok_Provider extends AI_HTTP_Provider_Base {
         // Create continuation request
         $continuation_request = array(
             'messages' => $messages,
-            'max_tokens' => 1000 // Default, can be overridden
+            // max_tokens will be set by normalizer if needed
         );
         
         if ($callback) {

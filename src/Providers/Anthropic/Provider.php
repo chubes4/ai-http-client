@@ -134,10 +134,8 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
 
         // Model will be set by automatic model detection if not provided
 
-        // Anthropic requires max_tokens
-        if (!isset($request['max_tokens'])) {
-            $request['max_tokens'] = 1000;
-        }
+        // Anthropic requires max_tokens - but only set if user hasn't specified it
+        // Let the RequestNormalizer handle this requirement
 
         // Validate temperature (0.0 to 1.0 for Anthropic)
         if (isset($request['temperature'])) {
@@ -225,7 +223,7 @@ class AI_HTTP_Anthropic_Provider extends AI_HTTP_Provider_Base {
         // Create continuation request
         $continuation_request = array(
             'messages' => $messages,
-            'max_tokens' => 1000 // Default, can be overridden
+            // max_tokens will be set by RequestNormalizer if required
         );
         
         // Extract system message if present in original conversation
