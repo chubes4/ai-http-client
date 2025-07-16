@@ -53,45 +53,58 @@ class AI_HTTP_Streaming_Client {
         $curl_headers[] = 'Accept: text/event-stream';
 
         $ch = curl_init($url);
+        
+        // Try the WordPress HTTP API approach first (like original Wordsurf)
+        if (function_exists('wp_remote_post') && !$completion_callback) {
+            error_log('AI HTTP Client: Using WordPress HTTP API for non-streaming request');
+            
+            $response = wp_remote_post($url, array(
+                'headers' => $headers,
+                'body' => wp_json_encode($body),
+                'timeout' => $timeout,
+                'stream' => false
+            ));
+            
+            if (is_wp_error($response)) {
+                throw new Exception('WordPress HTTP error: ' . $response->get_error_message());
+            }
+            
+            $full_response = wp_remote_retrieve_body($response);
+            return $full_response;
+        }
+        
+        // For streaming, use the working approach: stream to frontend, capture via output buffering
+        ob_start();
+        
         curl_setopt_array($ch, [
             CURLOPT_HTTPHEADER => $curl_headers,
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => wp_json_encode($body),
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
-                // Always log that WRITEFUNCTION was called - this will tell us if it's being invoked
                 error_log("AI HTTP Client: WRITEFUNCTION CALLED!");
                 
                 $chunk_count++;
                 $data_length = strlen($data);
                 
-                // Log each chunk for debugging
-                error_log("AI HTTP Client: Received chunk {$chunk_count}, {$data_length} bytes: " . substr($data, 0, 100) . '...');
+                error_log("AI HTTP Client: Received chunk {$chunk_count}, {$data_length} bytes");
                 
-                // Stream the raw data directly to output buffer
+                // Stream to frontend AND capture for callback
                 echo $data;
-                
-                // Flush immediately for real-time streaming
                 self::flush_output();
                 
-                // Accumulate for completion callback
                 $full_response .= $data;
-                
                 return $data_length;
             },
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false, // Must be false for WRITEFUNCTION to work
-            CURLOPT_NOPROGRESS => true, // Disable progress meter
-            CURLOPT_BUFFERSIZE => 4096, // Set buffer size
-            CURLOPT_TCP_NODELAY => true, // Disable TCP Nagle algorithm for faster streaming
+            CURLOPT_RETURNTRANSFER => false,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_USERAGENT => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
         ]);
         
-        // Additional debugging - log all cURL options set
-        error_log('AI HTTP Client: cURL options set - RETURNTRANSFER: false, WRITEFUNCTION: defined');
+        error_log('AI HTTP Client: Using cURL with output buffering for response capture');
 
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -99,12 +112,23 @@ class AI_HTTP_Streaming_Client {
         $curl_info = curl_getinfo($ch);
         curl_close($ch);
 
+        // Capture output buffer as fallback if WRITEFUNCTION didn't work
+        $output_buffer = ob_get_contents();
+        ob_end_clean();
+        
+        // If WRITEFUNCTION didn't accumulate data, use output buffer
+        if (strlen($full_response) === 0 && strlen($output_buffer) > 0) {
+            error_log('AI HTTP Client: WRITEFUNCTION failed, using output buffer fallback');
+            $full_response = $output_buffer;
+        }
+
         // Comprehensive response logging
         error_log('AI HTTP Client: cURL completed. HTTP code: ' . $http_code);
         error_log('AI HTTP Client: cURL error: ' . ($error ?: 'none'));
         error_log('AI HTTP Client: Total chunks received: ' . $chunk_count);
-        error_log('AI HTTP Client: Total response length: ' . strlen($full_response) . ' bytes');
-        error_log('AI HTTP Client: cURL info: ' . wp_json_encode($curl_info));
+        error_log('AI HTTP Client: WRITEFUNCTION response length: ' . strlen($full_response) . ' bytes');
+        error_log('AI HTTP Client: Output buffer length: ' . strlen($output_buffer) . ' bytes');
+        error_log('AI HTTP Client: Final response length: ' . strlen($full_response) . ' bytes');
 
         if ($result === false) {
             error_log('AI HTTP Client: cURL exec failed with error: ' . $error);
@@ -124,6 +148,14 @@ class AI_HTTP_Streaming_Client {
             try {
                 error_log('AI HTTP Client: Calling completion callback with ' . strlen($full_response) . ' bytes of data');
                 error_log('AI HTTP Client: Full response preview: ' . substr($full_response, 0, 200) . '...');
+                
+                // Log the COMPLETE response if it's not too large (for debugging tool calls)
+                if (strlen($full_response) > 0 && strlen($full_response) < 50000) {
+                    error_log('AI HTTP Client: COMPLETE API RESPONSE: ' . $full_response);
+                } else {
+                    error_log('AI HTTP Client: Response too large to log completely (' . strlen($full_response) . ' bytes)');
+                }
+                
                 call_user_func($completion_callback, $full_response);
             } catch (Exception $e) {
                 error_log('AI HTTP Client streaming completion callback error: ' . $e->getMessage());
