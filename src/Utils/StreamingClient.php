@@ -51,6 +51,9 @@ class AI_HTTP_Streaming_Client {
         
         // Add required headers for SSE
         $curl_headers[] = 'Accept: text/event-stream';
+        
+        // Debug log all headers being sent
+        error_log('AI HTTP Client: All cURL headers: ' . print_r($curl_headers, true));
 
         $ch = curl_init($url);
         
