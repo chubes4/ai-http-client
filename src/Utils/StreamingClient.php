@@ -75,7 +75,7 @@ class AI_HTTP_Streaming_Client {
             },
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => true, // Need this true to ensure proper data handling
+            CURLOPT_RETURNTRANSFER => false, // Must be false for WRITEFUNCTION to work
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
