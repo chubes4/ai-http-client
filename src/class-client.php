@@ -19,6 +19,11 @@ class AI_HTTP_Client {
     private $provider_factory;
     
     /**
+     * Continuation manager for provider-agnostic continuation
+     */
+    private $continuation_manager;
+    
+    /**
      * Client configuration
      */
     private $config = array();
@@ -42,6 +47,9 @@ class AI_HTTP_Client {
 
         // Dependency injection with fallbacks
         $this->provider_factory = $provider_factory ?: new AI_HTTP_Provider_Factory(null, $this->config);
+        
+        // Initialize continuation manager for provider-agnostic continuation
+        $this->continuation_manager = new AI_HTTP_Continuation_Manager($this->provider_factory, $this->config);
         
         // Normalizers are now handled by the factory on a per-provider basis
         // This follows SRP - each provider gets its own specialized normalizers
@@ -118,63 +126,57 @@ class AI_HTTP_Client {
         error_log('AI HTTP Client DEBUG: Request after normalization: ' . json_encode($provider_request));
         
         // Step 4: Send streaming request through provider (streams to output buffer)
-        return $provider->send_streaming_request($provider_request, $completion_callback);
+        $full_response = $provider->send_streaming_request($provider_request, $completion_callback);
+        
+        // Step 5: Store continuation state for provider-agnostic continuation
+        if ($full_response) {
+            $this->continuation_manager->store_continuation_state($provider_name, $full_response, $provider_request);
+        }
+        
+        return $full_response;
     }
 
     /**
-     * Continue conversation with tool results
-     * Supports provider-specific continuation patterns:
+     * Continue conversation with tool results (provider-agnostic)
+     * 
+     * This method provides a simplified interface that automatically handles
+     * provider-specific continuation patterns behind the scenes:
      * - OpenAI: Uses response_id with Responses API continuation
-     * - Anthropic: Uses conversation_history array (response_id parameter repurposed)
-     * - Others: Will use conversation_history rebuilding pattern
+     * - Anthropic: Uses conversation_history array
+     * - Others: Use conversation_history rebuilding pattern
      *
-     * @param string|array $response_id_or_history Response ID (OpenAI) or conversation history (Anthropic/others)
      * @param array $tool_results Array of tool results to continue with
      * @param string $provider_name Optional specific provider to use
      * @param callable $completion_callback Optional callback for streaming
      * @return array|string Response from continuation request
      * @throws Exception If continuation is not supported or fails
      */
-    public function continue_with_tool_results($response_id_or_history, $tool_results, $provider_name = null, $completion_callback = null) {
+    public function continue_with_tool_results($tool_results, $provider_name = null, $completion_callback = null) {
         $provider_name = $provider_name ?: $this->config['default_provider'];
         
-        // Create provider instance
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
-        
-        if (!$provider) {
-            throw new Exception("Provider '{$provider_name}' not available");
-        }
-        
-        if (!$provider->is_configured()) {
-            throw new Exception("Provider '{$provider_name}' not configured");
-        }
-        
-        // Check if provider supports continuation
-        if (!method_exists($provider, 'continue_with_tool_results')) {
-            throw new Exception("Provider '{$provider_name}' does not support continuation");
-        }
-        
-        // Use provider-specific continuation method
-        return $provider->continue_with_tool_results($response_id_or_history, $tool_results, $completion_callback);
+        // Use centralized continuation manager
+        return $this->continuation_manager->continue_with_tool_results($provider_name, $tool_results, $completion_callback);
     }
 
     /**
-     * Get last response ID from provider
-     * Used for continuation tracking (OpenAI Responses API)
-     *
+     * Check if continuation is possible for current provider
+     * 
      * @param string $provider_name Optional specific provider to use
-     * @return string|null Response ID or null if not available
+     * @return bool True if continuation state exists
      */
-    public function get_last_response_id($provider_name = null) {
+    public function can_continue($provider_name = null) {
         $provider_name = $provider_name ?: $this->config['default_provider'];
-        
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
-        
-        if (!$provider || !method_exists($provider, 'get_last_response_id')) {
-            return null;
-        }
-        
-        return $provider->get_last_response_id();
+        return $this->continuation_manager->can_continue($provider_name);
+    }
+    
+    /**
+     * Clear continuation state for provider
+     * 
+     * @param string $provider_name Optional specific provider to use
+     */
+    public function clear_continuation_state($provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        $this->continuation_manager->clear_continuation_state($provider_name);
     }
 
     /**

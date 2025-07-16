@@ -86,21 +86,29 @@ class AI_HTTP_Continuation_Manager {
     }
 
     /**
-     * Extract continuation data from response based on provider
+     * Extract continuation data from response using provider-specific handlers
      *
      * @param string $provider_name Provider name
-     * @param array $response_data Response data
+     * @param mixed $response_data Response data (string for streaming, array for non-streaming)
      * @param array $original_request Original request
      * @return array|null Continuation data or null if none needed
      */
     private function extract_continuation_data($provider_name, $response_data, $original_request) {
+        // Try provider-specific continuation handler first
+        $continuation_handler = $this->get_continuation_handler($provider_name);
+        
+        if ($continuation_handler && method_exists($continuation_handler, 'extract_data')) {
+            return $continuation_handler->extract_data($response_data, $original_request);
+        }
+        
+        // Fallback to generic extraction patterns
         switch ($provider_name) {
             case 'openai':
                 // OpenAI needs response ID from Responses API
-                if (isset($response_data['id'])) {
+                if (is_array($response_data) && isset($response_data['id'])) {
                     return array(
                         'response_id' => $response_data['id'],
-                        'model' => $response_data['model'] ?? null,
+                        'model' => $response_data['model'] ?? ($original_request['model'] ?? null),
                         'created' => $response_data['created'] ?? time()
                     );
                 }

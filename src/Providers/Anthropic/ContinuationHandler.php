@@ -104,4 +104,15 @@ class AI_HTTP_Anthropic_Continuation_Handler {
                is_array($continuation_data['conversation_history']) && 
                !empty($continuation_data['conversation_history']);
     }
+    
+    /**
+     * Extract continuation data - static method for ContinuationManager
+     *
+     * @param mixed $response_data Response data from provider
+     * @param array $original_request Original request data
+     * @return array Continuation data
+     */
+    public static function extract_data($response_data, $original_request = array()) {
+        return self::extract_continuation_data($response_data, $original_request);
+    }
 }
