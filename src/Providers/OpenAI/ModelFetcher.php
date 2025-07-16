@@ -87,13 +87,22 @@ class AI_HTTP_OpenAI_Model_Fetcher {
     }
 
     /**
-     * Check if model ID is a chat model
+     * Check if model ID is a chat/reasoning model compatible with Responses API
      *
      * @param string $model_id Model ID
-     * @return bool True if it's a chat model
+     * @return bool True if it's a compatible model
      */
     private static function is_chat_model($model_id) {
-        $chat_patterns = array('gpt-', 'gpt4', 'chatgpt');
+        // Responses API compatible models (2025)
+        $chat_patterns = array(
+            'gpt-',        // GPT-4o series, GPT-4.1 series
+            'gpt4',        // Legacy GPT-4 variants
+            'chatgpt',     // ChatGPT models
+            'o1',          // o1 reasoning models
+            'o3',          // o3 reasoning models  
+            'o4'           // o4-mini reasoning models
+        );
+        
         $exclude_patterns = array('embedding', 'whisper', 'tts', 'dall-e', 'davinci-edit');
 
         // Exclude non-chat models
@@ -103,7 +112,7 @@ class AI_HTTP_OpenAI_Model_Fetcher {
             }
         }
 
-        // Include known chat model patterns
+        // Include known chat/reasoning model patterns
         foreach ($chat_patterns as $pattern) {
             if (strpos($model_id, $pattern) !== false) {
                 return true;
