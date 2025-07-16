@@ -96,9 +96,10 @@ class AI_HTTP_Openai_Request_Normalizer {
                 $normalized_message['type'] = $message['type'];
             }
 
-            // Preserve other OpenAI-specific fields (tool_calls, tool_call_id, etc.)
+            // Preserve only known OpenAI-specific fields (reject unknown parameters)
+            $allowed_fields = array('tool_calls', 'tool_call_id', 'name', 'function_call');
             foreach ($message as $key => $value) {
-                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files', 'type'))) {
+                if (in_array($key, $allowed_fields)) {
                     $normalized_message[$key] = $value;
                 }
             }
