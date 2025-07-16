@@ -426,8 +426,18 @@ class AI_HTTP_OpenAI_Streaming_Module {
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => function_exists('wp_json_encode') ? wp_json_encode($body) : json_encode($body),
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
-                // Only accumulate data, don't echo raw (we'll process it later)
+                // Accumulate data for completion callback
                 $full_response .= $data;
+                
+                // Echo data to frontend EventSource for streaming
+                echo $data;
+                
+                // Flush output to ensure immediate streaming
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+                
                 return strlen($data);
             },
             CURLOPT_TIMEOUT => $timeout,
