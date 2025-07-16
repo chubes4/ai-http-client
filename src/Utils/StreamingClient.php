@@ -81,11 +81,17 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
             CURLOPT_RETURNTRANSFER => false, // Must be false for WRITEFUNCTION to work
+            CURLOPT_NOPROGRESS => true, // Disable progress meter
+            CURLOPT_BUFFERSIZE => 4096, // Set buffer size
+            CURLOPT_TCP_NODELAY => true, // Disable TCP Nagle algorithm for faster streaming
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_USERAGENT => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
         ]);
+        
+        // Additional debugging - log all cURL options set
+        error_log('AI HTTP Client: cURL options set - RETURNTRANSFER: false, WRITEFUNCTION: defined');
 
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
