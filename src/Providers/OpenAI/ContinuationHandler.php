@@ -120,10 +120,12 @@ class AI_HTTP_OpenAI_Continuation_Handler {
      * @return string|null Response ID or null if not found
      */
     private static function extract_response_id_from_stream($stream_response) {
+        error_log("AI HTTP Client: Extracting response ID from stream response of length: " . strlen($stream_response));
+        
         // Parse SSE events to find response.created event with ID
         $event_blocks = explode("\n\n", trim($stream_response));
         
-        foreach ($event_blocks as $block) {
+        foreach ($event_blocks as $block_index => $block) {
             if (empty(trim($block))) {
                 continue;
             }
@@ -140,15 +142,22 @@ class AI_HTTP_OpenAI_Continuation_Handler {
                 }
             }
             
+            // Debug: Log all events to see what we're getting
+            if (!empty($event_type)) {
+                error_log("AI HTTP Client: Found event type '{$event_type}' with data: " . substr($current_data, 0, 200) . "...");
+            }
+            
             // Look for response.created event which contains the response ID
             if ($event_type === 'response.created' && !empty($current_data)) {
                 $decoded = json_decode($current_data, true);
                 if (json_last_error() === JSON_ERROR_NONE && isset($decoded['id'])) {
+                    error_log("AI HTTP Client: Successfully extracted response ID: " . $decoded['id']);
                     return $decoded['id'];
                 }
             }
         }
         
+        error_log("AI HTTP Client: No response ID found in stream response");
         return null;
     }
 
