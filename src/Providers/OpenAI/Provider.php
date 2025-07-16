@@ -50,8 +50,8 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             throw new Exception('OpenAI API key not configured');
         }
         
-        // Use simple streaming pattern - return full response for external processing
-        $full_response = AI_HTTP_Streaming_Client::stream_post(
+        // Use OpenAI StreamingModule which properly handles headers and Content-Type
+        $full_response = AI_HTTP_OpenAI_Streaming_Module::send_streaming_request(
             $url,
             $request,
             $headers,
