@@ -38,6 +38,7 @@ class AI_HTTP_Continuation_State {
         set_transient($transient_key, $state_with_timestamp, 300); // 5 minutes expiry
         
         error_log("AI HTTP Client: Stored continuation state for provider '{$provider_name}' (transient: {$transient_key})");
+        error_log("AI HTTP Client: Stored state data: " . json_encode($state_data));
     }
 
     /**

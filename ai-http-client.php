@@ -81,6 +81,7 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/SSEParser.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/FileUploadClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ToolExecutor.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/Normalizers/GenericStreamNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ContinuationState.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ContinuationManager.php';
         

@@ -55,6 +55,9 @@ class AI_HTTP_Anthropic_Streaming_Module {
             }
         };
         
+        // Anthropic requires stream: true parameter
+        $request['stream'] = true;
+        
         return AI_HTTP_Streaming_Client::stream_post(
             $url,
             $request,
@@ -66,7 +69,8 @@ class AI_HTTP_Anthropic_Streaming_Module {
                 $headers
             ),
             $wrapped_callback,
-            $timeout
+            $timeout,
+            'anthropic'
         );
     }
 

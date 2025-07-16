@@ -337,6 +337,7 @@ class AI_HTTP_Options_Manager {
      */
     public static function init_ajax_handlers() {
         add_action('wp_ajax_ai_http_save_settings', [__CLASS__, 'ajax_save_settings']);
+        add_action('wp_ajax_ai_http_load_provider_settings', [__CLASS__, 'ajax_load_provider_settings']);
     }
     
     /**
@@ -371,6 +372,25 @@ class AI_HTTP_Options_Manager {
         } catch (Exception $e) {
             error_log('AI HTTP Client: Save settings AJAX failed: ' . $e->getMessage());
             wp_send_json_error('Save failed: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * AJAX handler for loading provider settings
+     */
+    public static function ajax_load_provider_settings() {
+        check_ajax_referer('ai_http_nonce', 'nonce');
+        
+        try {
+            $provider = sanitize_text_field($_POST['provider']);
+            $options_manager = new self();
+            $settings = $options_manager->get_provider_settings($provider);
+            
+            wp_send_json_success($settings);
+            
+        } catch (Exception $e) {
+            error_log('AI HTTP Client: Load provider settings AJAX failed: ' . $e->getMessage());
+            wp_send_json_error('Failed to load settings: ' . $e->getMessage());
         }
     }
 }

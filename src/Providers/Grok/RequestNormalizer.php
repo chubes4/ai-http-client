@@ -23,8 +23,11 @@ class AI_HTTP_Grok_Request_Normalizer {
     public function normalize($standard_request) {
         $normalized = array();
 
-        // Model will be set by automatic model detection if not provided
-        $normalized['model'] = $standard_request['model'] ?? 'grok-3';
+        // Model must be explicitly provided - no defaults
+        if (!isset($standard_request['model'])) {
+            throw new Exception('Model parameter is required for Grok requests');
+        }
+        $normalized['model'] = $standard_request['model'];
 
         // Convert messages to Grok format (OpenAI-compatible)
         if (isset($standard_request['messages']) && is_array($standard_request['messages'])) {

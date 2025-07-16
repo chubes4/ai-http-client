@@ -69,7 +69,8 @@ class AI_HTTP_OpenAI_Streaming_Module {
                         $headers
                     ),
                     $wrapped_callback,
-                    $timeout
+                    $timeout,
+                    'openai'
                 );
                 
                 // If we get here without exception, request succeeded

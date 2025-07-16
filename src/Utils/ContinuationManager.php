@@ -59,17 +59,23 @@ class AI_HTTP_Continuation_Manager {
      * @return mixed Provider response
      */
     public function continue_with_tool_results($provider_name, $tool_results, $callback = null) {
+        error_log("AI HTTP Client: ContinuationManager attempting to continue with tool results for provider: {$provider_name}");
+        
         // Get stored continuation state
         $continuation_data = AI_HTTP_Continuation_State::get($provider_name);
         
         if (!$continuation_data) {
+            error_log("AI HTTP Client: No continuation state found for provider '{$provider_name}'");
             throw new Exception("No continuation state found for provider '{$provider_name}'. Cannot continue conversation.");
         }
+
+        error_log("AI HTTP Client: Retrieved continuation data: " . json_encode($continuation_data));
 
         // Create provider instance
         $provider = $this->provider_factory->create_provider($provider_name, $this->config);
         
         if (!$provider) {
+            error_log("AI HTTP Client: Failed to create provider instance for '{$provider_name}'");
             throw new Exception("Failed to create provider instance for '{$provider_name}'");
         }
 
@@ -77,9 +83,11 @@ class AI_HTTP_Continuation_Manager {
         $continuation_handler = $this->get_continuation_handler($provider_name);
         
         if ($continuation_handler) {
+            error_log("AI HTTP Client: Using provider-specific continuation handler for '{$provider_name}'");
             // Use provider-specific continuation handler
             return $continuation_handler->handle_continuation($continuation_data, $tool_results, $callback);
         } else {
+            error_log("AI HTTP Client: No continuation handler found, using fallback for '{$provider_name}'");
             // Fallback to provider's direct continuation method
             return $this->fallback_continuation($provider, $continuation_data, $tool_results, $callback);
         }

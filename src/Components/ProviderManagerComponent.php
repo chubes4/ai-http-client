@@ -331,6 +331,8 @@ class AI_HTTP_ProviderManager_Component {
         }
 
         function aiHttpProviderChanged(componentId, provider) {
+            // Load provider settings and update all fields
+            aiHttpLoadProviderSettings(componentId, provider);
             // Update models when provider changes - NO auto-save
             aiHttpRefreshModels(componentId, provider);
         }
@@ -355,10 +357,13 @@ class AI_HTTP_ProviderManager_Component {
             }).then(response => response.json()).then(data => {
                 if (data.success) {
                     modelSelect.innerHTML = '';
+                    const selectedModel = modelSelect.getAttribute('data-selected-model') || '';
+                    
                     Object.entries(data.data).forEach(([key, value]) => {
                         const option = document.createElement('option');
                         option.value = key;
                         option.textContent = value;
+                        option.selected = (key === selectedModel);
                         modelSelect.appendChild(option);
                     });
                 } else {
@@ -399,6 +404,75 @@ class AI_HTTP_ProviderManager_Component {
             if (valueDisplay) {
                 valueDisplay.textContent = value;
             }
+        }
+        
+        function aiHttpLoadProviderSettings(componentId, provider) {
+            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=ai_http_load_provider_settings&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    const settings = data.data;
+                    
+                    // Update API key field
+                    const apiKeyInput = document.getElementById(componentId + '_api_key');
+                    if (apiKeyInput) {
+                        apiKeyInput.value = settings.api_key || '';
+                    }
+                    
+                    // Update model field (will be populated by aiHttpRefreshModels)
+                    const modelSelect = document.getElementById(componentId + '_model');
+                    if (modelSelect) {
+                        modelSelect.setAttribute('data-selected-model', settings.model || '');
+                    }
+                    
+                    // Update temperature field
+                    const temperatureInput = document.getElementById(componentId + '_temperature');
+                    if (temperatureInput) {
+                        temperatureInput.value = settings.temperature || '0.7';
+                        aiHttpUpdateTemperatureValue(componentId, settings.temperature || '0.7');
+                    }
+                    
+                    // Update system prompt field
+                    const systemPromptTextarea = document.getElementById(componentId + '_system_prompt');
+                    if (systemPromptTextarea) {
+                        systemPromptTextarea.value = settings.system_prompt || '';
+                    }
+                    
+                    // Update instructions field
+                    const instructionsTextarea = document.getElementById(componentId + '_instructions');
+                    if (instructionsTextarea) {
+                        instructionsTextarea.value = settings.instructions || '';
+                    }
+                    
+                    // Update provider status
+                    const providerStatusSpan = document.getElementById(componentId + '_provider_status');
+                    if (providerStatusSpan) {
+                        const apiKeyValue = settings.api_key || '';
+                        if (apiKeyValue.trim()) {
+                            providerStatusSpan.innerHTML = '<span style="color: #00a32a;">✓ Configured</span>';
+                        } else {
+                            providerStatusSpan.innerHTML = '<span style="color: #d63638;">⚠ Not configured</span>';
+                        }
+                    }
+                    
+                    // Handle custom fields
+                    Object.keys(settings).forEach(key => {
+                        if (key.startsWith('custom_')) {
+                            const customInput = document.getElementById(componentId + '_' + key);
+                            if (customInput) {
+                                customInput.value = settings[key] || '';
+                            }
+                        }
+                    });
+                    
+                } else {
+                    console.error('AI HTTP Client: Failed to load provider settings', data.message);
+                }
+            }).catch(error => {
+                console.error('AI HTTP Client: Provider settings load failed', error);
+            });
         }
         </script>
         <?php

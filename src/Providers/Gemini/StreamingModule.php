@@ -59,6 +59,54 @@ class AI_HTTP_Gemini_Streaming_Module {
             }
         };
         
+        // Custom streaming callback to normalize Gemini response format
+        $normalize_callback = function($data) use ($wrapped_callback) {
+            error_log('AI HTTP Client: Gemini normalize_callback called with data: ' . $data);
+            
+            // Parse SSE data
+            $lines = explode("\n", $data);
+            
+            foreach ($lines as $line) {
+                if (strpos($line, 'data: ') === 0) {
+                    $json_data = substr($line, 6);
+                    
+                    // Parse Gemini response
+                    $decoded = json_decode($json_data, true);
+                    if ($decoded && json_last_error() === JSON_ERROR_NONE) {
+                        try {
+                            error_log('AI HTTP Client: Decoded Gemini data: ' . wp_json_encode($decoded));
+                            
+                            // Normalize to universal format
+                            $normalized = AI_HTTP_Generic_Stream_Normalizer::normalize_chunk_by_provider($decoded, 'gemini');
+                            error_log('AI HTTP Client: Normalized result: ' . wp_json_encode($normalized));
+                            
+                            if ($normalized && (!empty($normalized['content']) || !empty($normalized['tool_calls']) || $normalized['done'])) {
+                                // Send normalized chunk as SSE in universal format
+                                echo "data: " . wp_json_encode($normalized) . "\n\n";
+                                
+                                if (ob_get_level() > 0) {
+                                    ob_flush();
+                                }
+                                flush();
+                            }
+                            
+                            // Send completion marker if done
+                            if ($normalized['done']) {
+                                echo "data: [DONE]\n\n";
+                                if (ob_get_level() > 0) {
+                                    ob_flush();
+                                }
+                                flush();
+                            }
+                        } catch (Exception $e) {
+                            error_log('AI HTTP Client: Error in normalize_callback: ' . $e->getMessage());
+                            error_log('AI HTTP Client: Error stack trace: ' . $e->getTraceAsString());
+                        }
+                    }
+                }
+            }
+        };
+        
         return AI_HTTP_Streaming_Client::stream_post(
             $url,
             $request,
@@ -69,8 +117,9 @@ class AI_HTTP_Gemini_Streaming_Module {
                 ),
                 $headers
             ),
-            $wrapped_callback,
-            $timeout
+            $normalize_callback,
+            $timeout,
+            'gemini'
         );
     }
 

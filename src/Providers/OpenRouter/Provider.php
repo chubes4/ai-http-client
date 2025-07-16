@@ -74,8 +74,16 @@ class AI_HTTP_OpenRouter_Provider extends AI_HTTP_Provider_Base {
         }
 
         try {
+            // Check if model is configured
+            if (!isset($this->config['model'])) {
+                return array(
+                    'success' => false,
+                    'message' => 'No model configured for OpenRouter provider'
+                );
+            }
+            
             $test_request = array(
-                'model' => 'openai/gpt-3.5-turbo',
+                'model' => $this->config['model'],
                 'messages' => array(
                     array(
                         'role' => 'user',

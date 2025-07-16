@@ -67,7 +67,8 @@ class AI_HTTP_OpenRouter_Streaming_Module {
                 $headers
             ),
             $wrapped_callback,
-            $timeout
+            $timeout,
+            'openrouter'
         );
     }
 

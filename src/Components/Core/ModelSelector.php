@@ -199,7 +199,19 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         $provider = sanitize_text_field($_POST['provider']);
         
         try {
-            $client = new AI_HTTP_Client();
+            // Get provider settings from WordPress options
+            $options_manager = new AI_HTTP_Options_Manager();
+            $provider_settings = $options_manager->get_provider_settings($provider);
+            
+            // Configure client with provider settings
+            $config = array(
+                'default_provider' => $provider,
+                'providers' => array(
+                    $provider => $provider_settings
+                )
+            );
+            
+            $client = new AI_HTTP_Client($config);
             $models = $client->get_models($provider);
             
             if (empty($models)) {

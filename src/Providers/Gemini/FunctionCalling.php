@@ -21,6 +21,12 @@ class AI_HTTP_Gemini_Function_Calling {
      * @return array Sanitized tools in Gemini format
      */
     public static function sanitize_tools($tools) {
+        // Check if tools are already in Gemini format
+        if (isset($tools[0]['functionDeclarations'])) {
+            // Tools are already in Gemini format, just return them
+            return $tools;
+        }
+        
         $sanitized = array();
 
         foreach ($tools as $tool) {
@@ -54,6 +60,12 @@ class AI_HTTP_Gemini_Function_Calling {
      * @return array Gemini-formatted tool
      */
     private static function normalize_single_tool($tool) {
+        // Handle if tool is already in Gemini functionDeclarations format
+        if (isset($tool['functionDeclarations']) && is_array($tool['functionDeclarations'])) {
+            // This is already a Gemini-formatted tool array, just return it
+            return $tool;
+        }
+        
         // Handle if tool is in OpenAI format - convert to Gemini
         if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
             return array(
@@ -82,6 +94,8 @@ class AI_HTTP_Gemini_Function_Calling {
         }
         
         
+        // Debug: log the unexpected tool format
+        error_log('Gemini tool normalization: Unexpected tool format - ' . wp_json_encode($tool));
         throw new Exception('Invalid tool definition for Gemini format');
     }
 

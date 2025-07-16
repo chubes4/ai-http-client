@@ -93,7 +93,14 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
                 )
             );
 
-            $model = 'gemini-1.5-flash';
+            // Use configured model or fail if not set
+            $model = $this->config['model'] ?? null;
+            if (!$model) {
+                return array(
+                    'success' => false,
+                    'message' => 'No model configured for Gemini provider'
+                );
+            }
             $url = $this->get_api_endpoint($model);
             $response = $this->make_request($url, $test_request);
             
@@ -138,9 +145,9 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_Provider_Base {
     protected function sanitize_request($request) {
         $request = parent::sanitize_request($request);
 
-        // Model will be set by automatic model detection if not provided
+        // Model must be explicitly provided - no defaults
         if (!isset($request['model'])) {
-            $request['model'] = 'gemini-1.5-flash';
+            throw new Exception('Model parameter is required for Gemini requests');
         }
 
         // Convert standard format to Gemini format if needed

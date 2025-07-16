@@ -100,8 +100,16 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         }
 
         try {
+            // Check if model is configured
+            if (!isset($this->config['model'])) {
+                return array(
+                    'success' => false,
+                    'message' => 'No model configured for OpenAI provider'
+                );
+            }
+            
             $test_request = array(
-                'model' => 'gpt-3.5-turbo',
+                'model' => $this->config['model'],
                 'messages' => array(
                     array(
                         'role' => 'user',
@@ -247,7 +255,10 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
             $continuation_request['model'] = $continuation_data['model'];
         } else {
             // Fallback to provider config if no model in continuation data
-            $continuation_request['model'] = $this->config['model'] ?? 'gpt-4o-mini';
+            if (!isset($this->config['model'])) {
+                throw new Exception('Model parameter is required for OpenAI requests');
+            }
+            $continuation_request['model'] = $this->config['model'];
         }
         
         $url = $this->get_api_endpoint();
