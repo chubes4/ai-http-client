@@ -24,33 +24,113 @@ class AI_HTTP_Tool_Executor {
      * @param string $tool_name Tool name
      * @param array $arguments Tool arguments
      * @param string $call_id Optional call ID for tracking
+     * @param int $timeout_seconds Optional timeout in seconds (default: 30)
      * @return array Tool execution result
      */
-    public static function execute_tool($tool_name, $arguments = array(), $call_id = null) {
+    public static function execute_tool($tool_name, $arguments = array(), $call_id = null, $timeout_seconds = 30) {
+        $start_time = microtime(true);
+        
         try {
-            // Check registered custom tools
-            if (isset(self::$custom_tools[$tool_name])) {
-                $handler = self::$custom_tools[$tool_name];
-                return call_user_func($handler, $arguments, $call_id);
+            // Validate arguments before execution
+            if (!self::validate_tool_arguments($tool_name, $arguments)) {
+                return array(
+                    'success' => false,
+                    'error' => 'Invalid arguments for tool: ' . $tool_name,
+                    'call_id' => $call_id
+                );
             }
             
-            // Allow WordPress plugins to handle tools via filter
-            $result = apply_filters('ai_http_client_execute_tool', null, $tool_name, $arguments, $call_id);
-            if ($result !== null) {
-                return $result;
+            // Execute with timeout handling
+            $result = self::execute_with_timeout($tool_name, $arguments, $call_id, $timeout_seconds);
+            
+            // Add execution metadata
+            $execution_time = microtime(true) - $start_time;
+            if (is_array($result)) {
+                $result['execution_time'] = round($execution_time, 3);
+                $result['call_id'] = $call_id;
             }
             
-            return array(
-                'success' => false,
-                'error' => 'Unknown tool: ' . $tool_name
-            );
+            return $result;
             
         } catch (Exception $e) {
+            $execution_time = microtime(true) - $start_time;
+            error_log("AI HTTP Client DEBUG: Tool execution failed for '{$tool_name}': " . $e->getMessage());
+            
             return array(
                 'success' => false,
-                'error' => 'Tool execution failed: ' . $e->getMessage()
+                'error' => 'Tool execution failed: ' . $e->getMessage(),
+                'call_id' => $call_id,
+                'execution_time' => round($execution_time, 3)
             );
         }
+    }
+    
+    /**
+     * Execute tool with timeout handling
+     *
+     * @param string $tool_name Tool name
+     * @param array $arguments Tool arguments  
+     * @param string $call_id Call ID
+     * @param int $timeout_seconds Timeout in seconds
+     * @return array Tool execution result
+     * @throws Exception If timeout is exceeded
+     */
+    private static function execute_with_timeout($tool_name, $arguments, $call_id, $timeout_seconds) {
+        $start_time = time();
+        
+        // Set up timeout tracking
+        $max_execution_time = ini_get('max_execution_time');
+        if ($max_execution_time > 0 && $timeout_seconds > $max_execution_time) {
+            $timeout_seconds = $max_execution_time - 5; // Leave 5 seconds buffer
+        }
+        
+        // Check registered custom tools
+        if (isset(self::$custom_tools[$tool_name])) {
+            $handler = self::$custom_tools[$tool_name];
+            
+            // Execute with periodic timeout checks
+            $result = self::execute_handler_with_checks($handler, $arguments, $call_id, $start_time, $timeout_seconds);
+            return $result;
+        }
+        
+        // Allow WordPress plugins to handle tools via filter
+        $result = apply_filters('ai_http_client_execute_tool', null, $tool_name, $arguments, $call_id);
+        
+        // Check timeout after filter execution
+        if ((time() - $start_time) > $timeout_seconds) {
+            throw new Exception("Tool execution timeout exceeded ({$timeout_seconds}s)");
+        }
+        
+        if ($result !== null) {
+            return $result;
+        }
+        
+        return array(
+            'success' => false,
+            'error' => 'Unknown tool: ' . $tool_name
+        );
+    }
+    
+    /**
+     * Execute handler with timeout checks
+     *
+     * @param callable $handler Tool handler
+     * @param array $arguments Tool arguments
+     * @param string $call_id Call ID
+     * @param int $start_time Start timestamp
+     * @param int $timeout_seconds Timeout in seconds
+     * @return array Tool execution result
+     * @throws Exception If timeout is exceeded
+     */
+    private static function execute_handler_with_checks($handler, $arguments, $call_id, $start_time, $timeout_seconds) {
+        // For simple handlers, just execute directly with timeout check
+        $result = call_user_func($handler, $arguments, $call_id);
+        
+        if ((time() - $start_time) > $timeout_seconds) {
+            throw new Exception("Tool execution timeout exceeded ({$timeout_seconds}s)");
+        }
+        
+        return $result;
     }
 
     /**
@@ -123,9 +203,10 @@ class AI_HTTP_Tool_Executor {
      * Execute multiple tools in sequence
      *
      * @param array $tool_calls Array of tool calls
+     * @param bool $continue_on_failure Whether to continue executing remaining tools if one fails
      * @return array Array of results
      */
-    public static function execute_multiple_tools($tool_calls) {
+    public static function execute_multiple_tools($tool_calls, $continue_on_failure = true) {
         $results = array();
         
         foreach ($tool_calls as $tool_call) {
@@ -138,15 +219,100 @@ class AI_HTTP_Tool_Executor {
                 $arguments = json_decode($arguments, true) ?: array();
             }
             
-            $result = self::execute_tool($tool_name, $arguments, $call_id);
+            $result = self::execute_tool_with_retry($tool_name, $arguments, $call_id);
             $results[] = array(
                 'tool_call_id' => $call_id,
                 'tool_name' => $tool_name,
                 'result' => $result
             );
+            
+            // Stop executing if this tool failed and continue_on_failure is false
+            if (!$continue_on_failure && isset($result['success']) && !$result['success']) {
+                error_log("AI HTTP Client DEBUG: Stopping tool execution after failure in '{$tool_name}'");
+                break;
+            }
         }
         
         return $results;
+    }
+    
+    /**
+     * Execute tool with retry logic
+     *
+     * @param string $tool_name Tool name
+     * @param array $arguments Tool arguments
+     * @param string $call_id Call ID
+     * @param int $max_retries Maximum number of retries (default: 2)
+     * @param int $timeout_seconds Timeout per attempt in seconds (default: 30)
+     * @return array Tool execution result
+     */
+    public static function execute_tool_with_retry($tool_name, $arguments = array(), $call_id = null, $max_retries = 2, $timeout_seconds = 30) {
+        $last_error = null;
+        
+        for ($attempt = 0; $attempt <= $max_retries; $attempt++) {
+            try {
+                $result = self::execute_tool($tool_name, $arguments, $call_id, $timeout_seconds);
+                
+                // If successful, return immediately
+                if (isset($result['success']) && $result['success']) {
+                    if ($attempt > 0) {
+                        error_log("AI HTTP Client DEBUG: Tool '{$tool_name}' succeeded on attempt " . ($attempt + 1));
+                    }
+                    return $result;
+                }
+                
+                // If failed but not due to timeout/exception, don't retry
+                if (isset($result['error']) && !self::is_retryable_error($result['error'])) {
+                    return $result;
+                }
+                
+                $last_error = isset($result['error']) ? $result['error'] : 'Unknown error';
+                
+            } catch (Exception $e) {
+                $last_error = $e->getMessage();
+                error_log("AI HTTP Client DEBUG: Tool '{$tool_name}' attempt " . ($attempt + 1) . " failed: " . $last_error);
+            }
+            
+            // Wait before retry (exponential backoff)
+            if ($attempt < $max_retries) {
+                $wait_time = pow(2, $attempt); // 1s, 2s, 4s...
+                sleep($wait_time);
+            }
+        }
+        
+        // All attempts failed
+        return array(
+            'success' => false,
+            'error' => 'Tool execution failed after ' . ($max_retries + 1) . ' attempts. Last error: ' . $last_error,
+            'call_id' => $call_id,
+            'attempts' => $max_retries + 1
+        );
+    }
+    
+    /**
+     * Check if an error is retryable
+     *
+     * @param string $error Error message
+     * @return bool True if error is retryable
+     */
+    private static function is_retryable_error($error) {
+        $retryable_patterns = array(
+            'timeout',
+            'connection',
+            'network',
+            'temporary',
+            'busy',
+            'unavailable'
+        );
+        
+        $error_lower = strtolower($error);
+        foreach ($retryable_patterns as $pattern) {
+            if (strpos($error_lower, $pattern) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**

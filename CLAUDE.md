@@ -299,6 +299,18 @@ Since this is a standalone PHP library for WordPress:
 - **Linting**: Use WordPress Coding Standards if available: `phpcs --standard=WordPress`
 - **Integration**: Include via `require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';`
 
+### Git Subtree Commands for Distribution
+```bash
+# Add library to target plugin (first time)
+git subtree add --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main --squash
+
+# Update library in target plugin
+git subtree pull --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main --squash
+
+# Push changes back to library (from plugin repo)
+git subtree push --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main
+```
+
 ### Critical Architecture Rules
 - **Never hardcode model names** - All models must be fetched dynamically from provider APIs
 - **Single Responsibility** - Each class/module handles exactly one concern
@@ -364,6 +376,15 @@ All major AI providers now implemented with full feature support:
 - **Security**: All inputs sanitized with WordPress functions (`sanitize_text_field`, etc.)
 - **Error Handling**: Returns `WP_Error` compatible responses for WordPress integration
 
+### Debugging and Troubleshooting
+- **WordPress Debug Logging**: Enable `WP_DEBUG_LOG` for error tracking
+- **Provider Response Debugging**: Check `raw_response` in returned data arrays
+- **Streaming Issues**: Verify output buffering is disabled (`ob_get_level()`)
+- **API Key Testing**: Use provider test endpoints via `is_configured()` methods
+- **Model Fetching**: Debug via `get_available_models()` for each provider
+- **AJAX Testing**: Check browser console for component AJAX errors
+- **Version Conflicts**: Check global `$ai_http_client_version` for library conflicts
+
 ## Target Plugin Integration
 This library was designed to support 4 specific WordPress plugins:
 1. **data-machine** - Multi-modal processing, file uploads, custom tool implementation
@@ -372,3 +393,58 @@ This library was designed to support 4 specific WordPress plugins:
 4. **ai-bot-for-bbpress** - Standard completions (already supported)
 
 All target plugin patterns are now fully implemented and supported. Plugins define their own tools via WordPress filters - no built-in tools included.
+
+## Quick Reference
+
+### Basic Integration
+```php
+// 1. Include library
+require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
+
+// 2. Add admin UI
+echo AI_HTTP_ProviderManager_Component::render();
+
+// 3. Send request
+$client = new AI_HTTP_Client();
+$response = $client->send_request([
+    'messages' => [['role' => 'user', 'content' => 'Hello AI!']],
+    'max_tokens' => 100
+]);
+```
+
+### Common Patterns
+```php
+// Streaming with tool calling
+$client->send_streaming_request($request, function($chunk) {
+    echo "data: " . json_encode(['content' => $chunk]) . "\n\n";
+    flush();
+});
+
+// Multi-modal with file upload
+$request['messages'][0]['content'] = [
+    ['type' => 'text', 'text' => 'Analyze this image'],
+    ['type' => 'image_url', 'image_url' => ['url' => $image_url]]
+];
+
+// Tool calling
+$request['tools'] = [
+    ['type' => 'function', 'function' => [
+        'name' => 'get_weather',
+        'description' => 'Get weather for location',
+        'parameters' => ['type' => 'object', 'properties' => [...]]
+    ]]
+];
+```
+
+### Provider-Specific Features
+```php
+// OpenAI Responses API continuation
+$response_id = $client->get_last_response_id();
+$continuation = $client->continue_with_tool_results($response_id, $tool_results);
+
+// Grok reasoning effort
+$request['reasoning_effort'] = 'high';
+
+// Anthropic system messages
+$request['system'] = 'You are a helpful assistant';
+```
