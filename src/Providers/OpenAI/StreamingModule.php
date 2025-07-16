@@ -224,6 +224,57 @@ class AI_HTTP_OpenAI_Streaming_Module {
                         }
                     }
                     
+                    // Process response.output_item.done events (individual function call completion)
+                    if ($event_type === 'response.output_item.done' && !empty($current_data)) {
+                        $extraction_info['completed_events_found']++;
+                        
+                        $decoded = json_decode($current_data, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            $extraction_info['errors'][] = 'JSON decode error in output_item.done block ' . $block_index . ': ' . json_last_error_msg();
+                            continue;
+                        }
+                        
+                        if ($decoded && isset($decoded['item'])) {
+                            $item = $decoded['item'];
+                            
+                            // Process individual function call item
+                            if (isset($item['type']) && $item['type'] === 'function_call' && 
+                                isset($item['status']) && $item['status'] === 'completed') {
+                                
+                                // Parse arguments from JSON string if needed
+                                $arguments = isset($item['arguments']) ? $item['arguments'] : '{}';
+                                if (is_string($arguments)) {
+                                    $arguments_array = json_decode($arguments, true);
+                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                        $arguments = $arguments_array;
+                                    }
+                                }
+                                
+                                // Safely encode arguments back to JSON
+                                $arguments_json = function_exists('wp_json_encode') ? 
+                                    wp_json_encode($arguments) : 
+                                    json_encode($arguments);
+                                    
+                                if ($arguments_json === false) {
+                                    $extraction_info['errors'][] = "Failed to encode arguments for function '{$item['name']}' in output_item.done event";
+                                    $arguments_json = '{}';
+                                }
+                                
+                                $tool_calls[] = array(
+                                    'id' => isset($item['call_id']) ? $item['call_id'] : (isset($item['id']) ? $item['id'] : uniqid('tool_')),
+                                    'type' => 'function',
+                                    'function' => array(
+                                        'name' => $item['name'],
+                                        'arguments' => $arguments_json
+                                    )
+                                );
+                                
+                                $extraction_info['tool_calls_extracted']++;
+                                error_log("AI HTTP Client: Extracted tool call '{$item['name']}' from response.output_item.done event");
+                            }
+                        }
+                    }
+                    
                     // Process response.completed events (Wordsurf pattern)
                     if ($event_type === 'response.completed' && !empty($current_data)) {
                         $extraction_info['completed_events_found']++;

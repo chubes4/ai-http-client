@@ -62,25 +62,29 @@ class AI_HTTP_Streaming_Client {
         
         curl_setopt_array($ch, [
             CURLOPT_HTTPHEADER => $curl_headers,
-            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => $json_data,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
-                // Stream directly to output (frontend gets real-time data)
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
+                $chunk_count++;
+                error_log("AI HTTP Client: Chunk {$chunk_count} - Length: " . strlen($data) . " bytes");
+                error_log("AI HTTP Client: Chunk {$chunk_count} - Content preview: " . substr($data, 0, 200));
+                
+                // Echo the data directly to the client for real-time streaming (original pattern)
                 echo $data;
-                self::flush_output();
                 
-                // Accumulate for return value (simple pattern like original)
+                // Flush the output buffer to ensure the data is sent immediately (original pattern)
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+                
+                // Append the data to our buffer to capture the full response (original pattern)
                 $full_response .= $data;
+                error_log("AI HTTP Client: Total accumulated so far: " . strlen($full_response) . " bytes");
                 
+                // Return the number of bytes written
                 return strlen($data);
-            },
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3,
-            CURLOPT_USERAGENT => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
+            }
         ]);
         
         error_log('AI HTTP Client: Using simple streaming pattern (like original working system)');
