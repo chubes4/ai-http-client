@@ -40,14 +40,27 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
     }
 
     public function send_streaming_request($request, $callback) {
-        $request = $this->sanitize_request($request);
+        error_log('AI HTTP Client OpenAI Provider: Starting streaming request');
+        error_log('AI HTTP Client OpenAI Provider: Raw request: ' . wp_json_encode($request));
         
+        $request = $this->sanitize_request($request);
         $url = $this->get_api_endpoint();
+        $headers = $this->get_auth_headers();
+        
+        error_log('AI HTTP Client OpenAI Provider: Sanitized request: ' . wp_json_encode($request));
+        error_log('AI HTTP Client OpenAI Provider: API URL: ' . $url);
+        error_log('AI HTTP Client OpenAI Provider: Auth headers: ' . wp_json_encode(array_keys($headers)));
+        error_log('AI HTTP Client OpenAI Provider: API key configured: ' . (empty($this->api_key) ? 'NO' : 'YES'));
+        
+        if (empty($this->api_key)) {
+            error_log('AI HTTP Client OpenAI Provider: API key is empty!');
+            throw new Exception('OpenAI API key not configured');
+        }
         
         return AI_HTTP_OpenAI_Streaming_Module::send_streaming_request(
             $url,
             $request,
-            $this->get_auth_headers(),
+            $headers,
             $callback,
             $this->timeout
         );
