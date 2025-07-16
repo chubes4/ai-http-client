@@ -39,31 +39,32 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_Provider_Base {
         return $this->make_request($url, $request);
     }
 
-    public function send_streaming_request($request, $callback) {
-        error_log('AI HTTP Client OpenAI Provider: Starting streaming request');
-        error_log('AI HTTP Client OpenAI Provider: Raw request: ' . wp_json_encode($request));
+    public function send_streaming_request($request, $callback = null) {
+        error_log('AI HTTP Client OpenAI Provider: Starting simple streaming request');
         
         $request = $this->sanitize_request($request);
         $url = $this->get_api_endpoint();
         $headers = $this->get_auth_headers();
         
-        error_log('AI HTTP Client OpenAI Provider: Sanitized request: ' . wp_json_encode($request));
-        error_log('AI HTTP Client OpenAI Provider: API URL: ' . $url);
-        error_log('AI HTTP Client OpenAI Provider: Auth headers: ' . wp_json_encode(array_keys($headers)));
-        error_log('AI HTTP Client OpenAI Provider: API key configured: ' . (empty($this->api_key) ? 'NO' : 'YES'));
-        
         if (empty($this->api_key)) {
-            error_log('AI HTTP Client OpenAI Provider: API key is empty!');
             throw new Exception('OpenAI API key not configured');
         }
         
-        return AI_HTTP_OpenAI_Streaming_Module::send_streaming_request(
+        // Use simple streaming pattern - return full response for external processing
+        $full_response = AI_HTTP_Streaming_Client::stream_post(
             $url,
             $request,
             $headers,
-            $callback,
+            null, // No completion callback - external processing
             $this->timeout
         );
+        
+        // If callback provided, call it with the full response (for backward compatibility)
+        if ($callback && is_callable($callback)) {
+            call_user_func($callback, $full_response);
+        }
+        
+        return $full_response;
     }
 
     public function get_available_models() {

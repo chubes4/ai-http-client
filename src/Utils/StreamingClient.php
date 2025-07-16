@@ -57,79 +57,45 @@ class AI_HTTP_Streaming_Client {
             CURLOPT_HTTPHEADER => $curl_headers,
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => wp_json_encode($body),
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response, &$chunk_count) {
-                // Always log that WRITEFUNCTION was called - this will tell us if it's being invoked
-                error_log("AI HTTP Client: WRITEFUNCTION CALLED!");
-                
-                $chunk_count++;
-                $data_length = strlen($data);
-                
-                // Log each chunk for debugging
-                error_log("AI HTTP Client: Received chunk {$chunk_count}, {$data_length} bytes: " . substr($data, 0, 100) . '...');
-                
-                // Stream the raw data directly to output buffer
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$full_response) {
+                // Stream directly to output (frontend gets real-time data)
                 echo $data;
-                
-                // Flush immediately for real-time streaming
                 self::flush_output();
                 
-                // Accumulate for completion callback
+                // Accumulate for return value (simple pattern like original)
                 $full_response .= $data;
                 
-                return $data_length;
+                return strlen($data);
             },
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false, // Must be false for WRITEFUNCTION to work
-            CURLOPT_NOPROGRESS => true, // Disable progress meter
-            CURLOPT_BUFFERSIZE => 4096, // Set buffer size
-            CURLOPT_TCP_NODELAY => true, // Disable TCP Nagle algorithm for faster streaming
+            CURLOPT_RETURNTRANSFER => false,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_USERAGENT => 'AI-HTTP-Client/' . AI_HTTP_CLIENT_VERSION
         ]);
         
-        // Additional debugging - log all cURL options set
-        error_log('AI HTTP Client: cURL options set - RETURNTRANSFER: false, WRITEFUNCTION: defined');
+        error_log('AI HTTP Client: Using simple streaming pattern (like original working system)');
 
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
-        $curl_info = curl_getinfo($ch);
         curl_close($ch);
 
-        // Comprehensive response logging
-        error_log('AI HTTP Client: cURL completed. HTTP code: ' . $http_code);
-        error_log('AI HTTP Client: cURL error: ' . ($error ?: 'none'));
-        error_log('AI HTTP Client: Total chunks received: ' . $chunk_count);
-        error_log('AI HTTP Client: Total response length: ' . strlen($full_response) . ' bytes');
-        error_log('AI HTTP Client: cURL info: ' . wp_json_encode($curl_info));
+        error_log('AI HTTP Client: Stream completed. HTTP code: ' . $http_code);
+        error_log('AI HTTP Client: Full response length: ' . strlen($full_response) . ' bytes');
 
         if ($result === false) {
-            error_log('AI HTTP Client: cURL exec failed with error: ' . $error);
             throw new Exception('cURL streaming error: ' . $error);
         }
 
         if ($http_code >= 400) {
-            // Log the actual error response for debugging
-            if (function_exists('error_log')) {
-                error_log("AI HTTP Client: HTTP {$http_code} error response: " . $full_response);
-            }
+            error_log("AI HTTP Client: HTTP {$http_code} error response: " . substr($full_response, 0, 500));
             throw new Exception("HTTP {$http_code} streaming error");
         }
-        
-        // Call completion callback if provided
-        if ($completion_callback && is_callable($completion_callback)) {
-            try {
-                error_log('AI HTTP Client: Calling completion callback with ' . strlen($full_response) . ' bytes of data');
-                error_log('AI HTTP Client: Full response preview: ' . substr($full_response, 0, 200) . '...');
-                call_user_func($completion_callback, $full_response);
-            } catch (Exception $e) {
-                error_log('AI HTTP Client streaming completion callback error: ' . $e->getMessage());
-            }
-        }
 
+        // Simple pattern: just return the full response for external processing
         return $full_response;
     }
 
