@@ -81,6 +81,7 @@ class AI_HTTP_Streaming_Client {
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $curl_info = curl_getinfo($ch);
         curl_close($ch);
 
         error_log('AI HTTP Client: Stream completed. HTTP code: ' . $http_code);
@@ -91,8 +92,11 @@ class AI_HTTP_Streaming_Client {
         }
 
         if ($http_code >= 400) {
-            error_log("AI HTTP Client: HTTP {$http_code} error response: " . substr($full_response, 0, 500));
-            throw new Exception("HTTP {$http_code} streaming error");
+            error_log("AI HTTP Client: HTTP {$http_code} error response: " . substr($full_response, 0, 1000));
+            error_log("AI HTTP Client: Full error response length: " . strlen($full_response) . " bytes");
+            error_log("AI HTTP Client: cURL error: " . $error);
+            error_log("AI HTTP Client: Response info: " . print_r($curl_info, true));
+            throw new Exception("HTTP {$http_code} streaming error: " . substr($full_response, 0, 200));
         }
 
         // Simple pattern: just return the full response for external processing
