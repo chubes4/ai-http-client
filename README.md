@@ -9,7 +9,7 @@ A professional WordPress library for unified AI provider communication. Drop-in 
 **Complete Drop-In Solution:**
 - ✅ Backend AI integration + Admin UI component
 - ✅ Zero styling (you control the design)
-- ✅ Auto-discovery of providers
+- ✅ Unified architecture with shared normalizers
 - ✅ Standardized request/response formats
 - ✅ WordPress-native (no Composer, uses `wp_remote_post`)
 - ✅ Dynamic model fetching (no hardcoded models)
@@ -62,13 +62,22 @@ $response = $client->send_request([
     'messages' => [
         ['role' => 'user', 'content' => 'Hello AI!']
     ],
-    'model' => 'gpt-4o',
+    'model' => 'gpt-4o-mini',
     'max_tokens' => 100
 ]);
 
 if ($response['success']) {
     echo $response['data']['content'];
 }
+
+// Streaming requests
+$client->send_streaming_request([
+    'messages' => [['role' => 'user', 'content' => 'Stream this response']],
+    'model' => 'gpt-4o-mini'
+]);
+
+// Test connection
+$test_result = $client->test_connection('openai');
 ```
 
 ### 4. Modular Prompt System
@@ -100,30 +109,40 @@ $response = $client->send_request([
     'tools' => $tool_schemas
 ]);
 
-// Continue with tool results
+// Continue with tool results (OpenAI - use response ID)
 $response_id = $client->get_last_response_id();
 $continuation = $client->continue_with_tool_results($response_id, $tool_results);
+
+// Continue with tool results (Anthropic - use conversation history)
+$continuation = $client->continue_with_tool_results($conversation_history, $tool_results, 'anthropic');
 ```
 
 ## Supported Providers
 
-All providers support **dynamic model fetching** - no hardcoded model lists. Models are fetched live from each provider's API.
+All providers are **fully refactored** with unified architecture and support **dynamic model fetching** - no hardcoded model lists. Models are fetched live from each provider's API.
 
-- **OpenAI** - All models via dynamic API fetching
-- **Anthropic** - All Claude models 
-- **Google Gemini** - All Gemini models via dynamic API fetching
-- **Grok/X.AI** - All Grok models via dynamic API fetching
-- **OpenRouter** - 200+ models via unified API
+- **OpenAI** - GPT models via Responses API, streaming, function calling, vision
+- **Anthropic** - Claude models, streaming, function calling, vision
+- **Google Gemini** - Gemini models via 2025 API, streaming, function calling, multi-modal
+- **Grok/X.AI** - Grok models with reasoning_effort parameter, streaming
+- **OpenRouter** - 100+ models via unified API with provider routing
 
 ## Architecture
 
 **"Round Plug" Design** - Standardized input → Black box processing → Standardized output
 
-**Auto-Discovery** - New providers automatically discovered by scanning `/src/Providers/ProviderName/`
+**Unified Architecture** - Shared normalizers handle all provider differences, simple providers handle pure API communication
 
 **WordPress-Native** - Uses WordPress HTTP API, options system, and admin patterns
 
 **Modular Prompts** - Dynamic prompt building with tool registration, context injection, and granular control
+
+### Key Components
+
+- **AI_HTTP_Client** - Main orchestrator using unified normalizers
+- **Unified Normalizers** - Shared logic for request/response conversion, streaming, tools, and connection testing
+- **Simple Providers** - Pure API communication classes (one per provider)
+- **Admin UI** - Complete WordPress admin interface with zero styling
 
 ## Component Configuration
 
@@ -203,11 +222,24 @@ Designed for **git subtree inclusion** like Action Scheduler:
 
 This library assumes you:
 - Know WordPress plugin development
-- Understand dependency injection and factory patterns
+- Understand unified architecture patterns
 - Want backend functionality + unstyled UI component
 - Need to ship AI features quickly
 
 Not for beginners or general PHP projects.
+
+### Adding New Providers
+
+1. Create simple provider class in `src/Providers/` (e.g., `newprovider.php`)
+2. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
+3. Add provider case to `AI_HTTP_Client::get_provider()`
+4. Add provider loading to `ai-http-client.php`
+
+Each provider needs only 4 methods:
+- `send_raw_request()` - Send API request
+- `send_raw_streaming_request()` - Send streaming request
+- `get_raw_models()` - Fetch available models
+- `is_configured()` - Check if provider is configured
 
 ## Contributing
 

@@ -74,7 +74,8 @@ class AI_HTTP_Client {
             $provider = $this->get_provider($provider_name);
             
             // Step 3: Normalize request for provider
-            $provider_request = $this->request_normalizer->normalize($request, $provider_name);
+            $provider_config = $this->get_provider_config($provider_name);
+            $provider_request = $this->request_normalizer->normalize($request, $provider_name, $provider_config);
             
             // Step 4: Send raw request to provider
             $raw_response = $provider->send_raw_request($provider_request);
@@ -118,7 +119,8 @@ class AI_HTTP_Client {
             $provider = $this->get_provider($provider_name);
             
             // Step 3: Normalize request for streaming
-            $provider_request = $this->request_normalizer->normalize($request, $provider_name);
+            $provider_config = $this->get_provider_config($provider_name);
+            $provider_request = $this->request_normalizer->normalize($request, $provider_name, $provider_config);
             $streaming_request = $this->streaming_normalizer->normalize_streaming_request($provider_request, $provider_name);
             
             // Step 4: Send streaming request with chunk processor

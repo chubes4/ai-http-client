@@ -18,12 +18,16 @@ class AI_HTTP_Unified_Request_Normalizer {
      *
      * @param array $standard_request Standardized request format
      * @param string $provider_name Target provider (openai, anthropic, gemini, etc.)
+     * @param array $provider_config Provider configuration from options
      * @return array Provider-specific formatted request
      * @throws Exception If provider not supported
      */
-    public function normalize($standard_request, $provider_name) {
+    public function normalize($standard_request, $provider_name, $provider_config = array()) {
         // Validate standard input first
         $this->validate_standard_request($standard_request);
+        
+        // Apply model fallback logic
+        $standard_request = $this->apply_model_fallback($standard_request, $provider_config);
         
         // Route to provider-specific normalization
         switch (strtolower($provider_name)) {
@@ -45,6 +49,30 @@ class AI_HTTP_Unified_Request_Normalizer {
             default:
                 throw new Exception("Unsupported provider: {$provider_name}");
         }
+    }
+
+    /**
+     * Apply model fallback logic
+     *
+     * @param array $request Request to check for model
+     * @param array $provider_config Provider configuration
+     * @return array Request with model ensured
+     * @throws Exception If no model available
+     */
+    private function apply_model_fallback($request, $provider_config) {
+        // If model is already in request, use it
+        if (isset($request['model']) && !empty($request['model'])) {
+            return $request;
+        }
+        
+        // Fall back to configured model
+        if (isset($provider_config['model']) && !empty($provider_config['model'])) {
+            $request['model'] = $provider_config['model'];
+            return $request;
+        }
+        
+        // No model available - throw exception
+        throw new Exception('No model specified in request and no model configured for provider');
     }
 
     /**
