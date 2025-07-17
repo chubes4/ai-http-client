@@ -50,6 +50,8 @@ class AI_HTTP_OpenAI_Provider {
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
 
+        error_log('AI HTTP Client DEBUG: OpenAI request to ' . $url . ' with payload: ' . wp_json_encode($provider_request));
+        
         $response = wp_remote_post($url, array(
             'headers' => $headers,
             'body' => wp_json_encode($provider_request),
@@ -99,6 +101,8 @@ class AI_HTTP_OpenAI_Provider {
         $headers['Content-Type'] = 'application/json';
 
         $provider_request['stream'] = true;
+        
+        error_log('AI HTTP Client DEBUG: OpenAI streaming request to ' . $url . ' with payload: ' . wp_json_encode($provider_request));
 
         $response_body = '';
         $ch = curl_init();

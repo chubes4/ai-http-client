@@ -7,7 +7,6 @@ AI HTTP Client - WordPress library for unified AI provider communication.
 ## Core Architecture
 
 ### Distribution Pattern
-- **Development**: Symlinks across plugins
 - **Production**: Git subtree in plugin's `/lib/ai-http-client/`
 - **Integration**: `require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';`
 
