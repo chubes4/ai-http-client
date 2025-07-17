@@ -16,6 +16,20 @@ class AI_HTTP_Unified_Model_Fetcher {
 
     /**
      * Fetch models for any provider
+     * Returns normalized key-value format: model_id => display_name
+     *
+     * @param string $provider_name Provider name (openai, anthropic, gemini, etc.)
+     * @param array $provider_config Provider configuration (API keys, etc.)
+     * @return array Normalized models array (model_id => display_name)
+     * @throws Exception If provider not supported or API fails
+     */
+    public static function fetch_models($provider_name, $provider_config = array()) {
+        $raw_models = self::fetch_raw_models($provider_name, $provider_config);
+        return self::normalize_models($raw_models, $provider_name);
+    }
+
+    /**
+     * Fetch raw models for any provider
      * Pure API fetching - will throw exception if it fails
      *
      * @param string $provider_name Provider name (openai, anthropic, gemini, etc.)
@@ -23,7 +37,7 @@ class AI_HTTP_Unified_Model_Fetcher {
      * @return array Raw models response from API
      * @throws Exception If provider not supported or API fails
      */
-    public static function fetch_models($provider_name, $provider_config = array()) {
+    public static function fetch_raw_models($provider_name, $provider_config = array()) {
         switch (strtolower($provider_name)) {
             case 'openai':
                 return self::fetch_openai_models($provider_config);
@@ -143,5 +157,83 @@ class AI_HTTP_Unified_Model_Fetcher {
         
         $provider = new AI_HTTP_OpenRouter_Provider($config);
         return $provider->get_raw_models();
+    }
+
+    /**
+     * Normalize raw API response to key-value format for UI components
+     *
+     * @param array $raw_models Raw API response
+     * @param string $provider_name Provider name
+     * @return array Key-value array of model_id => display_name
+     */
+    private static function normalize_models($raw_models, $provider_name) {
+        $models = array();
+        
+        switch (strtolower($provider_name)) {
+            case 'openai':
+                // OpenAI returns: { "data": [{"id": "gpt-4", "object": "model", ...}, ...] }
+                $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
+                if (is_array($data)) {
+                    foreach ($data as $model) {
+                        if (isset($model['id'])) {
+                            $models[$model['id']] = $model['id'];
+                        }
+                    }
+                }
+                break;
+                
+            case 'openrouter':
+                // OpenRouter returns: { "data": [{"id": "model-name", "name": "Display Name", ...}, ...] }
+                $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
+                if (is_array($data)) {
+                    foreach ($data as $model) {
+                        if (isset($model['id'])) {
+                            $display_name = isset($model['name']) ? $model['name'] : $model['id'];
+                            $models[$model['id']] = $display_name;
+                        }
+                    }
+                }
+                break;
+                
+            case 'gemini':
+                // Gemini returns: { "models": [{"name": "models/gemini-pro", "displayName": "Gemini Pro", ...}, ...] }
+                $data = isset($raw_models['models']) ? $raw_models['models'] : $raw_models;
+                if (is_array($data)) {
+                    foreach ($data as $model) {
+                        if (isset($model['name'])) {
+                            $model_id = str_replace('models/', '', $model['name']);
+                            $display_name = isset($model['displayName']) ? $model['displayName'] : $model_id;
+                            $models[$model_id] = $display_name;
+                        }
+                    }
+                }
+                break;
+                
+            case 'grok':
+                // Grok uses OpenAI-compatible format
+                $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
+                if (is_array($data)) {
+                    foreach ($data as $model) {
+                        if (isset($model['id'])) {
+                            $models[$model['id']] = $model['id'];
+                        }
+                    }
+                }
+                break;
+                
+            case 'anthropic':
+                // Anthropic doesn't have models API - should not reach here
+                // Return empty array
+                break;
+                
+            default:
+                // If already in key-value format, use as-is
+                if (is_array($raw_models)) {
+                    $models = $raw_models;
+                }
+                break;
+        }
+        
+        return $models;
     }
 }

@@ -163,7 +163,7 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
             $options_manager = new AI_HTTP_Options_Manager();
             $provider_config = $options_manager->get_provider_settings($provider);
             
-            // Use unified model fetcher
+            // Use unified model fetcher - now returns normalized key-value format
             $models = AI_HTTP_Unified_Model_Fetcher::fetch_models($provider, $provider_config);
             
             $html = '';
