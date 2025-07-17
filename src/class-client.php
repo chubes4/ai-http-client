@@ -2,8 +2,8 @@
 /**
  * AI HTTP Client - Main Orchestrator
  * 
- * Single Responsibility: Orchestrate the AI request pipeline
- * Acts as the "round plug" interface - standardized input/output
+ * Single Responsibility: Orchestrate AI requests using unified normalizers
+ * Acts as the "round plug" interface with simplified provider architecture
  *
  * @package AIHttpClient
  * @author Chris Huber <https://chubes.net>
@@ -14,14 +14,13 @@ defined('ABSPATH') || exit;
 class AI_HTTP_Client {
 
     /**
-     * Provider factory for creating provider instances
+     * Unified normalizers
      */
-    private $provider_factory;
-    
-    /**
-     * Continuation manager for provider-agnostic continuation
-     */
-    private $continuation_manager;
+    private $request_normalizer;
+    private $response_normalizer;
+    private $streaming_normalizer;
+    private $tool_results_normalizer;
+    private $connection_test_normalizer;
     
     /**
      * Client configuration
@@ -29,12 +28,16 @@ class AI_HTTP_Client {
     private $config = array();
 
     /**
-     * Constructor with dependency injection
+     * Provider instances cache
+     */
+    private $providers = array();
+
+    /**
+     * Constructor with unified normalizers
      *
      * @param array $config Client configuration
-     * @param AI_HTTP_Provider_Factory $provider_factory Optional factory injection
      */
-    public function __construct($config = array(), $provider_factory = null) {
+    public function __construct($config = array()) {
         // Set default configuration
         $this->config = wp_parse_args($config, array(
             'default_provider' => 'openai',
@@ -45,21 +48,16 @@ class AI_HTTP_Client {
             'logging_enabled' => false
         ));
 
-        // Dependency injection with fallbacks
-        $this->provider_factory = $provider_factory ?: new AI_HTTP_Provider_Factory(null, $this->config);
-        
-        // Initialize continuation manager for provider-agnostic continuation
-        $this->continuation_manager = new AI_HTTP_Continuation_Manager($this->provider_factory, $this->config);
-        
-        // Normalizers are now handled by the factory on a per-provider basis
-        // This follows SRP - each provider gets its own specialized normalizers
+        // Initialize unified normalizers
+        $this->request_normalizer = new AI_HTTP_Unified_Request_Normalizer();
+        $this->response_normalizer = new AI_HTTP_Unified_Response_Normalizer();
+        $this->streaming_normalizer = new AI_HTTP_Unified_Streaming_Normalizer();
+        $this->tool_results_normalizer = new AI_HTTP_Unified_Tool_Results_Normalizer();
+        $this->connection_test_normalizer = new AI_HTTP_Unified_Connection_Test_Normalizer();
     }
 
     /**
-     * Main pipeline: Send standardized request through the system
-     * 
-     * This is the "round plug" interface - accepts standardized input,
-     * returns standardized output, hiding all internal complexity
+     * Main pipeline: Send standardized request through unified architecture
      *
      * @param array $request Standardized "round plug" input
      * @param string $provider_name Optional specific provider to use
@@ -69,189 +67,253 @@ class AI_HTTP_Client {
         $provider_name = $provider_name ?: $this->config['default_provider'];
         
         try {
-            // Step 1: Validate the round plug input
+            // Step 1: Validate standard input
             $this->validate_request($request);
             
-            // Step 2: Try primary provider
-            $response = $this->process_request($request, $provider_name);
+            // Step 2: Get or create provider instance
+            $provider = $this->get_provider($provider_name);
             
-            // Step 3: Try fallback providers if enabled and primary failed
-            if (!$response['success'] && $this->config['fallback_enabled']) {
-                $response = $this->try_fallback_providers($request, $provider_name);
-            }
+            // Step 3: Normalize request for provider
+            $provider_request = $this->request_normalizer->normalize($request, $provider_name);
             
-            // Step 4: Add metadata and return standardized response
-            $response['provider'] = $provider_name;
-            $response['success'] = isset($response['success']) ? $response['success'] : !isset($response['error']);
+            // Step 4: Send raw request to provider
+            $raw_response = $provider->send_raw_request($provider_request);
             
-            return $response;
+            // Step 5: Normalize response to standard format
+            $standard_response = $this->response_normalizer->normalize($raw_response, $provider_name);
+            
+            // Step 6: Add metadata
+            $standard_response['provider'] = $provider_name;
+            $standard_response['success'] = true;
+            
+            return $standard_response;
             
         } catch (Exception $e) {
-            return $this->create_error_response($e->getMessage());
+            // Try fallback providers if enabled
+            if ($this->config['fallback_enabled']) {
+                return $this->try_fallback_providers($request, $provider_name);
+            }
+            
+            return $this->create_error_response($e->getMessage(), $provider_name);
         }
     }
 
     /**
-     * Send streaming request through the system
-     * 
-     * Real-time streaming version of send_request for chat applications
-     * Streams directly to output buffer like Wordsurf for maximum compatibility
+     * Send streaming request through unified architecture
      *
-     * @param array $request Standardized "round plug" input
+     * @param array $request Standardized request
      * @param string $provider_name Optional specific provider to use
      * @param callable $completion_callback Optional callback when streaming completes
      * @return string Full response from streaming request
-     * @throws Exception If streaming is not supported or fails
+     * @throws Exception If streaming fails
      */
     public function send_streaming_request($request, $provider_name = null, $completion_callback = null) {
         $provider_name = $provider_name ?: $this->config['default_provider'];
 
-        // Step 1: Validate the round plug input
-        $this->validate_request($request);
-        
-        // Step 2: Create provider instance
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
-        
-        if (!$provider) {
-            throw new Exception("Provider '{$provider_name}' not available");
+        try {
+            // Step 1: Validate standard input
+            $this->validate_request($request);
+            
+            // Step 2: Get or create provider instance
+            $provider = $this->get_provider($provider_name);
+            
+            // Step 3: Normalize request for streaming
+            $provider_request = $this->request_normalizer->normalize($request, $provider_name);
+            $streaming_request = $this->streaming_normalizer->normalize_streaming_request($provider_request, $provider_name);
+            
+            // Step 4: Send streaming request with chunk processor
+            return $provider->send_raw_streaming_request($streaming_request, function($chunk) use ($provider_name) {
+                $processed = $this->streaming_normalizer->process_streaming_chunk($chunk, $provider_name);
+                if ($processed && isset($processed['content'])) {
+                    echo $processed['content'];
+                    flush();
+                }
+            });
+            
+        } catch (Exception $e) {
+            throw new Exception("Streaming failed for {$provider_name}: " . $e->getMessage());
         }
-        
-        if (!$provider->is_configured()) {
-            throw new Exception("Provider '{$provider_name}' not configured");
-        }
-        
-        // Step 3: Transform input through provider-specific request normalizer
-        $request_normalizer = AI_HTTP_Normalizer_Factory::get_request_normalizer($provider_name);
-        $provider_request = $request_normalizer->normalize($request);
-        error_log('AI HTTP Client DEBUG: Request after normalization: ' . json_encode($provider_request));
-        
-        // Step 4: Send streaming request through provider (streams to output buffer)
-        $full_response = $provider->send_streaming_request($provider_request, $completion_callback);
-        
-        // Step 5: Store continuation state for provider-agnostic continuation
-        if ($full_response) {
-            $this->continuation_manager->store_continuation_state($provider_name, $full_response, $provider_request);
-        }
-        
-        return $full_response;
     }
 
     /**
-     * Continue conversation with tool results (provider-agnostic)
-     * 
-     * This method provides a simplified interface that automatically handles
-     * provider-specific continuation patterns behind the scenes:
-     * - OpenAI: Uses response_id with Responses API continuation
-     * - Anthropic: Uses conversation_history array
-     * - Others: Use conversation_history rebuilding pattern
+     * Continue conversation with tool results using unified architecture
      *
-     * @param array $tool_results Array of tool results to continue with
+     * @param string|array $context_data Provider-specific context (response_id, conversation_history, etc.)
+     * @param array $tool_results Array of tool results
      * @param string $provider_name Optional specific provider to use
      * @param callable $completion_callback Optional callback for streaming
      * @return array|string Response from continuation request
-     * @throws Exception If continuation is not supported or fails
+     * @throws Exception If continuation fails
      */
-    public function continue_with_tool_results($tool_results, $provider_name = null, $completion_callback = null) {
+    public function continue_with_tool_results($context_data, $tool_results, $provider_name = null, $completion_callback = null) {
         $provider_name = $provider_name ?: $this->config['default_provider'];
         
-        // Use centralized continuation manager
-        return $this->continuation_manager->continue_with_tool_results($provider_name, $tool_results, $completion_callback);
+        try {
+            // Step 1: Get provider instance
+            $provider = $this->get_provider($provider_name);
+            
+            // Step 2: Normalize tool results for continuation
+            $continuation_request = $this->tool_results_normalizer->normalize_for_continuation(
+                $tool_results, 
+                $provider_name, 
+                $context_data
+            );
+            
+            // Step 3: Send continuation request
+            if ($completion_callback) {
+                // Streaming continuation
+                return $provider->send_raw_streaming_request($continuation_request, $completion_callback);
+            } else {
+                // Non-streaming continuation
+                $raw_response = $provider->send_raw_request($continuation_request);
+                return $this->response_normalizer->normalize($raw_response, $provider_name);
+            }
+            
+        } catch (Exception $e) {
+            throw new Exception("Tool continuation failed for {$provider_name}: " . $e->getMessage());
+        }
     }
 
     /**
-     * Check if continuation is possible for current provider
-     * 
-     * @param string $provider_name Optional specific provider to use
-     * @return bool True if continuation state exists
-     */
-    public function can_continue($provider_name = null) {
-        $provider_name = $provider_name ?: $this->config['default_provider'];
-        return $this->continuation_manager->can_continue($provider_name);
-    }
-    
-    /**
-     * Clear continuation state for provider
-     * 
-     * @param string $provider_name Optional specific provider to use
-     */
-    public function clear_continuation_state($provider_name = null) {
-        $provider_name = $provider_name ?: $this->config['default_provider'];
-        $this->continuation_manager->clear_continuation_state($provider_name);
-    }
-
-    /**
-     * Check if streaming is available
+     * Test connection to provider using unified architecture
      *
-     * @return bool True if streaming is supported
+     * @param string $provider_name Provider to test
+     * @return array Standardized test result
      */
-    public function is_streaming_available() {
-        return AI_HTTP_Streaming_Client::is_streaming_available();
+    public function test_connection($provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
+        
+        try {
+            // Step 1: Validate provider configuration
+            $provider_config = $this->get_provider_config($provider_name);
+            $validation = $this->connection_test_normalizer->validate_provider_config($provider_name, $provider_config);
+            
+            if (!$validation['valid']) {
+                return $this->connection_test_normalizer->create_error_response($validation['message'], $provider_name);
+            }
+            
+            // Step 2: Get provider instance
+            $provider = $this->get_provider($provider_name);
+            
+            // Step 3: Create test request
+            $test_request = $this->connection_test_normalizer->create_test_request($provider_name, $provider_config);
+            
+            // Step 4: Send test request
+            $raw_response = $provider->send_raw_request($test_request);
+            
+            // Step 5: Normalize test response
+            return $this->connection_test_normalizer->normalize_test_response($raw_response, $provider_name);
+            
+        } catch (Exception $e) {
+            return $this->connection_test_normalizer->create_error_response($e->getMessage(), $provider_name);
+        }
     }
 
-
     /**
-     * Process request through the modular pipeline
+     * Get available models for provider
      *
-     * @param array $request Standardized request
      * @param string $provider_name Provider name
-     * @return array Response
+     * @return array Available models
      */
-    private function process_request($request, $provider_name) {
-        // Create provider instance using factory
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
+    public function get_available_models($provider_name = null) {
+        $provider_name = $provider_name ?: $this->config['default_provider'];
         
-        if (!$provider) {
-            return $this->create_error_response("Provider '{$provider_name}' not available");
+        try {
+            $provider = $this->get_provider($provider_name);
+            return $provider->get_raw_models();
+            
+        } catch (Exception $e) {
+            if (function_exists('error_log')) {
+                error_log('AI HTTP Client: Model fetch failed for ' . $provider_name . ': ' . $e->getMessage());
+            }
+            return array();
         }
-        
-        if (!$provider->is_configured()) {
-            return $this->create_error_response("Provider '{$provider_name}' not configured");
-        }
-        
-        // Transform input through provider-specific request normalizer
-        $request_normalizer = AI_HTTP_Normalizer_Factory::get_request_normalizer($provider_name);
-        $provider_request = $request_normalizer->normalize($request);
-        
-        // Send request through provider
-        $provider_response = $provider->send_request($provider_request);
-        
-        // Transform output through provider-specific response normalizer
-        // Pass provider instance for continuation support (OpenAI response ID tracking)
-        $response_normalizer = AI_HTTP_Normalizer_Factory::get_response_normalizer($provider_name, $provider);
-        $normalized_response = $response_normalizer->normalize($provider_response);
-        
-        return $normalized_response;
     }
 
     /**
-     * Try fallback providers if primary fails
+     * Get or create provider instance
      *
-     * @param array $request Standardized request
-     * @param string $primary_provider Primary provider that failed
-     * @return array Response from successful fallback or error
+     * @param string $provider_name Provider name
+     * @return object Provider instance
+     * @throws Exception If provider not supported
      */
-    private function try_fallback_providers($request, $primary_provider) {
+    private function get_provider($provider_name) {
+        if (isset($this->providers[$provider_name])) {
+            return $this->providers[$provider_name];
+        }
+        
+        $provider_config = $this->get_provider_config($provider_name);
+        
+        switch (strtolower($provider_name)) {
+            case 'openai':
+                $this->providers[$provider_name] = new AI_HTTP_OpenAI_Provider($provider_config);
+                break;
+            
+            case 'gemini':
+                $this->providers[$provider_name] = new AI_HTTP_Gemini_Provider($provider_config);
+                break;
+            
+            case 'anthropic':
+                $this->providers[$provider_name] = new AI_HTTP_Anthropic_Provider($provider_config);
+                break;
+            
+            case 'grok':
+                $this->providers[$provider_name] = new AI_HTTP_Grok_Provider($provider_config);
+                break;
+            
+            case 'openrouter':
+                $this->providers[$provider_name] = new AI_HTTP_OpenRouter_Provider($provider_config);
+                break;
+            
+            default:
+                throw new Exception("Provider '{$provider_name}' not supported in unified architecture");
+        }
+        
+        return $this->providers[$provider_name];
+    }
+
+    /**
+     * Get provider configuration
+     *
+     * @param string $provider_name Provider name
+     * @return array Provider configuration
+     */
+    private function get_provider_config($provider_name) {
+        $options_manager = new AI_HTTP_Options_Manager();
+        $all_providers = $options_manager->get_all_providers();
+        
+        return isset($all_providers[$provider_name]) ? $all_providers[$provider_name] : array();
+    }
+
+    /**
+     * Try fallback providers
+     *
+     * @param array $request Original request
+     * @param string $failed_provider Failed provider name
+     * @return array Response from fallback provider
+     */
+    private function try_fallback_providers($request, $failed_provider) {
         foreach ($this->config['fallback_order'] as $fallback_provider) {
-            if ($fallback_provider !== $primary_provider) {
-                $response = $this->process_request($request, $fallback_provider);
-                if ($response && !isset($response['error'])) {
-                    // Mark that we used a fallback
-                    $response['used_fallback'] = true;
-                    $response['original_provider'] = $primary_provider;
-                    $response['provider'] = $fallback_provider;
-                    return $response;
-                }
+            if ($fallback_provider === $failed_provider) {
+                continue; // Skip the failed provider
+            }
+            
+            try {
+                return $this->send_request($request, $fallback_provider);
+            } catch (Exception $e) {
+                // Continue to next fallback
+                continue;
             }
         }
         
-        return $this->create_error_response('All providers failed');
+        return $this->create_error_response("All providers failed", $failed_provider);
     }
 
     /**
-     * Validate standardized request format ("round plug" validation)
+     * Validate standard request format
      *
-     * @param array $request Request data to validate
-     * @throws Exception If request format is invalid
+     * @param array $request Request to validate
+     * @throws Exception If invalid
      */
     private function validate_request($request) {
         if (!is_array($request)) {
@@ -265,124 +327,22 @@ class AI_HTTP_Client {
         if (empty($request['messages'])) {
             throw new Exception('Messages array cannot be empty');
         }
-
-        // Additional validation is delegated to RequestNormalizer
     }
 
     /**
      * Create standardized error response
      *
-     * @param string $message Error message
+     * @param string $error_message Error message
+     * @param string $provider_name Provider name
      * @return array Standardized error response
      */
-    private function create_error_response($message) {
+    private function create_error_response($error_message, $provider_name = 'unknown') {
         return array(
             'success' => false,
             'data' => null,
-            'error' => $message,
-            'provider' => null,
+            'error' => $error_message,
+            'provider' => $provider_name,
             'raw_response' => null
         );
-    }
-
-    /**
-     * Get available providers from registry
-     *
-     * @return array Available provider names
-     */
-    public function get_providers() {
-        $registry = AI_HTTP_Provider_Registry::get_instance();
-        return $registry->get_available_providers();
-    }
-
-    /**
-     * Get available models for a provider
-     *
-     * @param string $provider_name Provider name (optional)
-     * @return array Available models
-     */
-    public function get_models($provider_name = null) {
-        $provider_name = $provider_name ?: $this->config['default_provider'];
-        
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
-        
-        if (!$provider) {
-            return array();
-        }
-
-        return $provider->get_available_models();
-    }
-
-    /**
-     * Test connection to a provider
-     *
-     * @param string $provider_name Provider name (optional)
-     * @return array Test result with success status and message
-     */
-    public function test_connection($provider_name = null) {
-        $provider_name = $provider_name ?: $this->config['default_provider'];
-        
-        $provider = $this->provider_factory->create_provider($provider_name, $this->config);
-        
-        if (!$provider) {
-            return array('success' => false, 'message' => 'Provider not found');
-        }
-
-        return $provider->test_connection();
-    }
-
-    /**
-     * Check if a provider is available and configured
-     *
-     * @param string $provider_name Provider name
-     * @return bool True if provider is ready to use
-     */
-    public function is_provider_ready($provider_name) {
-        return $this->provider_factory->can_create_provider($provider_name, $this->config);
-    }
-
-    /**
-     * Extract tool calls from streaming response in provider-agnostic way
-     * 
-     * This provides the "round plug in round hole" interface for tool extraction
-     * regardless of which AI provider generated the response
-     *
-     * @param string $full_response Full streaming response from provider
-     * @param string $provider_name Optional specific provider name
-     * @return array Standardized tool calls array
-     */
-    public function extract_tool_calls($full_response, $provider_name = null) {
-        $provider_name = $provider_name ?: $this->config['default_provider'];
-        
-        // Get provider-specific streaming module
-        $module_class = 'AI_HTTP_' . ucfirst($provider_name) . '_Streaming_Module';
-        
-        if (class_exists($module_class) && method_exists($module_class, 'extract_tool_calls')) {
-            $extraction_result = call_user_func([$module_class, 'extract_tool_calls'], $full_response);
-            
-            // Standardize the result format - some providers return array, others return object with tool_calls key
-            if (is_array($extraction_result)) {
-                // If it's a simple array, assume it's the tool calls
-                if (isset($extraction_result['tool_calls'])) {
-                    return $extraction_result['tool_calls'];
-                }
-                return $extraction_result;
-            }
-            
-            return array();
-        }
-        
-        // Log warning if provider doesn't support tool extraction
-        error_log("AI HTTP Client: Provider '{$provider_name}' does not support tool call extraction");
-        return array();
-    }
-
-    /**
-     * Get client configuration
-     *
-     * @return array Current configuration
-     */
-    public function get_config() {
-        return $this->config;
     }
 }

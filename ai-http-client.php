@@ -65,83 +65,28 @@ if (!function_exists('ai_http_client_init')) {
     function ai_http_client_init() {
         // Load in dependency order
         
-        // 1. Core base classes
-        require_once AI_HTTP_CLIENT_PATH . '/src/class-provider-base.php';
+        // 1. Load dependencies in order
         
-        // 2. Provider management utilities
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/ProviderRegistry.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/ProviderFactory.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/NormalizerFactory.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/ModelFetcher.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/GenericRequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/GenericResponseNormalizer.php';
-        
-        // 2.5. Shared utilities
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/StreamingClient.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/SSEParser.php';
+        // 2. Shared utilities (only keep what's needed)
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/FileUploadClient.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ToolExecutor.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/Normalizers/GenericStreamNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ContinuationState.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Utils/ContinuationManager.php';
         
-        
-        // 3. Provider implementations (organized by provider)
-        // OpenAI Provider (OLD - disabled for unified architecture)
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/StreamingModule.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/ModelFetcher.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/FunctionCalling.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/Provider.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/RequestNormalizer.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/ResponseNormalizer.php';
-        // require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenAI/ContinuationHandler.php';
-        
-        // Anthropic Provider
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/StreamingModule.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/ModelFetcher.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/FunctionCalling.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/Provider.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/RequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/ResponseNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Anthropic/ContinuationHandler.php';
-        
-        // Google Gemini Provider
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/StreamingModule.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/ModelFetcher.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/FunctionCalling.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/Provider.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/RequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/ResponseNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Gemini/ContinuationHandler.php';
-        
-        // Grok/X.AI Provider
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/StreamingModule.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/ModelFetcher.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/FunctionCalling.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/Provider.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/RequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/Grok/ResponseNormalizer.php';
-        
-        // OpenRouter Provider
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/StreamingModule.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/ModelFetcher.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/FunctionCalling.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/Provider.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/RequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/OpenRouter/ResponseNormalizer.php';
-        
-        // Additional providers can be added here or auto-discovered
-        
-        // 5. Unified Architecture (NEW)
+        // 2.6. Unified Normalizers (NEW ARCHITECTURE)
         require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedRequestNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedResponseNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedStreamingNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedToolResultsNormalizer.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedConnectionTestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/class-client-unified.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedModelFetcher.php';
         
-        // 4. Main orchestrator client
+        // 2.7. Simple Providers (NEW ARCHITECTURE)
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/gemini.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/anthropic.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/grok.php';
+        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openrouter.php';
+        
+        // 3. Main orchestrator client (NEW UNIFIED ARCHITECTURE)
         require_once AI_HTTP_CLIENT_PATH . '/src/class-client.php';
         
         // 4.5. WordPress management components

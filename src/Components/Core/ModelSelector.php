@@ -159,8 +159,12 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
      */
     private static function render_model_options($provider, $selected_model) {
         try {
-            $client = new AI_HTTP_Client();
-            $models = $client->get_models($provider);
+            // Get provider configuration
+            $options_manager = new AI_HTTP_Options_Manager();
+            $provider_config = $options_manager->get_provider_settings($provider);
+            
+            // Use unified model fetcher
+            $models = AI_HTTP_Unified_Model_Fetcher::fetch_models($provider, $provider_config);
             
             $html = '';
             
@@ -201,18 +205,10 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         try {
             // Get provider settings from WordPress options
             $options_manager = new AI_HTTP_Options_Manager();
-            $provider_settings = $options_manager->get_provider_settings($provider);
+            $provider_config = $options_manager->get_provider_settings($provider);
             
-            // Configure client with provider settings
-            $config = array(
-                'default_provider' => $provider,
-                'providers' => array(
-                    $provider => $provider_settings
-                )
-            );
-            
-            $client = new AI_HTTP_Client($config);
-            $models = $client->get_models($provider);
+            // Use unified model fetcher
+            $models = AI_HTTP_Unified_Model_Fetcher::fetch_models($provider, $provider_config);
             
             if (empty($models)) {
                 wp_send_json_error('No models available for ' . $provider . '. Check API key configuration.');

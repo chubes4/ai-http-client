@@ -84,7 +84,7 @@ class AI_HTTP_Unified_Request_Normalizer {
 
         // Convert max_tokens to max_output_tokens for Responses API
         if (isset($request['max_tokens'])) {
-            $request['max_output_tokens'] = max(16, intval($request['max_tokens']));
+            $request['max_output_tokens'] = intval($request['max_tokens']);
             unset($request['max_tokens']);
         }
 
@@ -316,16 +316,22 @@ class AI_HTTP_Unified_Request_Normalizer {
         $normalized = array();
 
         foreach ($tools as $tool) {
+            // Handle nested format (Chat Completions) - convert to flat format (Responses API)
             if (isset($tool['type']) && $tool['type'] === 'function' && isset($tool['function'])) {
-                $normalized[] = $tool; // Already in OpenAI format
-            } elseif (isset($tool['name']) && isset($tool['description'])) {
                 $normalized[] = array(
+                    'name' => sanitize_text_field($tool['function']['name']),
                     'type' => 'function',
-                    'function' => array(
-                        'name' => sanitize_text_field($tool['name']),
-                        'description' => sanitize_textarea_field($tool['description']),
-                        'parameters' => $tool['parameters'] ?? array()
-                    )
+                    'description' => sanitize_textarea_field($tool['function']['description']),
+                    'parameters' => $tool['function']['parameters'] ?? array()
+                );
+            } 
+            // Handle flat format - pass through with sanitization
+            elseif (isset($tool['name']) && isset($tool['description'])) {
+                $normalized[] = array(
+                    'name' => sanitize_text_field($tool['name']),
+                    'type' => 'function',
+                    'description' => sanitize_textarea_field($tool['description']),
+                    'parameters' => $tool['parameters'] ?? array()
                 );
             }
         }

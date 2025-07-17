@@ -1,8 +1,8 @@
 <?php
 /**
- * AI HTTP Client - Simplified OpenAI Provider
+ * AI HTTP Client - Simplified Gemini Provider
  * 
- * Single Responsibility: Pure OpenAI API communication only
+ * Single Responsibility: Pure Google Gemini API communication only
  * No normalization logic - just sends/receives raw data
  * This is a "dumb" API client that the unified normalizers use
  *
@@ -12,11 +12,10 @@
 
 defined('ABSPATH') || exit;
 
-class AI_HTTP_OpenAI_Provider {
+class AI_HTTP_Gemini_Provider {
 
     private $api_key;
-    private $organization;
-    private $base_url = 'https://api.openai.com/v1';
+    private $base_url = 'https://generativelanguage.googleapis.com/v1beta';
     private $timeout = 30;
 
     /**
@@ -26,7 +25,6 @@ class AI_HTTP_OpenAI_Provider {
      */
     public function __construct($config = array()) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
-        $this->organization = isset($config['organization']) ? $config['organization'] : '';
         $this->timeout = isset($config['timeout']) ? intval($config['timeout']) : 30;
         
         if (isset($config['base_url']) && !empty($config['base_url'])) {
@@ -35,20 +33,24 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Send raw request to OpenAI API
+     * Send raw request to Gemini API
      *
-     * @param array $provider_request Already normalized for OpenAI
-     * @return array Raw OpenAI response
+     * @param array $provider_request Already normalized for Gemini
+     * @return array Raw Gemini response
      * @throws Exception If request fails
      */
     public function send_raw_request($provider_request) {
         if (!$this->is_configured()) {
-            throw new Exception('OpenAI provider not configured - missing API key');
+            throw new Exception('Gemini provider not configured - missing API key');
         }
 
-        $url = $this->base_url . '/responses';
+        $model = isset($provider_request['model']) ? $provider_request['model'] : 'gemini-pro';
+        $url = $this->base_url . '/models/' . $model . ':generateContent';
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
+
+        // Remove model from request body (it's in the URL)
+        unset($provider_request['model']);
 
         $response = wp_remote_post($url, array(
             'headers' => $headers,
@@ -58,7 +60,7 @@ class AI_HTTP_OpenAI_Provider {
         ));
 
         if (is_wp_error($response)) {
-            throw new Exception('OpenAI API request failed: ' . $response->get_error_message());
+            throw new Exception('Gemini API request failed: ' . $response->get_error_message());
         }
 
         $status_code = wp_remote_retrieve_response_code($response);
@@ -66,7 +68,7 @@ class AI_HTTP_OpenAI_Provider {
         $decoded_response = json_decode($body, true);
 
         if ($status_code !== 200) {
-            $error_message = 'OpenAI API error (HTTP ' . $status_code . ')';
+            $error_message = 'Gemini API error (HTTP ' . $status_code . ')';
             if (isset($decoded_response['error']['message'])) {
                 $error_message .= ': ' . $decoded_response['error']['message'];
             }
@@ -74,31 +76,32 @@ class AI_HTTP_OpenAI_Provider {
         }
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('Invalid JSON response from OpenAI API');
+            throw new Exception('Invalid JSON response from Gemini API');
         }
 
         return $decoded_response;
     }
 
     /**
-     * Send raw streaming request to OpenAI API
+     * Send raw streaming request to Gemini API
      *
-     * @param array $provider_request Already normalized for OpenAI
+     * @param array $provider_request Already normalized for Gemini
      * @param callable $callback Optional callback for each chunk
      * @return string Full response content
      * @throws Exception If request fails
      */
     public function send_raw_streaming_request($provider_request, $callback = null) {
         if (!$this->is_configured()) {
-            throw new Exception('OpenAI provider not configured - missing API key');
+            throw new Exception('Gemini provider not configured - missing API key');
         }
 
-
-        $url = $this->base_url . '/responses';
+        $model = isset($provider_request['model']) ? $provider_request['model'] : 'gemini-pro';
+        $url = $this->base_url . '/models/' . $model . ':streamGenerateContent';
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
 
-        $provider_request['stream'] = true;
+        // Remove model from request body (it's in the URL)
+        unset($provider_request['model']);
 
         $response_body = '';
         $ch = curl_init();
@@ -127,18 +130,18 @@ class AI_HTTP_OpenAI_Provider {
         curl_close($ch);
 
         if ($result === false) {
-            throw new Exception('OpenAI streaming request failed: ' . $error);
+            throw new Exception('Gemini streaming request failed: ' . $error);
         }
 
         if ($http_code !== 200) {
-            throw new Exception('OpenAI streaming request failed with HTTP ' . $http_code);
+            throw new Exception('Gemini streaming request failed with HTTP ' . $http_code);
         }
 
         return '';
     }
 
     /**
-     * Get available models from OpenAI API
+     * Get available models from Gemini API
      *
      * @return array Raw models response
      * @throws Exception If request fails
@@ -157,7 +160,7 @@ class AI_HTTP_OpenAI_Provider {
         ));
 
         if (is_wp_error($response)) {
-            throw new Exception('OpenAI models request failed: ' . $response->get_error_message());
+            throw new Exception('Gemini models request failed: ' . $response->get_error_message());
         }
 
         $status_code = wp_remote_retrieve_response_code($response);
@@ -165,11 +168,11 @@ class AI_HTTP_OpenAI_Provider {
         $decoded_response = json_decode($body, true);
 
         if ($status_code !== 200) {
-            throw new Exception('OpenAI models request failed with HTTP ' . $status_code);
+            throw new Exception('Gemini models request failed with HTTP ' . $status_code);
         }
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('Invalid JSON response from OpenAI models API');
+            throw new Exception('Invalid JSON response from Gemini models API');
         }
 
         return $decoded_response;
@@ -185,20 +188,14 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Get authentication headers for OpenAI API
+     * Get authentication headers for Gemini API
      *
      * @return array Headers array
      */
     private function get_auth_headers() {
-        $headers = array(
-            'Authorization' => 'Bearer ' . $this->api_key
+        return array(
+            'x-goog-api-key' => $this->api_key
         );
-
-        if (!empty($this->organization)) {
-            $headers['OpenAI-Organization'] = $this->organization;
-        }
-
-        return $headers;
     }
 
     /**
