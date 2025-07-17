@@ -132,15 +132,6 @@ if (!function_exists('ai_http_client_init')) {
         
         // Additional providers can be added here or auto-discovered
         
-        // 5. Unified Architecture (NEW)
-        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedRequestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedResponseNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedStreamingNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedToolResultsNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Normalizers/UnifiedConnectionTestNormalizer.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
-        require_once AI_HTTP_CLIENT_PATH . '/src/class-client-unified.php';
-        
         // 4. Main orchestrator client
         require_once AI_HTTP_CLIENT_PATH . '/src/class-client.php';
         
