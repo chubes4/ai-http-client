@@ -90,21 +90,6 @@ class Content_Interaction_Service {
             }
         }
 
-        // Prevent bot from responding to its own posts
-        $post_author_id = get_post_field( 'post_author', $post_id );
-        if ( $bot_user_id && $post_author_id == $bot_user_id ) {
-            return false;
-        }
-
-        // Check forum access restrictions
-        $restriction_mode = get_option( 'ai_bot_forum_restriction', 'all' );
-        if ( $restriction_mode === 'selected' ) {
-            $allowed_forums = get_option( 'ai_bot_allowed_forums', array() );
-            if ( ! empty( $allowed_forums ) && ! in_array( $forum_id, (array) $allowed_forums ) ) {
-                return false;
-            }
-        }
-
         // 1. Check for mention (only if bot username is configured)
         if ( $bot_username && preg_match( '/@' . preg_quote( $bot_username, '/' ) . '/i', $post_content ) ) {
             // Use new logging prefix
@@ -122,10 +107,7 @@ class Content_Interaction_Service {
 
             if ( ! empty( $keywords ) ) {
                 // Create a regex pattern to match any keyword (case-insensitive)
-                $escaped_keywords = array_map( function( $keyword ) {
-                    return preg_quote( $keyword, '/' );
-                }, $keywords );
-                $pattern = '/\b(' . implode( '|', $escaped_keywords ) . ')\b/i';
+                $pattern = '/\b(' . implode( '|', array_map( 'preg_quote', $keywords, ['/'] ) ) . ')\b/i';
                 if ( preg_match( $pattern, $post_content ) ) {
                     return true;
                 }

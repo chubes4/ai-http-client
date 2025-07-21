@@ -5,6 +5,14 @@
 documentation/
 ai-bot-for-bbpress-helper/
 
+# Claude Code and Migration
+CLAUDE.md
+MIGRATION_PLAN.md
+
+# AI HTTP Client Library
+lib/ai-http-client/vendor/
+lib/ai-http-client/.git/
+
 # Optional: Ignore composer dependencies if you manage them separately
 # vendor/
 

@@ -83,4 +83,4 @@ class Forum_Structure_Provider {
 
         return $forum_structure_json;
     }
-}
+} 

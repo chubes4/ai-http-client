@@ -25,8 +25,6 @@ function ai_bot_register_all_settings() {
     register_setting( $settings_group, 'ai_bot_custom_prompt', 'wp_kses_post' );
     register_setting( $settings_group, 'ai_bot_temperature', 'ai_bot_sanitize_temperature' );
     register_setting( $settings_group, 'ai_bot_trigger_keywords', 'sanitize_textarea_field' );
-    register_setting( $settings_group, 'ai_bot_forum_restriction', 'sanitize_text_field' );
-    register_setting( $settings_group, 'ai_bot_allowed_forums', 'ai_bot_sanitize_forum_array' );
     register_setting( $settings_group, 'ai_bot_local_search_limit', 'absint' );
     register_setting( $settings_group, 'ai_bot_remote_endpoint_url', 'esc_url_raw' );
     register_setting( $settings_group, 'ai_bot_remote_search_limit', 'absint' );
@@ -106,15 +104,6 @@ function ai_bot_register_all_settings() {
         'ai_bot_trigger_keywords', // ID
         __( 'Trigger Keywords', 'ai-bot-for-bbpress' ), // Title
         'ai_bot_trigger_keywords_callback', // Callback
-        $page_slug, // Page
-        'ai_bot_behavior_settings_section' // Section
-    );
-
-    // Forum Restriction Field
-    add_settings_field(
-        'ai_bot_forum_restriction', // ID
-        __( 'Forum Access Control', 'ai-bot-for-bbpress' ), // Title
-        'ai_bot_forum_restriction_callback', // Callback
         $page_slug, // Page
         'ai_bot_behavior_settings_section' // Section
     );
@@ -216,81 +205,10 @@ function ai_bot_remote_search_limit_callback() {
     echo '<p class="description">' . esc_html__( 'Max number of relevant posts from the remote site to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
-// Forum restriction callback
-function ai_bot_forum_restriction_callback() {
-    $restriction_mode = get_option( 'ai_bot_forum_restriction', 'all' );
-    $allowed_forums = get_option( 'ai_bot_allowed_forums', array() );
-    
-    echo '<div id="ai-bot-forum-restriction">';
-    
-    // Radio buttons
-    echo '<p>';
-    echo '<label><input type="radio" name="ai_bot_forum_restriction" value="all" ' . checked( $restriction_mode, 'all', false ) . ' /> ';
-    echo esc_html__( 'All Forums (bot responds in any forum)', 'ai-bot-for-bbpress' ) . '</label><br>';
-    echo '<label><input type="radio" name="ai_bot_forum_restriction" value="selected" ' . checked( $restriction_mode, 'selected', false ) . ' /> ';
-    echo esc_html__( 'Selected Forums Only', 'ai-bot-for-bbpress' ) . '</label>';
-    echo '</p>';
-    
-    // Forum selection box
-    echo '<div id="ai-bot-forum-selection" style="margin-left: 25px; border: 1px solid #ddd; padding: 10px; max-height: 200px; overflow-y: auto; background: #fafafa;">';
-    
-    if ( function_exists( 'bbp_get_forums' ) ) {
-        $forums = bbp_get_forums( array( 'post_status' => 'publish' ) );
-        if ( $forums->have_posts() ) {
-            while ( $forums->have_posts() ) {
-                $forums->the_post();
-                $forum_id = get_the_ID();
-                $forum_title = get_the_title();
-                $checked = in_array( $forum_id, (array) $allowed_forums ) ? 'checked' : '';
-                
-                echo '<label style="display: block; margin: 3px 0;">';
-                echo '<input type="checkbox" name="ai_bot_allowed_forums[]" value="' . esc_attr( $forum_id ) . '" ' . $checked . ' class="ai-bot-forum-checkbox" /> ';
-                echo esc_html( $forum_title );
-                echo '</label>';
-            }
-            wp_reset_postdata();
-        } else {
-            echo '<p><em>' . esc_html__( 'No forums found. Make sure bbPress is active and you have created some forums.', 'ai-bot-for-bbpress' ) . '</em></p>';
-        }
-    } else {
-        echo '<p><em>' . esc_html__( 'bbPress not detected. Forum selection will be available when bbPress is active.', 'ai-bot-for-bbpress' ) . '</em></p>';
-    }
-    
-    echo '</div>';
-    echo '<p class="description">' . esc_html__( 'Choose "Selected Forums Only" to restrict the bot to specific forums. This helps prevent spam and keeps the bot focused on professional sections.', 'ai-bot-for-bbpress' ) . '</p>';
-    echo '</div>';
-    
-    // JavaScript for enabling/disabling checkboxes
-    echo '<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const radioButtons = document.querySelectorAll(\'input[name="ai_bot_forum_restriction"]\');
-        const checkboxes = document.querySelectorAll(\'.ai-bot-forum-checkbox\');
-        const selectionDiv = document.getElementById(\'ai-bot-forum-selection\');
-        
-        function updateCheckboxState() {
-            const isSelected = document.querySelector(\'input[name="ai_bot_forum_restriction"]:checked\').value === "selected";
-            checkboxes.forEach(checkbox => checkbox.disabled = !isSelected);
-            selectionDiv.style.opacity = isSelected ? "1" : "0.5";
-        }
-        
-        radioButtons.forEach(radio => radio.addEventListener("change", updateCheckboxState));
-        updateCheckboxState(); // Initial state
-    });
-    </script>';
-}
-
 // Sanitization callback for temperature
 function ai_bot_sanitize_temperature( $input ) {
     $input = floatval($input);
     if ($input < 0) return 0;
     if ($input > 1) return 1;
     return $input;
-}
-
-// Sanitization callback for forum array
-function ai_bot_sanitize_forum_array( $input ) {
-    if ( ! is_array( $input ) ) {
-        return array();
-    }
-    return array_map( 'absint', $input );
 }
