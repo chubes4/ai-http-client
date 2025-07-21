@@ -60,9 +60,35 @@ if (!defined('AI_HTTP_CLIENT_URL')) {
 /**
  * Initialize AI HTTP Client library
  * Loads all modular components in correct dependency order
+ * Supports both Composer autoloading and manual WordPress loading
  */
 if (!function_exists('ai_http_client_init')) {
     function ai_http_client_init() {
+        // Check if Composer autoloader is available
+        $composer_autoload = AI_HTTP_CLIENT_PATH . '/vendor/autoload.php';
+        $composer_loaded = false;
+        
+        if (file_exists($composer_autoload)) {
+            require_once $composer_autoload;
+            $composer_loaded = true;
+        }
+        
+        // If Composer isn't available, use manual loading
+        if (!$composer_loaded) {
+            ai_http_client_manual_load();
+        }
+        
+        // 5. Hook into WordPress for any setup needed
+        if (function_exists('add_action')) {
+            add_action('init', 'ai_http_client_wordpress_init', 1);
+        }
+    }
+    
+    /**
+     * Manual loading for non-Composer environments
+     * Maintains backward compatibility with existing WordPress installations
+     */
+    function ai_http_client_manual_load() {
         // Load in dependency order
         
         // 1. Load dependencies in order
@@ -103,11 +129,6 @@ if (!function_exists('ai_http_client_init')) {
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/SystemPromptField.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/Extended/TestConnection.php';
         require_once AI_HTTP_CLIENT_PATH . '/src/Components/ProviderManagerComponent.php';
-        
-        // 5. Hook into WordPress for any setup needed
-        if (function_exists('add_action')) {
-            add_action('init', 'ai_http_client_wordpress_init', 1);
-        }
     }
     
     function ai_http_client_wordpress_init() {

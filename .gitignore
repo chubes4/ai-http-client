@@ -24,3 +24,11 @@ wp-content/cache/
 # Temporary files
 *.tmp
 *.temp
+
+# Composer
+/vendor/
+composer.lock
+
+# Claude AI
+.claude.md
+plan.md
