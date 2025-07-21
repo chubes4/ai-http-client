@@ -90,8 +90,17 @@ All normalization logic is centralized in unified normalizers.
 
 ## Development Commands
 
+### Composer Scripts
+```bash
+composer test          # Run PHPUnit test suite
+composer analyse       # Run PHPStan static analysis (level 5)
+composer check         # Run both tests and analysis
+composer dump-autoload # Regenerate autoloader after adding new classes
+```
+
 ### Testing
-- No automated test framework configured
+- PHPUnit configured for automated testing
+- PHPStan static analysis at level 5
 - Testing requires WordPress environment with library loaded
 - Use the TestConnection component (`src/Components/Extended/TestConnection.php`) for provider connectivity testing
 
@@ -153,13 +162,26 @@ class AI_HTTP_NewProvider_Provider {
 
 ## Loading System
 
-The library uses a streamlined loading system in `ai-http-client.php`:
+The library uses a dual-loading system in `ai-http-client.php`:
+
+### Composer-First Loading
+1. **Composer Detection** - Checks for `/vendor/autoload.php`
+2. **Automatic Classmap** - Uses Composer's classmap autoloader for all classes
+3. **File Autoloading** - Main entry point loaded via Composer files directive
+
+### Manual Loading Fallback
+When Composer unavailable, uses manual `require_once` in dependency order:
 1. Shared utilities (FileUploadClient, ToolExecutor)
 2. **Unified Normalizers** - All normalization logic
 3. **Simple Providers** - Pure API communication
 4. **Main Client** - Unified orchestrator
 5. WordPress management components
 6. UI Components system
+
+### Version Management
+- `ai_http_client_version_check()` ensures highest version wins
+- Multiple plugins can safely include different versions
+- `AI_HTTP_CLIENT_VERSION` constant prevents conflicts
 
 ## Critical Rules
 

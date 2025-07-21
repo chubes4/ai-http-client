@@ -27,9 +27,12 @@ class AI_HTTP_Core_ApiKeyInput implements AI_HTTP_Component_Interface {
         $provider = $current_values['provider'] ?? 'openai';
         $api_key = $current_values['api_key'] ?? '';
         
-        $html = '<div class="ai-field-group ai-api-key-input">';
-        $html .= '<label for="' . esc_attr($unique_id) . '_api_key">' . esc_html($config['label']) . ':</label>';
-        $html .= '<div class="ai-input-with-button">';
+        $html = '<tr class="form-field">';
+        $html .= '<th scope="row">';
+        $html .= '<label for="' . esc_attr($unique_id) . '_api_key">' . esc_html($config['label']) . '</label>';
+        $html .= '</th>';
+        $html .= '<td>';
+        $html .= '<div>';
         $html .= '<input type="password" ';
         $html .= 'id="' . esc_attr($unique_id) . '_api_key" ';
         $html .= 'name="ai_api_key" ';
@@ -38,10 +41,10 @@ class AI_HTTP_Core_ApiKeyInput implements AI_HTTP_Component_Interface {
         $html .= 'data-component-id="' . esc_attr($unique_id) . '" ';
         $html .= 'data-component-type="api_key_input" ';
         $html .= 'data-provider="' . esc_attr($provider) . '" ';
-        $html .= 'class="ai-api-key-field" />';
+        $html .= 'class="regular-text" />';
         
         if ($config['show_toggle']) {
-            $html .= '<button type="button" class="ai-toggle-key-visibility" ';
+            $html .= '<button type="button" class="button button-small" ';
             $html .= 'onclick="aiHttpToggleKeyVisibility(\'' . esc_attr($unique_id) . '_api_key\')" ';
             $html .= 'title="Toggle API key visibility">';
             $html .= $config['toggle_icon'];
@@ -51,10 +54,11 @@ class AI_HTTP_Core_ApiKeyInput implements AI_HTTP_Component_Interface {
         $html .= '</div>';
         
         if ($config['show_help']) {
-            $html .= '<p class="ai-field-help">' . esc_html($config['help_text']) . '</p>';
+            $html .= '<br><small class="description">' . esc_html($config['help_text']) . '</small>';
         }
         
-        $html .= '</div>';
+        $html .= '</td>';
+        $html .= '</tr>';
         
         return $html;
     }

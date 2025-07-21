@@ -27,10 +27,14 @@ class AI_HTTP_Core_ProviderSelector implements AI_HTTP_Component_Interface {
         $available_providers = self::get_available_providers($config['allowed_providers']);
         $selected_provider = $current_values['provider'] ?? $config['default_provider'];
         
-        $html = '<div class="ai-field-group ai-provider-selector">';
-        $html .= '<label for="' . esc_attr($unique_id) . '_provider">' . esc_html($config['label']) . ':</label>';
+        $html = '<tr class="form-field">';
+        $html .= '<th scope="row">';
+        $html .= '<label for="' . esc_attr($unique_id) . '_provider">' . esc_html($config['label']) . '</label>';
+        $html .= '</th>';
+        $html .= '<td>';
         $html .= '<select id="' . esc_attr($unique_id) . '_provider" ';
         $html .= 'name="ai_provider" ';
+        $html .= 'class="regular-text" ';
         $html .= 'data-component-id="' . esc_attr($unique_id) . '" ';
         $html .= 'data-component-type="provider_selector">';
         
@@ -44,12 +48,13 @@ class AI_HTTP_Core_ProviderSelector implements AI_HTTP_Component_Interface {
         $html .= '</select>';
         
         if ($config['show_status']) {
-            $html .= '<span class="ai-provider-status" id="' . esc_attr($unique_id) . '_provider_status">';
+            $html .= '<br><small class="description" id="' . esc_attr($unique_id) . '_provider_status">';
             $html .= self::get_provider_status($selected_provider, $current_values);
-            $html .= '</span>';
+            $html .= '</small>';
         }
         
-        $html .= '</div>';
+        $html .= '</td>';
+        $html .= '</tr>';
         
         return $html;
     }

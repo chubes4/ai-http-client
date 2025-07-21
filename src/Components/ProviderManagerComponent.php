@@ -75,7 +75,9 @@ class AI_HTTP_ProviderManager_Component {
                 <h3><?php echo esc_html($args['title']); ?></h3>
             <?php endif; ?>
 
-            <div class="ai-provider-form">
+            <div class="form-table-wrapper">
+                <table class="form-table" role="presentation">
+                    <tbody>
                 
                 <?php
                 // Render core components
@@ -134,16 +136,21 @@ class AI_HTTP_ProviderManager_Component {
                 }
                 ?>
 
-                <!-- Save Button -->
-                <div class="ai-field-group">
-                    <button type="button" class="ai-save-settings" 
-                            onclick="aiHttpSaveSettings('<?php echo esc_attr($unique_id); ?>')">
-                        Save Settings
-                    </button>
-                    <span class="ai-save-result" id="<?php echo esc_attr($unique_id); ?>_save_result"></span>
-                </div>
+                    </tbody>
+                </table>
+            </div>
 
-                <?php if ($args['show_test_connection']): ?>
+            <!-- Save Button -->
+            <p class="submit">
+                <button type="button" class="button button-primary ai-save-settings" 
+                        onclick="aiHttpSaveSettings('<?php echo esc_attr($unique_id); ?>')">
+                    Save Settings
+                </button>
+                <span class="ai-save-result" id="<?php echo esc_attr($unique_id); ?>_save_result"></span>
+            </p>
+
+            <?php if ($args['show_test_connection']): ?>
+                <div class="test-connection-section">
                     <?php
                     // Render TestConnection component
                     try {
@@ -157,9 +164,8 @@ class AI_HTTP_ProviderManager_Component {
                         echo '<!-- Error rendering test connection component: ' . esc_html($e->getMessage()) . ' -->';
                     }
                     ?>
-                <?php endif; ?>
-
-            </div>
+                </div>
+            <?php endif; ?>
         </div>
 
         <script>

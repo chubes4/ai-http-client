@@ -27,22 +27,25 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         $provider = $current_values['provider'] ?? 'openai';
         $selected_model = $current_values['model'] ?? '';
         
-        $html = '<div class="ai-field-group ai-model-selector">';
-        $html .= '<label for="' . esc_attr($unique_id) . '_model">' . esc_html($config['label']) . ':</label>';
-        $html .= '<div class="ai-select-with-button">';
+        $html = '<tr class="form-field">';
+        $html .= '<th scope="row">';
+        $html .= '<label for="' . esc_attr($unique_id) . '_model">' . esc_html($config['label']) . '</label>';
+        $html .= '</th>';
+        $html .= '<td>';
+        $html .= '<div>';
         $html .= '<select id="' . esc_attr($unique_id) . '_model" ';
         $html .= 'name="ai_model" ';
         $html .= 'data-component-id="' . esc_attr($unique_id) . '" ';
         $html .= 'data-component-type="model_selector" ';
         $html .= 'data-provider="' . esc_attr($provider) . '" ';
-        $html .= 'class="ai-model-field">';
+        $html .= 'class="regular-text">';
         
         $html .= self::render_model_options($provider, $selected_model);
         
         $html .= '</select>';
         
         if ($config['show_refresh']) {
-            $html .= '<button type="button" class="ai-refresh-models" ';
+            $html .= '<button type="button" class="button button-small" ';
             $html .= 'onclick="aiHttpRefreshModels(\'' . esc_attr($unique_id) . '\', \'' . esc_attr($provider) . '\')" ';
             $html .= 'title="Refresh available models">';
             $html .= $config['refresh_icon'];
@@ -52,10 +55,11 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         $html .= '</div>';
         
         if ($config['show_help']) {
-            $html .= '<p class="ai-field-help">' . esc_html($config['help_text']) . '</p>';
+            $html .= '<br><small class="description">' . esc_html($config['help_text']) . '</small>';
         }
         
-        $html .= '</div>';
+        $html .= '</td>';
+        $html .= '</tr>';
         
         return $html;
     }

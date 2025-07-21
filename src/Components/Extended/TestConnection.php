@@ -24,13 +24,14 @@ class AI_HTTP_Extended_TestConnection implements AI_HTTP_Component_Interface {
     public static function render($unique_id, $config = [], $current_values = []) {
         $config = array_merge(self::get_defaults(), $config);
         
-        $html = '<div class="ai-field-group">';
+        $html = '<div class="postbox">';
+        $html .= '<div class="inside">';
         
         if ($config['show_label']) {
-            $html .= '<label>' . esc_html($config['label']) . '</label>';
+            $html .= '<h4>' . esc_html($config['label']) . '</h4>';
         }
         
-        $html .= '<button type="button" class="ai-test-connection" ';
+        $html .= '<button type="button" class="button button-secondary ai-test-connection" ';
         $html .= 'onclick="aiHttpTestConnection(\'' . esc_attr($unique_id) . '\')">';
         $html .= esc_html($config['button_text']);
         $html .= '</button>';
@@ -38,8 +39,10 @@ class AI_HTTP_Extended_TestConnection implements AI_HTTP_Component_Interface {
         $html .= '<span class="ai-test-result" id="' . esc_attr($unique_id) . '_test_result"></span>';
         
         if ($config['show_help']) {
-            $html .= '<p class="ai-field-help">' . esc_html($config['help_text']) . '</p>';
+            $html .= '<p class="description">' . esc_html($config['help_text']) . '</p>';
         }
+        
+        $html .= '</div>';
         
         $html .= '</div>';
         
