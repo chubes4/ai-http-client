@@ -1,27 +1,34 @@
 # macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Plugin/Project Specific
-documentation/
-ai-bot-for-bbpress-helper/
+# WordPress
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
 
-# Claude Code and Migration
-CLAUDE.md
-MIGRATION_PLAN.md
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# AI HTTP Client Library
-lib/ai-http-client/vendor/
-lib/ai-http-client/.git/
+# Logs
+*.log
 
-# Optional: Ignore composer dependencies if you manage them separately
-# vendor/
+# Temporary files
+*.tmp
+*.temp
 
-# Optional: Ignore node modules if you use npm/yarn
-# node_modules/
+# Composer
+/vendor/
+composer.lock
 
-# Optional: Ignore build artifacts if you have a build process
-# build/
-# dist/
-
-# Zip archives
-*.zip 
+# Claude AI
+.claude.md
+plan.md
