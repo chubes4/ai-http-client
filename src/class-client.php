@@ -35,14 +35,18 @@ class AI_HTTP_Client {
     /**
      * Constructor with unified normalizers
      *
-     * @param array $config Client configuration
+     * @param array $config Client configuration (optional - will auto-read from WordPress options if empty)
      */
     public function __construct($config = array()) {
+        // Auto-read from WordPress options if no config provided
+        if (empty($config) && class_exists('AI_HTTP_Options_Manager')) {
+            $options_manager = new AI_HTTP_Options_Manager();
+            $config = $options_manager->get_client_config();
+        }
+        
         // Set default configuration
         $this->config = wp_parse_args($config, array(
             'default_provider' => 'openai',
-            'fallback_enabled' => true,
-            'fallback_order' => array('openai', 'anthropic', 'openrouter'),
             'timeout' => 30,
             'retry_attempts' => 3,
             'logging_enabled' => false
@@ -90,11 +94,6 @@ class AI_HTTP_Client {
             return $standard_response;
             
         } catch (Exception $e) {
-            // Try fallback providers if enabled
-            if ($this->config['fallback_enabled']) {
-                return $this->try_fallback_providers($request, $provider_name);
-            }
-            
             return $this->create_error_response($e->getMessage(), $provider_name);
         }
     }
@@ -287,29 +286,6 @@ class AI_HTTP_Client {
         return isset($all_providers[$provider_name]) ? $all_providers[$provider_name] : array();
     }
 
-    /**
-     * Try fallback providers
-     *
-     * @param array $request Original request
-     * @param string $failed_provider Failed provider name
-     * @return array Response from fallback provider
-     */
-    private function try_fallback_providers($request, $failed_provider) {
-        foreach ($this->config['fallback_order'] as $fallback_provider) {
-            if ($fallback_provider === $failed_provider) {
-                continue; // Skip the failed provider
-            }
-            
-            try {
-                return $this->send_request($request, $fallback_provider);
-            } catch (Exception $e) {
-                // Continue to next fallback
-                continue;
-            }
-        }
-        
-        return $this->create_error_response("All providers failed", $failed_provider);
-    }
 
     /**
      * Validate standard request format
