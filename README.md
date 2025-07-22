@@ -239,16 +239,6 @@ Designed for **flexible distribution**:
 - Multiple plugins can include different versions safely
 - Automatic updates via `git subtree pull` or `composer update`
 
-## For Advanced Developers Only
-
-This library assumes you:
-- Know WordPress plugin development
-- Understand unified architecture patterns
-- Want backend functionality + unstyled UI component
-- Need to ship AI features quickly
-
-Not for beginners or general PHP projects.
-
 ### Adding New Providers
 
 1. Create simple provider class in `src/Providers/` (e.g., `newprovider.php`)
@@ -264,7 +254,7 @@ Each provider needs only 4 methods:
 
 ## Contributing
 
-Built by advanced developers, for advanced developers. PRs welcome for:
+Built by developers, for developers. PRs welcome for:
 - New provider implementations
 - Performance improvements
 - WordPress compatibility fixes
@@ -275,4 +265,4 @@ GPL v2 or later
 
 ---
 
-**[Chris Huber](https://chubes.net)** - For advanced WordPress developers who ship fast.
+**[Chris Huber](https://chubes.net)**
