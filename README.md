@@ -1,10 +1,10 @@
 # AI HTTP Client for WordPress
 
-A professional WordPress library for unified AI provider communication. Drop-in solution for advanced WordPress plugin developers who need AI functionality with minimal integration effort.
+A professional WordPress library for unified AI provider communication. Drop-in solution for WordPress plugin developers who need AI functionality with minimal integration effort.
 
 ## Why This Library?
 
-**For Advanced WordPress Developers** - Not beginners, not general PHP projects. This is for experienced plugin developers who want to ship AI features fast.
+This is for WordPress plugin developers who want to ship AI features fast.
 
 **Complete Drop-In Solution:**
 - ✅ Backend AI integration + Admin UI component
