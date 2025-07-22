@@ -3,7 +3,7 @@ Contributors: chubes
 Tags: bbpress, ai, bot, forum, chatgpt
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -102,6 +102,11 @@ If the "Remote REST Endpoint URL" is configured, the plugin will also send searc
 3.  (Add more descriptions as needed)
 
 == Changelog ==
+
+= 1.0.4 =
+* Fix: Bot replies now properly trigger WordPress hooks (bbp_new_reply) for better integration
+* Enhancement: Bot replies now work correctly with notification plugins, points systems, and activity feeds
+* Enhancement: Improved compatibility with bbPress ecosystem plugins that expect standard hooks
 
 = 1.0.3 =
 * NEW FEATURE: Forum Access Control - Bot can now be restricted to specific forums only

@@ -133,6 +133,11 @@ class AiBot {
             return $reply_id; // Return the WP_Error object
         } else {
             // error_log( 'AI Bot Info: Successfully posted reply ID ' . $reply_id . ' to topic ID ' . $topic_id );
+            
+            // IMPORTANT: Fire the bbp_new_reply hook to ensure compatibility with notification plugins,
+            // points systems, activity feeds, and other bbPress integrations that expect this hook
+            do_action( 'bbp_new_reply', $reply_id, $topic_id, $forum_id, array(), $bot_user_id );
+            
             return $reply_id;
         }
     }
