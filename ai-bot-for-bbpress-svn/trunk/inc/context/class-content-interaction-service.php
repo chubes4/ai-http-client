@@ -6,6 +6,7 @@ use AiBot\API\ChatGPT_API;
 use AiBot\Context\Database_Agent;
 use AiBot\Context\Local_Context_Retriever; // Add use statement for Local_Context_Retriever
 use AiBot\Context\Remote_Context_Retriever; // Add use statement for Remote_Context_Retriever
+use AiBot\Core\System_Prompt_Builder;
 
 /**
  * Content Interaction Service Class
@@ -43,23 +44,33 @@ class Content_Interaction_Service {
     private $remote_context_retriever;
 
     /**
+     * System Prompt Builder instance
+     *
+     * @var System_Prompt_Builder
+     */
+    private $system_prompt_builder;
+
+    /**
      * Constructor
      *
      * @param Database_Agent $database_agent Instance of the database agent.
      * @param Local_Context_Retriever $local_context_retriever Instance of the local context retriever.
      * @param Remote_Context_Retriever $remote_context_retriever Instance of the remote context retriever.
      * @param ChatGPT_API $chatgpt_api Instance of the ChatGPT API.
+     * @param System_Prompt_Builder $system_prompt_builder Instance of the system prompt builder.
      */
     public function __construct(
         Database_Agent $database_agent,
         Local_Context_Retriever $local_context_retriever,
         Remote_Context_Retriever $remote_context_retriever,
-        ChatGPT_API $chatgpt_api
+        ChatGPT_API $chatgpt_api,
+        System_Prompt_Builder $system_prompt_builder
     ) {
         $this->database_agent           = $database_agent;
         $this->local_context_retriever  = $local_context_retriever; // Assign the injected instance
         $this->remote_context_retriever = $remote_context_retriever;
         $this->chatgpt_api              = $chatgpt_api; // Assign the injected instance
+        $this->system_prompt_builder    = $system_prompt_builder;
     }
 
     /**
@@ -69,55 +80,6 @@ class Content_Interaction_Service {
         // Add hooks or other initialization steps
     }
 
-    /**
-     * Check if the interaction should be triggered based on various criteria.
-     *
-     * @param int    $post_id      The ID of the current post/reply.
-     * @param string $post_content The content of the current post/reply.
-     * @param int    $topic_id     The ID of the topic.
-     * @param int    $forum_id     The ID of the forum.
-     * @return bool True if interaction should be triggered, false otherwise.
-     */
-    public function should_trigger_interaction( $post_id, $post_content, $topic_id, $forum_id ) {
-
-        // Get the Bot User ID and Username - Use new option name
-        $bot_user_id = get_option( 'ai_bot_user_id' );
-        $bot_username = null;
-        if ( $bot_user_id ) {
-            $bot_user_data = get_userdata( $bot_user_id );
-            if ( $bot_user_data ) {
-                $bot_username = $bot_user_data->user_login;
-            }
-        }
-
-        // 1. Check for mention (only if bot username is configured)
-        if ( $bot_username && preg_match( '/@' . preg_quote( $bot_username, '/' ) . '/i', $post_content ) ) {
-            // Use new logging prefix
-            // error_log( "AI Bot Info: Mention detected for user @{$bot_username}" );
-            return true;
-        }
-
-        // 2. Check for keywords - Use new option name
-        $keywords_string = get_option( 'ai_bot_trigger_keywords', '' );
-        if ( ! empty( $keywords_string ) ) {
-            // Split keywords by comma or newline, trim whitespace, remove empty entries
-            $keywords = preg_split( '/[\s,]+/', $keywords_string, -1, PREG_SPLIT_NO_EMPTY );
-            $keywords = array_map( 'trim', $keywords );
-            $keywords = array_filter( $keywords );
-
-            if ( ! empty( $keywords ) ) {
-                // Create a regex pattern to match any keyword (case-insensitive)
-                $pattern = '/\b(' . implode( '|', array_map( 'preg_quote', $keywords, ['/'] ) ) . ')\b/i';
-                if ( preg_match( $pattern, $post_content ) ) {
-                    return true;
-                }
-            }
-        }
-
-        // Add other trigger conditions here (e.g., scheduled tasks)
-
-        return false; // No trigger condition met
-    }
 
     /**
      * Get the hostname from the configured remote endpoint URL.
@@ -257,49 +219,8 @@ class Content_Interaction_Service {
 
         $conversation_history_context .= "--- END CONVERSATION HISTORY ---\n\n";
 
-        // --- Extract Keywords for Context Search ---
-        // Prepare list of terms to exclude from keywords
-        $excluded_terms = ['forum', 'topic', 'post', 'reply', 'thread', 'discussion', 'message', 'conversation'];
-        if (isset($bot_username) && $bot_username !== 'Bot') { // Make sure we have a specific bot username
-             $excluded_terms[] = '@' . $bot_username; // Add the @mention format
-             $excluded_terms[] = $bot_username; // Add the username itself
-        }
-        $exclude_list_string = implode(', ', $excluded_terms);
-
-        $keywords_comma_separated = ''; // Initialize
-        // Refined prompt for keyword extraction V3
-        $keyword_extraction_prompt = sprintf(
-            "Analyze the following forum post content. Extract the most relevant keywords or phrases for searching a knowledge base to answer the user's core query. Provide the results as a single comma-separated list.\\n\\n".
-            "**Guidelines:**\\n".
-            "1. Prioritize specific, multi-word phrases (e.g., 'Grateful Dead Ripple', 'artist story sharing') over single generic words (e.g., 'music', 'artists').\\n".
-            "2. If the user asks about a specific person, band, song, place, event name, or other named entity, ensure that entity's name is the core part of your primary extracted phrase.\\n".
-            "3. Order the results from most central to least central to the user's query.\\n".
-            "4. Extract *up to* 3 distinct phrases/keywords. If the user's post is short or very specific, providing only 1 or 2 highly relevant phrases/keywords is preferable to adding less relevant ones.\\n".
-            "5. **CRITICAL:** Avoid appending generic terms like 'discussion', 'event', 'forecast', 'update', 'info', 'details', 'question', 'help', or the forum terms (%s) to the core subject. For example, if the post is about 'High Water 2025', extract 'High Water 2025', NOT 'High Water 2025 discussion' or 'High Water 2025 event'. Only include such terms if they are part of a specific official name or title explicitly mentioned in the post content.\\n\\n". // V3 refinement
-            "Post Content:\\n%s",
-            $exclude_list_string,
-            wp_strip_all_tags( $post_content )
-        );
-        $keywords_response = $this->chatgpt_api->generate_response( $keyword_extraction_prompt, '', '', 0.2 );
-
-        if ( ! is_wp_error( $keywords_response ) && ! empty( $keywords_response ) ) {
-            // Keep the raw comma-separated string from OpenAI
-            $keywords_comma_separated = trim( $keywords_response );
-            if ( ! empty( $keywords_comma_separated ) ) {
-                 // Use new logging prefix
-                 // error_log('AI Bot Info: Extracted Keywords for Context Search: ' . $keywords_comma_separated);
-            } else {
-                 // Use new logging prefix
-                 // error_log('AI Bot Warning: OpenAI returned empty keyword list for context search.');
-            }
-        } else {
-             // Use new logging prefix
-            // error_log('AI Bot Error: Failed to extract keywords for context search: ' . (is_wp_error($keywords_response) ? $keywords_response->get_error_message() : 'Empty response'));
-        }
-
-        // *** DEBUG LOG: Extracted Keywords ***
-        // error_log("AI Bot Debug: Keywords extracted for search: [" . $keywords_comma_separated . "]");
-        // *** END DEBUG LOG ***
+        // --- Extract Keywords for Context Search using centralized System_Prompt_Builder ---
+        $keywords_comma_separated = $this->system_prompt_builder->extract_keywords( $post_content, $bot_username );
 
         // --- Section 3: Relevant Knowledge Base Search (Coordinator Logic) ---
 
@@ -402,6 +323,81 @@ class Content_Interaction_Service {
                         . $remote_knowledge_context;
 
         return $context_string;
+    }
+
+    /**
+     * Get conversation history as structured array for proper OpenAI message flow
+     *
+     * @param int $post_id      The ID of the current post/reply.
+     * @param string $post_content The content of the current post/reply.
+     * @param int $topic_id     The ID of the topic.
+     * @param int $forum_id     The ID of the forum.
+     * @return array Array of conversation messages with role/content structure
+     */
+    public function get_conversation_messages( $post_id, $post_content, $topic_id, $forum_id ) {
+        $messages = array();
+        
+        $bot_user_id = get_option( 'ai_bot_user_id' );
+        
+        // --- Add Topic Starter as First User Message ---
+        $topic_starter_post = get_post($topic_id);
+        if ($topic_starter_post && $topic_starter_post->post_author != $bot_user_id) {
+            $starter_content = bbp_get_topic_content( $topic_id );
+            $starter_author_obj = get_userdata( $topic_starter_post->post_author );
+            $starter_author_name = $starter_author_obj ? '@' . $starter_author_obj->user_nicename : '@anonymous';
+            
+            $cleaned_starter_content = trim(html_entity_decode( wp_strip_all_tags( $starter_content ), ENT_QUOTES, 'UTF-8' ));
+            
+            $messages[] = array(
+                'role' => 'user',
+                'content' => $starter_author_name . ': ' . $cleaned_starter_content
+            );
+        }
+        
+        // --- Add Chronological Replies ---
+        $reply_limit = (int) get_option('ai_bot_reply_history_limit', 10);
+        $chronological_replies = $this->database_agent->get_chronological_topic_replies( $topic_id, $reply_limit, array( $post_id ) );
+        
+        if ( ! empty( $chronological_replies ) ) {
+            // Reverse to get oldest first
+            $ordered_replies = array_reverse( $chronological_replies );
+            
+            foreach ( $ordered_replies as $reply ) {
+                $reply_content = bbp_get_reply_content( $reply->ID );
+                $reply_author_obj = get_userdata( $reply->post_author );
+                $is_bot = ( $bot_user_id && $reply->post_author == $bot_user_id );
+                
+                // Clean content
+                $cleaned_content = trim(html_entity_decode( wp_strip_all_tags( $reply_content ), ENT_QUOTES, 'UTF-8' ));
+                
+                if ( $is_bot ) {
+                    // Bot's previous response
+                    $messages[] = array(
+                        'role' => 'assistant',
+                        'content' => $cleaned_content
+                    );
+                } else {
+                    // User message
+                    $author_name = $reply_author_obj ? '@' . $reply_author_obj->user_nicename : '@anonymous';
+                    $messages[] = array(
+                        'role' => 'user',
+                        'content' => $author_name . ': ' . $cleaned_content
+                    );
+                }
+            }
+        }
+        
+        // --- Add Current Triggering Message ---
+        $triggering_author_obj = get_userdata( get_post($post_id)->post_author );
+        $triggering_author_name = $triggering_author_obj ? '@' . $triggering_author_obj->user_nicename : '@anonymous';
+        $cleaned_current_content = trim(html_entity_decode( wp_strip_all_tags( $post_content ), ENT_QUOTES, 'UTF-8' ));
+        
+        $messages[] = array(
+            'role' => 'user',
+            'content' => $triggering_author_name . ': ' . $cleaned_current_content
+        );
+        
+        return $messages;
     }
 
 } // End class Content_Interaction_Service

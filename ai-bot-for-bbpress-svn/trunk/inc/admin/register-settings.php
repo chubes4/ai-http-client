@@ -25,6 +25,8 @@ function ai_bot_register_all_settings() {
     register_setting( $settings_group, 'ai_bot_custom_prompt', 'wp_kses_post' );
     register_setting( $settings_group, 'ai_bot_temperature', 'ai_bot_sanitize_temperature' );
     register_setting( $settings_group, 'ai_bot_trigger_keywords', 'sanitize_textarea_field' );
+    register_setting( $settings_group, 'ai_bot_forum_restriction', 'sanitize_text_field' );
+    register_setting( $settings_group, 'ai_bot_allowed_forums', 'ai_bot_sanitize_forum_array' );
     register_setting( $settings_group, 'ai_bot_local_search_limit', 'absint' );
     register_setting( $settings_group, 'ai_bot_remote_endpoint_url', 'esc_url_raw' );
     register_setting( $settings_group, 'ai_bot_remote_search_limit', 'absint' );
@@ -104,6 +106,15 @@ function ai_bot_register_all_settings() {
         'ai_bot_trigger_keywords', // ID
         __( 'Trigger Keywords', 'ai-bot-for-bbpress' ), // Title
         'ai_bot_trigger_keywords_callback', // Callback
+        $page_slug, // Page
+        'ai_bot_behavior_settings_section' // Section
+    );
+
+    // Forum Restriction Field
+    add_settings_field(
+        'ai_bot_forum_restriction', // ID
+        __( 'Forum Access Control', 'ai-bot-for-bbpress' ), // Title
+        'ai_bot_forum_restriction_callback', // Callback
         $page_slug, // Page
         'ai_bot_behavior_settings_section' // Section
     );
@@ -205,10 +216,148 @@ function ai_bot_remote_search_limit_callback() {
     echo '<p class="description">' . esc_html__( 'Max number of relevant posts from the remote site to use as context. Default: 3.', 'ai-bot-for-bbpress' ) . '</p>';
 }
 
+// Forum restriction callback
+function ai_bot_forum_restriction_callback() {
+    $restriction_mode = get_option( 'ai_bot_forum_restriction', 'all' );
+    $allowed_forums = get_option( 'ai_bot_allowed_forums', array() );
+    
+    echo '<div id="ai-bot-forum-restriction">';
+    
+    // Radio buttons
+    echo '<p>';
+    echo '<label><input type="radio" name="ai_bot_forum_restriction" value="all" ' . checked( $restriction_mode, 'all', false ) . ' /> ';
+    echo esc_html__( 'All Forums (bot responds in any forum)', 'ai-bot-for-bbpress' ) . '</label><br>';
+    echo '<label><input type="radio" name="ai_bot_forum_restriction" value="selected" ' . checked( $restriction_mode, 'selected', false ) . ' /> ';
+    echo esc_html__( 'Selected Forums Only', 'ai-bot-for-bbpress' ) . '</label>';
+    echo '</p>';
+    
+    // Forum selection box
+    echo '<div id="ai-bot-forum-selection" style="margin-left: 25px; border: 1px solid #ddd; padding: 10px; max-height: 200px; overflow-y: auto; background: #fafafa;">';
+    
+    // Get forums using WP_Query (bbPress stores forums as 'forum' post type)
+    if ( function_exists( 'bbp_get_forum_post_type' ) ) {
+        // Get all forums with hierarchy support
+        $forums = new WP_Query( array(
+            'post_type'      => bbp_get_forum_post_type(),
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'menu_order title',
+            'order'          => 'ASC'
+        ) );
+        
+        if ( $forums->have_posts() ) {
+            // Build hierarchical array
+            $forum_hierarchy = array();
+            $all_forums = array();
+            
+            while ( $forums->have_posts() ) {
+                $forums->the_post();
+                $forum_id = get_the_ID();
+                $forum_data = array(
+                    'id' => $forum_id,
+                    'title' => get_the_title(),
+                    'parent' => get_post()->post_parent,
+                    'children' => array()
+                );
+                $all_forums[$forum_id] = $forum_data;
+            }
+            wp_reset_postdata();
+            
+            // Build hierarchy
+            foreach ( $all_forums as $forum_id => $forum_data ) {
+                if ( $forum_data['parent'] == 0 ) {
+                    $forum_hierarchy[$forum_id] = $forum_data;
+                } else {
+                    if ( isset( $all_forums[$forum_data['parent']] ) ) {
+                        $all_forums[$forum_data['parent']]['children'][$forum_id] = $forum_data;
+                    } else {
+                        // Parent doesn't exist, treat as root level
+                        $forum_hierarchy[$forum_id] = $forum_data;
+                    }
+                }
+            }
+            
+            // Update hierarchy with children
+            foreach ( $all_forums as $forum_id => $forum_data ) {
+                if ( isset( $forum_hierarchy[$forum_id] ) ) {
+                    $forum_hierarchy[$forum_id]['children'] = $forum_data['children'];
+                }
+            }
+            
+            // Display hierarchical forum list
+            ai_bot_display_forum_hierarchy( $forum_hierarchy, $allowed_forums, 0 );
+            
+        } else {
+            echo '<p><em>' . esc_html__( 'No forums found. Create some forums in bbPress to enable forum restriction.', 'ai-bot-for-bbpress' ) . '</em></p>';
+        }
+    } else {
+        echo '<p><em>' . esc_html__( 'bbPress functions not yet loaded. Please refresh the page.', 'ai-bot-for-bbpress' ) . '</em></p>';
+    }
+    
+    echo '</div>';
+    echo '<p class="description">' . esc_html__( 'Choose "Selected Forums Only" to restrict the bot to specific forums. This helps prevent spam and keeps the bot focused on professional sections.', 'ai-bot-for-bbpress' ) . '</p>';
+    echo '</div>';
+    
+    // JavaScript for enabling/disabling checkboxes
+    echo '<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const radioButtons = document.querySelectorAll(\'input[name="ai_bot_forum_restriction"]\');
+        const checkboxes = document.querySelectorAll(\'.ai-bot-forum-checkbox\');
+        const selectionDiv = document.getElementById(\'ai-bot-forum-selection\');
+        
+        function updateCheckboxState() {
+            const isSelected = document.querySelector(\'input[name="ai_bot_forum_restriction"]:checked\').value === "selected";
+            checkboxes.forEach(checkbox => checkbox.disabled = !isSelected);
+            selectionDiv.style.opacity = isSelected ? "1" : "0.5";
+        }
+        
+        radioButtons.forEach(radio => radio.addEventListener("change", updateCheckboxState));
+        updateCheckboxState(); // Initial state
+    });
+    </script>';
+}
+
 // Sanitization callback for temperature
 function ai_bot_sanitize_temperature( $input ) {
     $input = floatval($input);
     if ($input < 0) return 0;
     if ($input > 1) return 1;
     return $input;
+}
+
+// Sanitization callback for forum array
+function ai_bot_sanitize_forum_array( $input ) {
+    if ( ! is_array( $input ) ) {
+        return array();
+    }
+    return array_map( 'absint', $input );
+}
+
+/**
+ * Display hierarchical forum list with proper indentation
+ *
+ * @param array $forums Array of forums in hierarchical structure
+ * @param array $allowed_forums Array of currently selected forum IDs
+ * @param int $depth Current depth level for indentation
+ */
+function ai_bot_display_forum_hierarchy( $forums, $allowed_forums, $depth = 0 ) {
+    foreach ( $forums as $forum ) {
+        $forum_id = $forum['id'];
+        $forum_title = $forum['title'];
+        $checked = in_array( $forum_id, (array) $allowed_forums ) ? 'checked' : '';
+        
+        // Calculate indentation based on depth
+        $indent_style = $depth > 0 ? 'margin-left: ' . ( $depth * 20 ) . 'px;' : '';
+        $depth_indicator = $depth > 0 ? str_repeat( '— ', $depth ) : '';
+        
+        echo '<label style="display: block; margin: 3px 0; ' . esc_attr( $indent_style ) . '">';
+        echo '<input type="checkbox" name="ai_bot_allowed_forums[]" value="' . esc_attr( $forum_id ) . '" ' . esc_attr( $checked ) . ' class="ai-bot-forum-checkbox" /> ';
+        echo esc_html( $depth_indicator . $forum_title );
+        echo '</label>';
+        
+        // Recursively display child forums
+        if ( ! empty( $forum['children'] ) ) {
+            ai_bot_display_forum_hierarchy( $forum['children'], $allowed_forums, $depth + 1 );
+        }
+    }
 }

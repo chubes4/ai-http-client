@@ -3,7 +3,7 @@ Contributors: chubes
 Tags: bbpress, ai, bot, forum, chatgpt
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -14,6 +14,13 @@ Integrates a configurable AI bot into bbPress forums, responding to mentions or 
 == Description ==
 
 AI Bot for bbPress integrates seamlessly with your bbPress forums, allowing a configurable AI bot user to participate in discussions. The bot can be triggered by direct mentions (@YourBotUsername) or specific keywords within forum posts, leveraging context from the forum and optionally a remote WordPress site.
+
+Currently uses OpenAI's ChatGPT API. Future versions will migrate to our [AI HTTP Client library](https://github.com/chubes4/ai-http-client) to provide multi-provider support (OpenAI, Anthropic, Gemini, Grok, OpenRouter) with a unified interface.
+
+**Links:**
+* [Plugin Homepage](https://chubes.net) - Visit the developer's website
+* [GitHub Repository](https://github.com/chubes4/ai-bot-for-bbpress) - Source code, issues, and contributions
+* [Support](https://github.com/chubes4/ai-bot-for-bbpress/issues) - Report bugs or request features
 
 == Installation ==
 
@@ -34,6 +41,7 @@ After activation, navigate to Settings > Forum AI Bot in your WordPress admin ar
 *   **Local Search Limit:** Maximum number of relevant posts/topics to retrieve from the local forum database for context. Default is 3.
 *   **Remote REST Endpoint URL:** The full URL to the search endpoint provided by the BBP Bot Helper plugin installed on your remote site (e.g., `https://your-main-site.com/wp-json/bbp-bot-helper/v1/search`). Leave blank to disable remote context.
 *   **Remote Search Limit:** Maximum number of relevant posts to retrieve from the remote endpoint for context. Default is 3.
+*   **Forum Access Control:** Choose whether the bot responds in all forums or only selected ones. When set to "Selected Forums Only", you can choose specific forums where the bot will be active.
 
 == Frequently Asked Questions ==
 
@@ -94,6 +102,21 @@ If the "Remote REST Endpoint URL" is configured, the plugin will also send searc
 3.  (Add more descriptions as needed)
 
 == Changelog ==
+
+= 1.0.3 =
+* NEW FEATURE: Forum Access Control - Bot can now be restricted to specific forums only
+* NEW: Hierarchical forum selection with proper indentation showing parent/child relationships
+* MAJOR: Improved conversation memory - Bot now uses proper OpenAI message structure for better context retention
+* ARCHITECTURE: Complete code refactor with centralized System_Prompt_Builder for all AI instructions
+* ARCHITECTURE: Eliminated redundant wrapper classes and directories for cleaner, more maintainable code
+* ARCHITECTURE: New Bot_Trigger_Service centralizes all trigger logic (mentions, keywords, forum restrictions)
+* Enhancement: Forum restriction enforcement - bot will only respond in selected forums when configured
+* Enhancement: Bot now posts user-friendly error messages instead of staying silent when API errors occur
+* Enhancement: Conversation history now uses proper user/assistant message alternation for OpenAI API
+* Enhancement: All prompt construction logic now centralized in single service following single responsibility principle
+* Fix: Bot now properly recognizes its own username when mentioned (no longer thinks mentions are about someone else)
+* Fix: Added proper output escaping for admin form inputs to meet WordPress security standards
+* Code cleanup: Removed redundant code and directories, improved separation of concerns
 
 = 1.0.2 =
 * Address WordPress.org review feedback:

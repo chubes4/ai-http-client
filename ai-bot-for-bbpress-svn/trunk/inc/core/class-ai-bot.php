@@ -1,8 +1,8 @@
 <?php
 namespace AiBot\Core;
 
-use AiBot\Triggers\Handle_Mention;
-use AiBot\Response\Generate_Bot_Response;
+use AiBot\Core\Generate_Bot_Response;
+use AiBot\Core\Bot_Trigger_Service;
 use AiBot\Context\Content_Interaction_Service;
 use AiBot\Context\Database_Agent;
 
@@ -12,9 +12,9 @@ use AiBot\Context\Database_Agent;
 class AiBot {
 
     /**
-     * @var Handle_Mention
+     * @var Bot_Trigger_Service
      */
-    private $handle_mention;
+    private $bot_trigger_service;
 
     /**
      * @var Generate_Bot_Response
@@ -34,18 +34,18 @@ class AiBot {
     /**
      * Constructor
      *
-     * @param Handle_Mention $handle_mention
+     * @param Bot_Trigger_Service $bot_trigger_service
      * @param Generate_Bot_Response $generate_bot_response
      * @param Content_Interaction_Service $content_interaction_service
      * @param Database_Agent $database_agent
      */
     public function __construct(
-        Handle_Mention $handle_mention,
+        Bot_Trigger_Service $bot_trigger_service,
         Generate_Bot_Response $generate_bot_response,
         Content_Interaction_Service $content_interaction_service,
         Database_Agent $database_agent
     ) {
-        $this->handle_mention              = $handle_mention;
+        $this->bot_trigger_service         = $bot_trigger_service;
         $this->generate_bot_response       = $generate_bot_response;
         $this->content_interaction_service = $content_interaction_service;
         $this->database_agent              = $database_agent;
@@ -63,10 +63,10 @@ class AiBot {
      * Register action and filter hooks
      */
     public function register_hooks() {
-        // Ensure Handle_Mention initializes its hooks
-        if (method_exists($this->handle_mention, 'init')) {
-            $this->handle_mention->init();
-        }
+        // Register bbPress hooks for bot triggers
+        add_action( 'bbp_new_reply', array( $this, 'handle_bot_trigger' ), 9, 5 );
+        add_action( 'bbp_new_topic', array( $this, 'handle_bot_trigger' ), 9, 4 );
+        
         // Add the cron action hook
         add_action( 'ai_bot_generate_bot_response_event', array( $this->generate_bot_response, 'generate_and_post_ai_response_cron' ), 10, 5 );
 
@@ -79,6 +79,24 @@ class AiBot {
             // error_log('AI Bot Error: Admin functions not loaded.');
         }
 
+    }
+
+    /**
+     * Handle mention or keyword trigger
+     */
+    public function handle_bot_trigger( $post_id, $topic_id, $forum_id, $anonymous_data, $reply_author = 0 ) {
+        $post_content = ($reply_author == 0) ? bbp_get_topic_content( $post_id ) : bbp_get_reply_content( $post_id );
+
+        // Check if the interaction should be triggered using the injected service
+        if ( $this->bot_trigger_service->should_trigger_interaction( $post_id, $post_content, $topic_id, $forum_id ) ) {
+
+            // Schedule cron event to generate and post AI response
+            $scheduled = wp_schedule_single_event(
+                time(),
+                'ai_bot_generate_bot_response_event',
+                array( $post_id, $topic_id, $forum_id, $anonymous_data, $reply_author )
+            );
+        }
     }
 
     /**

@@ -3,7 +3,7 @@
  * Plugin Name: AI Bot for bbPress
  * Plugin URI:  https://wordpress.org/plugins/ai-bot-for-bbpress/
  * Description: AI bot for bbPress forums that can be configured to reply to mentions or keywords.
- * Version:     1.0.2
+ * Version:     1.0.3
  * Author:      Chubes
  * Author URI:  https://chubes.net
  * License:     GPLv2 or later
@@ -27,8 +27,9 @@ require_once AI_BOT_PLUGIN_PATH . 'inc/core/class-ai-bot-service-container.php';
 
 // Include Namespaced Classes
 require_once AI_BOT_PLUGIN_PATH . 'inc/api/class-chatgpt-api.php';
-require_once AI_BOT_PLUGIN_PATH . 'inc/triggers/class-handle-mention.php';
-require_once AI_BOT_PLUGIN_PATH . 'inc/response/class-generate-bot-response.php'; // Corrected path
+require_once AI_BOT_PLUGIN_PATH . 'inc/core/class-generate-bot-response.php';
+require_once AI_BOT_PLUGIN_PATH . 'inc/core/class-system-prompt-builder.php';
+require_once AI_BOT_PLUGIN_PATH . 'inc/core/class-bot-trigger-service.php';
 require_once AI_BOT_PLUGIN_PATH . 'inc/context/class-database-agent.php';
 require_once AI_BOT_PLUGIN_PATH . 'inc/context/class-local-context-retriever.php';
 require_once AI_BOT_PLUGIN_PATH . 'inc/context/class-remote-context-retriever.php';
@@ -50,8 +51,9 @@ use AiBot\Context\Local_Context_Retriever;
 use AiBot\Context\Remote_Context_Retriever;
 use AiBot\Context\Content_Interaction_Service;
 use AiBot\Context\Forum_Structure_Provider;
-use AiBot\Response\Generate_Bot_Response;
-use AiBot\Triggers\Handle_Mention;
+use AiBot\Core\Generate_Bot_Response;
+use AiBot\Core\System_Prompt_Builder;
+use AiBot\Core\Bot_Trigger_Service;
 
 // --- Service Container Setup ---
 
@@ -90,6 +92,19 @@ $container->register( 'context.forum_structure_provider', function( $c ) {
     return new Forum_Structure_Provider();
 } );
 
+// Register the system prompt builder
+$container->register( 'core.system_prompt_builder', function( $c ) {
+    return new System_Prompt_Builder(
+        $c->get( 'context.forum_structure_provider' ),
+        $c->get( 'api.chatgpt' )
+    );
+} );
+
+// Register the bot trigger service
+$container->register( 'core.bot_trigger_service', function( $c ) {
+    return new Bot_Trigger_Service();
+} );
+
 // Register the content interaction service
 $container->register( 'context.interaction_service', function( $c ) {
     // Use the short class name because of the 'use' statement above
@@ -97,24 +112,19 @@ $container->register( 'context.interaction_service', function( $c ) {
         $c->get( 'context.database_agent' ),
         $c->get( 'context.local_retriever' ),
         $c->get( 'context.remote_retriever' ),
-        $c->get( 'api.chatgpt' )
+        $c->get( 'api.chatgpt' ),
+        $c->get( 'core.system_prompt_builder' )
     );
 } );
 
-$container->register( 'triggers.handle_mention', function( $c ) {
-    // Use the short class name because of the 'use' statement above
-    return new Handle_Mention(
-        $c->get( 'context.interaction_service' )
-    );
-} );
 
 // Register the response generation service
-$container->register( 'response.generate_bot', function( $c ) {
+$container->register( 'core.generate_bot_response', function( $c ) {
     // Use the short class name because of the 'use' statement above
     return new Generate_Bot_Response(
         $c->get( 'api.chatgpt' ),
         $c->get( 'context.interaction_service' ),
-        $c->get( 'context.forum_structure_provider' ),
+        $c->get( 'core.system_prompt_builder' ),
         $c // Pass the container itself
     );
 } );
@@ -123,8 +133,8 @@ $container->register( 'response.generate_bot', function( $c ) {
 $container->register( 'bot.main', function( $c ) {
     // Use the short class name because of the 'use' statement above
     return new AiBot(
-        $c->get( 'triggers.handle_mention' ),
-        $c->get( 'response.generate_bot' ),
+        $c->get( 'core.bot_trigger_service' ),
+        $c->get( 'core.generate_bot_response' ),
         $c->get( 'context.interaction_service' ),
         $c->get( 'context.database_agent' )
     );

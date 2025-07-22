@@ -22,9 +22,9 @@ class ChatGPT_API {
     }
 
     /**
-     * Generate AI response using ChatGPT API with proper conversation flow
+     * Generate AI response using ChatGPT API
      */
-    public function generate_response( $prompt, $system_prompt, $custom_prompt, $temperature, $conversation_messages = array() ) {
+    public function generate_response( $prompt, $system_prompt, $custom_prompt, $temperature ) {
         $api_key = $this->get_api_key();
         $model = 'gpt-4.1-mini';
 
@@ -36,36 +36,22 @@ class ChatGPT_API {
         $api_url = 'https://api.openai.com/v1/chat/completions';
 
         $messages = [];
-        
-        // Add system prompt
         if ( !empty( $system_prompt ) ) {
             $messages[] = [
                 'role' => 'system',
                 'content' => $system_prompt,
             ];
         }
-        
-        // Add conversation history with proper user/assistant alternation
-        if ( !empty( $conversation_messages ) ) {
-            $messages = array_merge( $messages, $conversation_messages );
-        }
-        
-        // Add context and instructions as system message if we have additional prompt content
-        if ( !empty( $prompt ) ) {
-            // If we have context/instructions, add as another system message
-            $messages[] = [
-                'role' => 'system',
-                'content' => 'Additional Context and Instructions: ' . $prompt
-            ];
-        }
-        
-        // Add custom prompt as final instruction if provided
         if ( !empty( $custom_prompt ) ) {
             $messages[] = [
-                'role' => 'system',
-                'content' => 'Custom Instructions: ' . $custom_prompt
+                'role' => 'user',
+                'content' => $custom_prompt,
             ];
         }
+        $messages[] = [
+            'role' => 'user',
+            'content' => $prompt,
+        ];
 
 
         $args = array(

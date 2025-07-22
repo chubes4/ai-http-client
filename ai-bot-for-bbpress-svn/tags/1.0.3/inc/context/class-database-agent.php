@@ -255,20 +255,16 @@ class Database_Agent {
 
         // Remove the filter to avoid affecting other queries
         remove_filter( 'posts_where', array( $this, 'build_or_search_where_clause' ), 10 );
+        unset( $this->current_search_keywords ); // Clean up stored keywords
 
         // Perform re-ranking based on keyword density if needed
         if (!empty($filtered_results)) {
             // error_log("AI Bot Debug: Re-ranking " . count($filtered_results) . " results based on keyword density.");
             $final_results_after_reranking = $this->rerank_results_by_keyword_density($filtered_results, $this->current_search_keywords);
             // error_log("AI Bot Debug: Results after re-ranking (IDs): " . print_r(wp_list_pluck($final_results_after_reranking, 'ID'), true));
-            
-            // Clean up stored keywords after re-ranking is complete
-            unset( $this->current_search_keywords );
             return array_slice($final_results_after_reranking, 0, $limit); // Ensure limit is respected after re-ranking
         }
 
-        // Clean up stored keywords when no re-ranking needed
-        unset( $this->current_search_keywords );
         // error_log("AI Bot Debug: No results to re-rank or return.");
         return $filtered_results; // Return filtered (and implicitly limited by original query)
     }
