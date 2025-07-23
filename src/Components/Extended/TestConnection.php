@@ -98,15 +98,23 @@ class AI_HTTP_Extended_TestConnection implements AI_HTTP_Component_Interface {
     }
     
     /**
-     * AJAX handler for testing connection
+     * AJAX handler for testing connection with plugin context
      */
     public static function ajax_test_connection() {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
-        $provider = sanitize_text_field($_POST['provider']);
-        
         try {
-            $client = new AI_HTTP_Client();
+            $plugin_context = sanitize_key($_POST['plugin_context']);
+            if (empty($plugin_context)) {
+                wp_send_json([
+                    'success' => false,
+                    'message' => 'Plugin context is required'
+                ]);
+            }
+            
+            $provider = sanitize_text_field($_POST['provider']);
+            
+            $client = new AI_HTTP_Client(['plugin_context' => $plugin_context]);
             $result = $client->test_connection($provider);
             
             wp_send_json($result);

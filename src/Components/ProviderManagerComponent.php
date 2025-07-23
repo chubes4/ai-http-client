@@ -16,21 +16,35 @@ class AI_HTTP_ProviderManager_Component {
     private static $instance_count = 0;
     private $options_manager;
     private $client;
+    private $plugin_context;
 
-    public function __construct() {
-        $this->options_manager = new AI_HTTP_Options_Manager();
-        $this->client = new AI_HTTP_Client();
+    public function __construct($plugin_context = null) {
+        if (empty($plugin_context)) {
+            throw new InvalidArgumentException('Plugin context is required for ProviderManagerComponent');
+        }
+        
+        $this->plugin_context = sanitize_key($plugin_context);
+        $this->options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+        $this->client = new AI_HTTP_Client(['plugin_context' => $this->plugin_context]);
         self::$instance_count++;
     }
 
     /**
-     * Static render method for easy usage
+     * Static render method for easy usage with required plugin context
      *
-     * @param array $args Component configuration
+     * @param array $args Component configuration - must include 'plugin_context'
      * @return string Rendered HTML
+     * @throws InvalidArgumentException If plugin_context is missing
      */
     public static function render($args = array()) {
-        $component = new self();
+        if (empty($args['plugin_context'])) {
+            throw new InvalidArgumentException('plugin_context is required in args for ProviderManagerComponent::render()');
+        }
+        
+        $plugin_context = $args['plugin_context'];
+        unset($args['plugin_context']); // Remove from args so it doesn't interfere with other config
+        
+        $component = new self($plugin_context);
         return $component->render_component($args);
     }
 
@@ -55,7 +69,7 @@ class AI_HTTP_ProviderManager_Component {
         );
 
         $args = array_merge($defaults, $args);
-        $unique_id = 'ai-provider-manager-' . uniqid();
+        $unique_id = 'ai-provider-manager-' . $this->plugin_context . '-' . uniqid();
         
         $current_settings = $this->options_manager->get_all_providers();
         $selected_provider = isset($current_settings['selected_provider']) 
@@ -69,7 +83,7 @@ class AI_HTTP_ProviderManager_Component {
 
         ob_start();
         ?>
-        <div class="<?php echo esc_attr($args['wrapper_class']); ?>" id="<?php echo esc_attr($unique_id); ?>">
+        <div class="<?php echo esc_attr($args['wrapper_class']); ?>" id="<?php echo esc_attr($unique_id); ?>" data-plugin-context="<?php echo esc_attr($this->plugin_context); ?>">
             
             <?php if ($args['title']): ?>
                 <h3><?php echo esc_html($args['title']); ?></h3>
@@ -291,6 +305,7 @@ class AI_HTTP_ProviderManager_Component {
             
             formData.append('action', 'ai_http_save_settings');
             formData.append('nonce', '<?php echo esc_js($nonce); ?>');
+            formData.append('plugin_context', component.getAttribute('data-plugin-context'));
             
             component.querySelectorAll('input, select, textarea').forEach(function(input) {
                 if (input.name) {
@@ -351,6 +366,8 @@ class AI_HTTP_ProviderManager_Component {
         }
 
         function aiHttpRefreshModels(componentId, provider) {
+            const component = document.getElementById(componentId);
+            const pluginContext = component.getAttribute('data-plugin-context');
             const modelSelect = document.getElementById(componentId + '_model');
             if (!modelSelect) return;
             
@@ -359,7 +376,7 @@ class AI_HTTP_ProviderManager_Component {
             fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_get_models&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+                body: 'action=ai_http_get_models&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
             }).then(response => response.json()).then(data => {
                 if (data.success) {
                     modelSelect.innerHTML = '';
@@ -382,6 +399,8 @@ class AI_HTTP_ProviderManager_Component {
         }
 
         function aiHttpTestConnection(componentId) {
+            const component = document.getElementById(componentId);
+            const pluginContext = component.getAttribute('data-plugin-context');
             const providerElement = document.getElementById(componentId + '_provider');
             const resultSpan = document.getElementById(componentId + '_test_result');
             
@@ -394,7 +413,7 @@ class AI_HTTP_ProviderManager_Component {
             fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_test_connection&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+                body: 'action=ai_http_test_connection&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
             }).then(response => response.json()).then(data => {
                 resultSpan.textContent = data.success ? '✓ Connected' : '✗ ' + (data.message || 'Connection failed');
                 resultSpan.style.color = data.success ? '#00a32a' : '#d63638';
@@ -413,10 +432,13 @@ class AI_HTTP_ProviderManager_Component {
         }
         
         function aiHttpLoadProviderSettings(componentId, provider) {
+            const component = document.getElementById(componentId);
+            const pluginContext = component.getAttribute('data-plugin-context');
+            
             fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_load_provider_settings&provider=' + encodeURIComponent(provider) + '&nonce=<?php echo esc_js($nonce); ?>'
+                body: 'action=ai_http_load_provider_settings&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
             }).then(response => response.json()).then(data => {
                 if (data.success) {
                     const settings = data.data;

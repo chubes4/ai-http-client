@@ -1,6 +1,20 @@
 # AI HTTP Client for WordPress
 
-A professional WordPress library for unified AI provider communication. Drop-in solution for WordPress plugin developers who need AI functionality with minimal integration effort.
+A professional WordPress library for unified AI provider communication with **multi-plugin support**. Drop-in solution for WordPress plugin developers who need AI functionality with minimal integration effort.
+
+## 🚨 Breaking Changes (Multi-Plugin Architecture)
+
+**Version 2.0+** introduces plugin context requirements for multi-plugin compatibility:
+
+```php
+// OLD (no longer supported)
+$client = new AI_HTTP_Client();
+echo AI_HTTP_ProviderManager_Component::render();
+
+// NEW (required)
+$client = new AI_HTTP_Client(['plugin_context' => 'my-plugin-slug']);
+echo AI_HTTP_ProviderManager_Component::render(['plugin_context' => 'my-plugin-slug']);
+```
 
 ## Why This Library?
 
@@ -8,6 +22,8 @@ This is for WordPress plugin developers who want to ship AI features fast.
 
 **Complete Drop-In Solution:**
 - ✅ Backend AI integration + Admin UI component
+- ✅ **Multi-plugin support** - Multiple plugins can use different AI providers simultaneously
+- ✅ **Shared API keys** - Efficient key management across plugins
 - ✅ Zero styling (you control the design)
 - ✅ Unified architecture with shared normalizers
 - ✅ Standardized request/response formats
@@ -57,13 +73,16 @@ require_once __DIR__ . '/vendor/autoload.php';
 require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
 ```
 
-### 2. Add Admin UI Component
+### 2. Add Admin UI Component (Multi-Plugin Architecture)
 ```php
-// Basic usage
-echo AI_HTTP_ProviderManager_Component::render();
-
-// Customized component
+// Basic usage - REQUIRES plugin context
 echo AI_HTTP_ProviderManager_Component::render([
+    'plugin_context' => 'my-plugin-slug'  // REQUIRED
+]);
+
+// Customized component with plugin context
+echo AI_HTTP_ProviderManager_Component::render([
+    'plugin_context' => 'my-plugin-slug',  // REQUIRED
     'components' => [
         'core' => ['provider_selector', 'api_key_input', 'model_selector'],
         'extended' => ['temperature_slider', 'system_prompt_field']
@@ -74,14 +93,15 @@ echo AI_HTTP_ProviderManager_Component::render([
 ]);
 ```
 
-### 3. Send AI Requests
+### 3. Send AI Requests (Multi-Plugin Architecture)
 ```php
-$client = new AI_HTTP_Client();
+// REQUIRES plugin context
+$client = new AI_HTTP_Client(['plugin_context' => 'my-plugin-slug']);
 $response = $client->send_request([
     'messages' => [
         ['role' => 'user', 'content' => 'Hello AI!']
     ],
-    'model' => 'gpt-4o-mini',
+    'model' => 'gpt-4o-mini',  // Uses plugin-scoped configuration
     'max_tokens' => 100
 ]);
 
@@ -89,13 +109,13 @@ if ($response['success']) {
     echo $response['data']['content'];
 }
 
-// Streaming requests
+// Streaming requests with plugin context
 $client->send_streaming_request([
     'messages' => [['role' => 'user', 'content' => 'Stream this response']],
-    'model' => 'gpt-4o-mini'
+    'model' => 'gpt-4o-mini'  // Uses plugin-scoped configuration
 ]);
 
-// Test connection
+// Test connection with plugin-scoped settings
 $test_result = $client->test_connection('openai');
 ```
 
@@ -150,11 +170,21 @@ All providers are **fully refactored** with unified architecture and support **d
 
 **"Round Plug" Design** - Standardized input → Black box processing → Standardized output
 
+**Multi-Plugin Architecture** - Complete plugin isolation with shared API key efficiency
+
 **Unified Architecture** - Shared normalizers handle all provider differences, simple providers handle pure API communication
 
 **WordPress-Native** - Uses WordPress HTTP API, options system, and admin patterns
 
 **Modular Prompts** - Dynamic prompt building with tool registration, context injection, and granular control
+
+### Multi-Plugin Benefits
+
+- **Plugin Isolation**: Each plugin maintains separate provider/model configurations
+- **Shared API Keys**: Efficient key storage across all plugins (no duplication)
+- **No Conflicts**: Plugin A can use GPT-4, Plugin B can use Claude simultaneously
+- **Independent Updates**: Each plugin's AI settings are completely isolated
+- **Backwards Migration**: Existing configurations automatically become plugin-scoped
 
 ### Key Components
 
@@ -228,6 +258,41 @@ $prompt = AI_HTTP_Prompt_Manager::build_modular_system_prompt(
 - **Granular Control** - Enable/disable tools per plugin or use case
 - **Filter Integration** - WordPress filters for prompt customization
 - **Variable Replacement** - Template variable substitution
+
+## Multi-Plugin Configuration
+
+### How It Works
+
+```php
+// Plugin-specific configuration (isolated per plugin)
+ai_http_client_providers_myplugin = [
+    'openai' => ['model' => 'gpt-4', 'temperature' => 0.7],
+    'anthropic' => ['model' => 'claude-3-sonnet']
+];
+
+// Plugin-specific provider selection  
+ai_http_client_selected_provider_myplugin = 'openai';
+
+// Shared API keys (efficient, no duplication)
+ai_http_client_shared_api_keys = [
+    'openai' => 'sk-...',
+    'anthropic' => 'sk-...'
+];
+```
+
+### Real-World Example
+
+```php
+// Plugin A: Content Editor using GPT-4
+$client_a = new AI_HTTP_Client(['plugin_context' => 'content-editor']);
+// Uses OpenAI GPT-4 with temperature 0.3
+
+// Plugin B: Chat Bot using Claude  
+$client_b = new AI_HTTP_Client(['plugin_context' => 'chat-bot']);
+// Uses Anthropic Claude with temperature 0.8
+
+// Both share the same API keys but have completely different configurations
+```
 
 ## Distribution Model
 

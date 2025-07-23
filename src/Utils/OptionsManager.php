@@ -14,23 +14,63 @@ defined('ABSPATH') || exit;
 class AI_HTTP_Options_Manager {
 
     /**
-     * Option name in wp_options table
+     * Base option name for plugin-scoped provider settings
      */
-    const OPTION_NAME = 'ai_http_client_providers';
+    const OPTION_NAME_BASE = 'ai_http_client_providers';
 
     /**
-     * Option name for selected provider
+     * Base option name for plugin-scoped selected provider
      */
-    const SELECTED_PROVIDER_OPTION = 'ai_http_client_selected_provider';
+    const SELECTED_PROVIDER_OPTION_BASE = 'ai_http_client_selected_provider';
 
     /**
-     * Get all provider settings
+     * Option name for shared API keys across all plugins
+     */
+    const SHARED_API_KEYS_OPTION = 'ai_http_client_shared_api_keys';
+
+    /**
+     * Plugin context for scoped configuration
+     */
+    private $plugin_context;
+
+    /**
+     * Constructor with plugin context
+     *
+     * @param string $plugin_context Plugin context for scoped configuration
+     */
+    public function __construct($plugin_context = null) {
+        if (empty($plugin_context)) {
+            throw new InvalidArgumentException('Plugin context is required for OptionsManager');
+        }
+        $this->plugin_context = sanitize_key($plugin_context);
+    }
+
+    /**
+     * Get plugin-scoped option name
+     *
+     * @param string $base_name Base option name
+     * @return string Scoped option name
+     */
+    private function get_scoped_option_name($base_name) {
+        return $base_name . '_' . $this->plugin_context;
+    }
+
+    /**
+     * Get all provider settings for this plugin context
      *
      * @return array All provider settings
      */
     public function get_all_providers() {
-        $settings = get_option(self::OPTION_NAME, array());
-        $selected_provider = get_option(self::SELECTED_PROVIDER_OPTION, 'openai');
+        $settings = get_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), array());
+        $selected_provider = get_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE), 'openai');
+        
+        // Merge with shared API keys
+        $shared_api_keys = get_option(self::SHARED_API_KEYS_OPTION, array());
+        foreach ($settings as $provider => &$config) {
+            if (isset($shared_api_keys[$provider])) {
+                $config['api_key'] = $shared_api_keys[$provider];
+            }
+        }
         
         // Add selected provider to the settings array
         $settings['selected_provider'] = $selected_provider;
@@ -39,33 +79,56 @@ class AI_HTTP_Options_Manager {
     }
 
     /**
-     * Get settings for a specific provider
+     * Get settings for a specific provider in this plugin context
      *
      * @param string $provider_name Provider name
-     * @return array Provider settings
+     * @return array Provider settings with merged API key
      */
     public function get_provider_settings($provider_name) {
-        $all_settings = get_option(self::OPTION_NAME, array());
-        return isset($all_settings[$provider_name]) ? $all_settings[$provider_name] : array();
+        $all_settings = get_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), array());
+        $provider_settings = isset($all_settings[$provider_name]) ? $all_settings[$provider_name] : array();
+        
+        // Merge with shared API key
+        $shared_api_keys = get_option(self::SHARED_API_KEYS_OPTION, array());
+        if (isset($shared_api_keys[$provider_name])) {
+            $provider_settings['api_key'] = $shared_api_keys[$provider_name];
+        }
+        
+        return $provider_settings;
     }
 
     /**
-     * Save settings for a specific provider
+     * Save settings for a specific provider in this plugin context
      *
      * @param string $provider_name Provider name
      * @param array $settings Provider settings
      * @return bool True on success
      */
     public function save_provider_settings($provider_name, $settings) {
-        $all_settings = get_option(self::OPTION_NAME, array());
+        $sanitized_settings = $this->sanitize_provider_settings($settings);
         
-        // Sanitize and merge settings
+        // Separate API key for shared storage
+        $api_key = null;
+        if (isset($sanitized_settings['api_key'])) {
+            $api_key = $sanitized_settings['api_key'];
+            unset($sanitized_settings['api_key']); // Remove from plugin-specific storage
+        }
+        
+        // Save plugin-specific settings (without API key)
+        $all_settings = get_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), array());
         $all_settings[$provider_name] = array_merge(
             isset($all_settings[$provider_name]) ? $all_settings[$provider_name] : array(),
-            $this->sanitize_provider_settings($settings)
+            $sanitized_settings
         );
+        $success_settings = update_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), $all_settings);
         
-        return update_option(self::OPTION_NAME, $all_settings);
+        // Save API key to shared storage if provided
+        $success_api_key = true;
+        if (!empty($api_key)) {
+            $success_api_key = $this->set_shared_api_key($provider_name, $api_key);
+        }
+        
+        return $success_settings && $success_api_key;
     }
 
     /**
@@ -108,61 +171,62 @@ class AI_HTTP_Options_Manager {
     }
 
     /**
-     * Get selected provider
+     * Get selected provider for this plugin context
      *
      * @return string Selected provider name
      */
     public function get_selected_provider() {
-        return get_option(self::SELECTED_PROVIDER_OPTION, 'openai');
+        return get_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE), 'openai');
     }
 
     /**
-     * Set selected provider
+     * Set selected provider for this plugin context
      *
      * @param string $provider_name Provider name
      * @return bool True on success
      */
     public function set_selected_provider($provider_name) {
-        return update_option(self::SELECTED_PROVIDER_OPTION, sanitize_text_field($provider_name));
+        return update_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE), sanitize_text_field($provider_name));
     }
 
     /**
-     * Delete provider settings
+     * Delete provider settings for this plugin context
      *
      * @param string $provider_name Provider name
      * @return bool True on success
      */
     public function delete_provider_settings($provider_name) {
-        $all_settings = get_option(self::OPTION_NAME, array());
+        $all_settings = get_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), array());
         
         if (isset($all_settings[$provider_name])) {
             unset($all_settings[$provider_name]);
-            return update_option(self::OPTION_NAME, $all_settings);
+            return update_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), $all_settings);
         }
         
         return true;
     }
 
     /**
-     * Reset all settings
+     * Reset all settings for this plugin context
      *
      * @return bool True on success
      */
     public function reset_all_settings() {
-        $deleted_main = delete_option(self::OPTION_NAME);
-        $deleted_selected = delete_option(self::SELECTED_PROVIDER_OPTION);
+        $deleted_main = delete_option($this->get_scoped_option_name(self::OPTION_NAME_BASE));
+        $deleted_selected = delete_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE));
         
         return $deleted_main && $deleted_selected;
     }
 
     /**
-     * Get API key for provider (with encryption support)
+     * Get API key for provider from shared storage (with encryption support)
      *
      * @param string $provider_name Provider name
      * @return string API key (decrypted if needed)
      */
     public function get_api_key($provider_name) {
-        $api_key = $this->get_provider_setting($provider_name, 'api_key');
+        $shared_api_keys = get_option(self::SHARED_API_KEYS_OPTION, array());
+        $api_key = isset($shared_api_keys[$provider_name]) ? $shared_api_keys[$provider_name] : '';
         
         // If encryption is available, decrypt the key
         if (!empty($api_key) && $this->is_encryption_available()) {
@@ -173,37 +237,53 @@ class AI_HTTP_Options_Manager {
     }
 
     /**
-     * Set API key for provider (with encryption support)
+     * Set API key for provider in shared storage (with encryption support)
      *
      * @param string $provider_name Provider name
      * @param string $api_key API key
      * @return bool True on success
      */
     public function set_api_key($provider_name, $api_key) {
+        return $this->set_shared_api_key($provider_name, $api_key);
+    }
+
+    /**
+     * Set shared API key for provider (with encryption support)
+     *
+     * @param string $provider_name Provider name
+     * @param string $api_key API key
+     * @return bool True on success
+     */
+    private function set_shared_api_key($provider_name, $api_key) {
         // If encryption is available, encrypt the key
         if ($this->is_encryption_available()) {
             $api_key = $this->encrypt_api_key($api_key);
         }
         
-        return $this->set_provider_setting($provider_name, 'api_key', $api_key);
+        $shared_api_keys = get_option(self::SHARED_API_KEYS_OPTION, array());
+        $shared_api_keys[$provider_name] = $api_key;
+        
+        return update_option(self::SHARED_API_KEYS_OPTION, $shared_api_keys);
     }
 
     /**
-     * Export all settings (for backup/migration)
+     * Export all settings for this plugin context (for backup/migration)
      *
      * @return array All settings
      */
     public function export_settings() {
         return array(
-            'providers' => get_option(self::OPTION_NAME, array()),
-            'selected_provider' => get_option(self::SELECTED_PROVIDER_OPTION, 'openai'),
+            'plugin_context' => $this->plugin_context,
+            'providers' => get_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), array()),
+            'selected_provider' => get_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE), 'openai'),
+            'shared_api_keys' => get_option(self::SHARED_API_KEYS_OPTION, array()),
             'export_date' => current_time('mysql'),
             'version' => AI_HTTP_CLIENT_VERSION
         );
     }
 
     /**
-     * Import settings (for backup/migration)
+     * Import settings for this plugin context (for backup/migration)
      *
      * @param array $settings Settings to import
      * @return bool True on success
@@ -213,14 +293,19 @@ class AI_HTTP_Options_Manager {
             return false;
         }
         
-        $success_main = update_option(self::OPTION_NAME, $settings['providers']);
+        $success_main = update_option($this->get_scoped_option_name(self::OPTION_NAME_BASE), $settings['providers']);
         $success_selected = true;
+        $success_api_keys = true;
         
         if (isset($settings['selected_provider'])) {
-            $success_selected = update_option(self::SELECTED_PROVIDER_OPTION, $settings['selected_provider']);
+            $success_selected = update_option($this->get_scoped_option_name(self::SELECTED_PROVIDER_OPTION_BASE), $settings['selected_provider']);
         }
         
-        return $success_main && $success_selected;
+        if (isset($settings['shared_api_keys'])) {
+            $success_api_keys = update_option(self::SHARED_API_KEYS_OPTION, $settings['shared_api_keys']);
+        }
+        
+        return $success_main && $success_selected && $success_api_keys;
     }
 
     /**
@@ -341,12 +426,17 @@ class AI_HTTP_Options_Manager {
     }
     
     /**
-     * AJAX handler for saving settings
+     * AJAX handler for saving settings with plugin context
      */
     public static function ajax_save_settings() {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
         try {
+            $plugin_context = sanitize_key($_POST['plugin_context']);
+            if (empty($plugin_context)) {
+                wp_send_json_error('Plugin context is required');
+            }
+            
             $provider = sanitize_text_field($_POST['ai_provider']);
             $settings = array(
                 'api_key' => sanitize_text_field($_POST['ai_api_key']),
@@ -363,7 +453,7 @@ class AI_HTTP_Options_Manager {
                 }
             }
 
-            $options_manager = new self();
+            $options_manager = new self($plugin_context);
             $options_manager->save_provider_settings($provider, $settings);
             $options_manager->set_selected_provider($provider);
 
@@ -376,14 +466,19 @@ class AI_HTTP_Options_Manager {
     }
     
     /**
-     * AJAX handler for loading provider settings
+     * AJAX handler for loading provider settings with plugin context
      */
     public static function ajax_load_provider_settings() {
         check_ajax_referer('ai_http_nonce', 'nonce');
         
         try {
+            $plugin_context = sanitize_key($_POST['plugin_context']);
+            if (empty($plugin_context)) {
+                wp_send_json_error('Plugin context is required');
+            }
+            
             $provider = sanitize_text_field($_POST['provider']);
-            $options_manager = new self();
+            $options_manager = new self($plugin_context);
             $settings = $options_manager->get_provider_settings($provider);
             
             wp_send_json_success($settings);

@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AI HTTP Client - WordPress library for unified AI provider communication.
+AI HTTP Client - WordPress library for unified AI provider communication with multi-plugin support.
 
-## Core Architecture (Unified)
+## Core Architecture (Unified Multi-Plugin)
 
 ### Distribution Pattern
 - **Production**: Git subtree in plugin's `/lib/ai-http-client/`
 - **Integration**: `require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';`
+- **Multi-Plugin**: Each plugin maintains separate configuration while sharing API keys
 
 ### Unified Architecture
 The library uses a fully unified architecture with shared normalizers:
@@ -32,6 +33,33 @@ Each provider is now a single file in `src/Providers/`:
 - `openrouter.php` - `AI_HTTP_OpenRouter_Provider`
 
 All normalization logic is centralized in unified normalizers.
+
+## Multi-Plugin Configuration Architecture
+
+### Plugin-Scoped Options Structure
+```php
+// Plugin-specific configuration (separate per plugin)
+ai_http_client_providers_myplugin = [
+    'openai' => ['model' => 'gpt-4', 'temperature' => 0.7, 'instructions' => '...'],
+    'anthropic' => ['model' => 'claude-3-sonnet', 'temperature' => 0.5]
+];
+
+// Plugin-specific provider selection
+ai_http_client_selected_provider_myplugin = 'openai';
+
+// Shared API keys (efficient, secure, shared across all plugins)
+ai_http_client_shared_api_keys = [
+    'openai' => 'sk-...',
+    'anthropic' => 'sk-...'
+];
+```
+
+### Benefits of Multi-Plugin Architecture
+- **Complete Plugin Isolation**: Each plugin can use different providers/models
+- **Shared API Keys**: Reduce duplication and improve security
+- **Independent Configuration**: Plugin A can use GPT-4, Plugin B can use Claude
+- **No Conflicts**: Multiple plugins on same site work independently
+- **Efficient Storage**: API keys stored once, settings stored per plugin
 
 ## Standardized Data Formats
 
@@ -84,9 +112,9 @@ All normalization logic is centralized in unified normalizers.
 - **AI_HTTP_OpenRouter_Provider** - Pure OpenRouter API communication
 
 ### WordPress Integration
-- **OptionsManager** - WordPress options storage (`src/Utils/OptionsManager.php`)
+- **OptionsManager** - Plugin-scoped WordPress options storage (`src/Utils/OptionsManager.php`)
 - **PromptManager** - Modular prompt building (`src/Utils/PromptManager.php`)
-- **ProviderManagerComponent** - Complete admin UI (`src/Components/ProviderManagerComponent.php`)
+- **ProviderManagerComponent** - Complete admin UI with plugin context support (`src/Components/ProviderManagerComponent.php`)
 
 ## Development Commands
 
@@ -104,35 +132,35 @@ composer dump-autoload # Regenerate autoloader after adding new classes
 - Testing requires WordPress environment with library loaded
 - Use the TestConnection component (`src/Components/Extended/TestConnection.php`) for provider connectivity testing
 
-### Development Workflow
+### Development Workflow (Multi-Plugin Architecture)
 ```php
-// Basic testing setup in WordPress
+// Basic testing setup in WordPress - REQUIRES plugin context
 require_once 'ai-http-client.php';
-$client = new AI_HTTP_Client();
+$client = new AI_HTTP_Client(['plugin_context' => 'my-plugin-slug']);
 $response = $client->send_request([
     'messages' => [['role' => 'user', 'content' => 'test']]
-    // Model automatically uses configured model from WordPress options
+    // Model uses plugin-scoped configuration
 ]);
 var_dump($response);
 
-// Test streaming
+// Test streaming with plugin context
 $client->send_streaming_request([
     'messages' => [['role' => 'user', 'content' => 'test']]
-    // Model automatically uses configured model
+    // Model uses plugin-scoped configuration
 ]);
 
-// Test connection
+// Test connection with plugin context
 $test_result = $client->test_connection('openai');
 var_dump($test_result);
 
-// Get available models
+// Get available models using plugin-scoped configuration
 $models = $client->get_available_models('openai');
 var_dump($models);
 
 // Override configured model per request
 $response = $client->send_request([
     'messages' => [['role' => 'user', 'content' => 'test']],
-    'model' => 'gpt-4o' // Override configured model
+    'model' => 'gpt-4o' // Override plugin-scoped model
 ]);
 ```
 
@@ -189,7 +217,9 @@ When Composer unavailable, uses manual `require_once` in dependency order:
 - **No Provider-Specific Logic in Core** - All provider differences handled in unified normalizers
 - **Single Responsibility** - Providers only handle API communication, normalizers handle format conversion
 - **WordPress-Native** - Use WordPress APIs and security practices
-- **No Hardcoded Defaults** - All configuration should come from WordPress options
+- **Plugin Context Required** - All AI_HTTP_Client and ProviderManagerComponent instances MUST include plugin context
+- **No Hardcoded Defaults** - All configuration should come from plugin-scoped WordPress options
+- **Shared API Keys** - API keys are shared across plugins for efficiency, other settings are plugin-specific
 
 ## Supported Providers
 
@@ -221,21 +251,25 @@ git subtree pull --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-
 git subtree push --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main
 ```
 
-## Quick Integration
+## Quick Integration (Multi-Plugin Architecture)
 
 ```php
 // 1. Include library
 require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
 
-// 2. Add admin UI
-echo AI_HTTP_ProviderManager_Component::render();
+// 2. Add admin UI with plugin context
+echo AI_HTTP_ProviderManager_Component::render([
+    'plugin_context' => 'my-plugin-slug' // REQUIRED
+]);
 
-// 3. Send request (model automatically uses configured model)
-$client = new AI_HTTP_Client();
+// 3. Send request with plugin context
+$client = new AI_HTTP_Client([
+    'plugin_context' => 'my-plugin-slug' // REQUIRED
+]);
 $response = $client->send_request([
     'messages' => [['role' => 'user', 'content' => 'Hello AI!']],
     'max_tokens' => 100
-    // Model automatically uses configured model from WordPress options
+    // Model uses plugin-scoped configuration
 ]);
 ```
 
@@ -251,6 +285,25 @@ $continuation = $client->continue_with_tool_results($conversation_history, $tool
 
 // All providers support continuation through unified architecture
 ```
+
+## Breaking Changes (Multi-Plugin Update)
+
+### Constructor Changes
+```php
+// OLD (no longer supported)
+$client = new AI_HTTP_Client();
+$component = AI_HTTP_ProviderManager_Component::render();
+
+// NEW (required)
+$client = new AI_HTTP_Client(['plugin_context' => 'my-plugin-slug']);
+$component = AI_HTTP_ProviderManager_Component::render(['plugin_context' => 'my-plugin-slug']);
+```
+
+### Migration from Single-Plugin
+1. **Update all instantiations** to include plugin context
+2. **API keys automatically migrate** to shared storage on first save
+3. **Plugin-specific settings** remain isolated per plugin
+4. **No data loss** - existing configurations continue working per plugin
 
 ## Error Handling
 

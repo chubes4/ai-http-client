@@ -33,15 +33,29 @@ class AI_HTTP_Client {
     private $providers = array();
 
     /**
-     * Constructor with unified normalizers
+     * Plugin context for scoped configuration
+     */
+    private $plugin_context;
+
+    /**
+     * Constructor with unified normalizers and plugin context support
      *
-     * @param array $config Client configuration (optional - will auto-read from WordPress options if empty)
+     * @param array $config Client configuration - must include 'plugin_context'
+     * @throws InvalidArgumentException If plugin_context is missing
      */
     public function __construct($config = array()) {
-        // Auto-read from WordPress options if no config provided
-        if (empty($config) && class_exists('AI_HTTP_Options_Manager')) {
-            $options_manager = new AI_HTTP_Options_Manager();
-            $config = $options_manager->get_client_config();
+        // Validate required plugin context
+        if (empty($config['plugin_context'])) {
+            throw new InvalidArgumentException('Plugin context is required for AI_HTTP_Client');
+        }
+        
+        $this->plugin_context = sanitize_key($config['plugin_context']);
+        
+        // Auto-read from WordPress options if no provider config provided
+        if (empty($config['default_provider']) && class_exists('AI_HTTP_Options_Manager')) {
+            $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+            $auto_config = $options_manager->get_client_config();
+            $config = array_merge($auto_config, $config);
         }
         
         // Set default configuration
@@ -279,11 +293,15 @@ class AI_HTTP_Client {
      * @param string $provider_name Provider name
      * @return array Provider configuration
      */
+    /**
+     * Get provider configuration from plugin-scoped options
+     *
+     * @param string $provider_name Provider name
+     * @return array Provider configuration with merged API keys
+     */
     private function get_provider_config($provider_name) {
-        $options_manager = new AI_HTTP_Options_Manager();
-        $all_providers = $options_manager->get_all_providers();
-        
-        return isset($all_providers[$provider_name]) ? $all_providers[$provider_name] : array();
+        $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+        return $options_manager->get_provider_settings($provider_name);
     }
 
 
