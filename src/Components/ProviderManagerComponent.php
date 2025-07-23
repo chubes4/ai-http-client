@@ -210,11 +210,8 @@ class AI_HTTP_ProviderManager_Component {
         </div>
 
         <?php
-        // Ensure global JavaScript functions are available first
-        $this->render_required_javascript();
-        
-        // Then render instance-specific JavaScript
-        $this->render_instance_javascript($unique_id);
+        // Enqueue component JavaScript and pass configuration
+        $this->enqueue_component_assets($unique_id);
         ?>
         <?php
 
@@ -296,344 +293,42 @@ class AI_HTTP_ProviderManager_Component {
     }
 
     /**
-     * Render minimal JavaScript for functionality
+     * Enqueue component assets and initialize JavaScript
      */
-    /**
-     * Render instance-specific JavaScript for this component
-     */
-    private function render_instance_javascript($unique_id) {
-        // Use global tracking to prevent duplicate instance scripts
-        global $ai_http_client_instance_js_rendered;
-        if (!isset($ai_http_client_instance_js_rendered)) {
-            $ai_http_client_instance_js_rendered = array();
+    private function enqueue_component_assets($unique_id) {
+        // Only enqueue if we're in admin or if explicitly needed
+        if (!is_admin() && !wp_doing_ajax()) {
+            return;
         }
         
-        if (in_array($unique_id, $ai_http_client_instance_js_rendered)) {
-            return; // Already rendered this instance
-        }
+        // Enqueue the component JavaScript file
+        $script_url = defined('AI_HTTP_CLIENT_URL') ? AI_HTTP_CLIENT_URL . 'assets/js/provider-manager.js' : '';
         
-        $ai_http_client_instance_js_rendered[] = $unique_id;
-        
-        ?>
-        <script>
-        // Provider change handler for <?php echo esc_js($unique_id); ?>
-        const providerSelect_<?php echo esc_js($unique_id); ?> = document.getElementById('<?php echo esc_js($unique_id); ?>_provider');
-        if (providerSelect_<?php echo esc_js($unique_id); ?>) {
-            providerSelect_<?php echo esc_js($unique_id); ?>.addEventListener('change', function() {
-                aiHttpProviderChanged('<?php echo esc_js($unique_id); ?>', this.value);
-            });
+        if (!empty($script_url)) {
+            wp_enqueue_script(
+                'ai-http-provider-manager',
+                $script_url,
+                array('jquery'),
+                AI_HTTP_CLIENT_VERSION,
+                true
+            );
+            
+            // Pass configuration to JavaScript
+            wp_localize_script('ai-http-provider-manager', 'aiHttpConfig_' . $unique_id, array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('ai_http_nonce'),
+                'plugin_context' => $this->plugin_context,
+                'component_id' => $unique_id
+            ));
+            
+            // Initialize the component instance
+            wp_add_inline_script('ai-http-provider-manager', 
+                "jQuery(document).ready(function($) {
+                    if (window.AIHttpProviderManager) {
+                        window.AIHttpProviderManager.init('{$unique_id}', window.aiHttpConfig_{$unique_id});
+                    }
+                });"
+            );
         }
-        </script>
-        <?php
     }
-
-    /**
-     * Ensure required JavaScript functions are available
-     * This ensures the component works even if admin_footer hook doesn't run
-     */
-    private function render_required_javascript() {
-        // Use WordPress global to prevent duplicate JavaScript across all plugins
-        global $ai_http_client_js_rendered;
-        if ($ai_http_client_js_rendered) return;
-        $ai_http_client_js_rendered = true;
-        
-        $nonce = wp_create_nonce('ai_http_nonce');
-        ?>
-        <script>
-        // Global AI HTTP Client JavaScript functions
-        function aiHttpSaveSettings(componentId) {
-            const component = document.getElementById(componentId);
-            const formData = new FormData();
-            
-            formData.append('action', 'ai_http_save_settings');
-            formData.append('nonce', '<?php echo esc_js($nonce); ?>');
-            formData.append('plugin_context', component.getAttribute('data-plugin-context'));
-            
-            component.querySelectorAll('input, select, textarea').forEach(function(input) {
-                if (input.name) {
-                    formData.append(input.name, input.value);
-                }
-            });
-
-            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                method: 'POST',
-                body: formData
-            }).then(response => response.json()).then(data => {
-                const resultSpan = document.getElementById(componentId + '_save_result');
-                if (resultSpan) {
-                    if (data.success) {
-                        resultSpan.textContent = '✓ Settings saved';
-                        resultSpan.style.color = '#00a32a';
-                        
-                        // Update provider status after successful save
-                        const apiKeyInput = document.getElementById(componentId + '_api_key');
-                        const providerStatusSpan = document.getElementById(componentId + '_provider_status');
-                        if (providerStatusSpan && apiKeyInput) {
-                            const apiKeyValue = apiKeyInput.value.trim();
-                            if (apiKeyValue) {
-                                providerStatusSpan.innerHTML = '<span style="color: #00a32a;">✓ Configured</span>';
-                            } else {
-                                providerStatusSpan.innerHTML = '<span style="color: #d63638;">⚠ Not configured</span>';
-                            }
-                        }
-                    } else {
-                        resultSpan.textContent = '✗ Save failed: ' + (data.message || 'Unknown error');
-                        resultSpan.style.color = '#d63638';
-                    }
-                    setTimeout(() => resultSpan.textContent = '', 3000);
-                }
-            }).catch(error => {
-                console.error('AI HTTP Client: Save failed', error);
-                const resultSpan = document.getElementById(componentId + '_save_result');
-                if (resultSpan) {
-                    resultSpan.textContent = '✗ Save failed';
-                    resultSpan.style.color = '#d63638';
-                    setTimeout(() => resultSpan.textContent = '', 3000);
-                }
-            });
-        }
-
-        function aiHttpProviderChanged(componentId, provider) {
-            // Load provider settings and update all fields
-            aiHttpLoadProviderSettings(componentId, provider);
-            // Update models when provider changes - NO auto-save
-            aiHttpRefreshModels(componentId, provider);
-        }
-
-        function aiHttpToggleKeyVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.type = input.type === 'password' ? 'text' : 'password';
-            }
-        }
-
-        function aiHttpRefreshModels(componentId, provider) {
-            const component = document.getElementById(componentId);
-            const pluginContext = component.getAttribute('data-plugin-context');
-            const modelSelect = document.getElementById(componentId + '_model');
-            if (!modelSelect) return;
-            
-            modelSelect.innerHTML = '<option value="">Loading models...</option>';
-            
-            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_get_models&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    modelSelect.innerHTML = '';
-                    const selectedModel = modelSelect.getAttribute('data-selected-model') || '';
-                    
-                    Object.entries(data.data).forEach(([key, value]) => {
-                        const option = document.createElement('option');
-                        option.value = key;
-                        option.textContent = value;
-                        option.selected = (key === selectedModel);
-                        modelSelect.appendChild(option);
-                    });
-                } else {
-                    modelSelect.innerHTML = '<option value="">Error loading models</option>';
-                }
-            }).catch(error => {
-                console.error('AI HTTP Client: Model fetch failed', error);
-                modelSelect.innerHTML = '<option value="">Error loading models</option>';
-            });
-        }
-
-        function aiHttpTestConnection(componentId) {
-            const component = document.getElementById(componentId);
-            const pluginContext = component.getAttribute('data-plugin-context');
-            const providerElement = document.getElementById(componentId + '_provider');
-            const resultSpan = document.getElementById(componentId + '_test_result');
-            
-            if (!providerElement || !resultSpan) return;
-            
-            const provider = providerElement.value;
-            resultSpan.textContent = 'Testing...';
-            resultSpan.style.color = '#666';
-            
-            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_test_connection&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
-            }).then(response => response.json()).then(data => {
-                resultSpan.textContent = data.success ? '✓ Connected' : '✗ ' + (data.message || 'Connection failed');
-                resultSpan.style.color = data.success ? '#00a32a' : '#d63638';
-            }).catch(error => {
-                console.error('AI HTTP Client: Connection test failed', error);
-                resultSpan.textContent = '✗ Test failed';
-                resultSpan.style.color = '#d63638';
-            });
-        }
-
-        function aiHttpUpdateTemperatureValue(componentId, value) {
-            const valueDisplay = document.getElementById(componentId + '_temperature_value');
-            if (valueDisplay) {
-                valueDisplay.textContent = value;
-            }
-        }
-        
-        function aiHttpLoadProviderSettings(componentId, provider) {
-            const component = document.getElementById(componentId);
-            const pluginContext = component.getAttribute('data-plugin-context');
-            
-            fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'action=ai_http_load_provider_settings&provider=' + encodeURIComponent(provider) + '&plugin_context=' + encodeURIComponent(pluginContext) + '&nonce=<?php echo esc_js($nonce); ?>'
-            }).then(response => response.json()).then(data => {
-                if (data.success) {
-                    const settings = data.data;
-                    
-                    // Update API key field
-                    const apiKeyInput = document.getElementById(componentId + '_api_key');
-                    if (apiKeyInput) {
-                        apiKeyInput.value = settings.api_key || '';
-                    }
-                    
-                    // Update model field (will be populated by aiHttpRefreshModels)
-                    const modelSelect = document.getElementById(componentId + '_model');
-                    if (modelSelect) {
-                        modelSelect.setAttribute('data-selected-model', settings.model || '');
-                    }
-                    
-                    // Update temperature field
-                    const temperatureInput = document.getElementById(componentId + '_temperature');
-                    if (temperatureInput) {
-                        temperatureInput.value = settings.temperature || '0.7';
-                        aiHttpUpdateTemperatureValue(componentId, settings.temperature || '0.7');
-                    }
-                    
-                    // Update system prompt field
-                    const systemPromptTextarea = document.getElementById(componentId + '_system_prompt');
-                    if (systemPromptTextarea) {
-                        systemPromptTextarea.value = settings.system_prompt || '';
-                    }
-                    
-                    // Update instructions field
-                    const instructionsTextarea = document.getElementById(componentId + '_instructions');
-                    if (instructionsTextarea) {
-                        instructionsTextarea.value = settings.instructions || '';
-                    }
-                    
-                    // Update provider status
-                    const providerStatusSpan = document.getElementById(componentId + '_provider_status');
-                    if (providerStatusSpan) {
-                        const apiKeyValue = settings.api_key || '';
-                        if (apiKeyValue.trim()) {
-                            providerStatusSpan.innerHTML = '<span style="color: #00a32a;">✓ Configured</span>';
-                        } else {
-                            providerStatusSpan.innerHTML = '<span style="color: #d63638;">⚠ Not configured</span>';
-                        }
-                    }
-                    
-                    // Handle custom fields
-                    Object.keys(settings).forEach(key => {
-                        if (key.startsWith('custom_')) {
-                            const customInput = document.getElementById(componentId + '_' + key);
-                            if (customInput) {
-                                customInput.value = settings[key] || '';
-                            }
-                        }
-                    });
-                    
-                } else {
-                    console.error('AI HTTP Client: Failed to load provider settings', data.message);
-                }
-            }).catch(error => {
-                console.error('AI HTTP Client: Provider settings load failed', error);
-            });
-        }
-        </script>
-        <?php
-    }
-
-
 }
-
-// Global JavaScript functions for component functionality
-if (!function_exists('ai_http_render_global_js')):
-function ai_http_render_global_js() {
-    static $rendered = false;
-    if ($rendered) return;
-    $rendered = true;
-    ?>
-    <script>
-    function aiHttpAutoSave(componentId) {
-        // Auto-save functionality
-        const component = document.getElementById(componentId);
-        const formData = new FormData();
-        
-        formData.append('action', 'ai_http_save_settings');
-        formData.append('nonce', '<?php echo wp_create_nonce('ai_http_nonce'); ?>');
-        
-        component.querySelectorAll('input, select, textarea').forEach(function(input) {
-            formData.append(input.name, input.value);
-        });
-
-        fetch(ajaxurl, {
-            method: 'POST',
-            body: formData
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                const status = document.getElementById(componentId + '_save_status');
-                status.style.display = 'block';
-                setTimeout(() => status.style.display = 'none', 2000);
-            }
-        });
-    }
-
-
-    function aiHttpToggleKeyVisibility(inputId) {
-        const input = document.getElementById(inputId);
-        input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    function aiHttpRefreshModels(componentId, provider) {
-        // Refresh models for provider
-        const modelSelect = document.getElementById(componentId + '_model');
-        
-        fetch(ajaxurl, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'action=ai_http_get_models&provider=' + provider + '&nonce=<?php echo wp_create_nonce('ai_http_nonce'); ?>'
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                modelSelect.innerHTML = '';
-                Object.entries(data.data).forEach(([key, value]) => {
-                    const option = document.createElement('option');
-                    option.value = key;
-                    option.textContent = value;
-                    modelSelect.appendChild(option);
-                });
-            }
-        });
-    }
-
-    function aiHttpTestConnection(componentId) {
-        const provider = document.getElementById(componentId + '_provider').value;
-        const resultSpan = document.getElementById(componentId + '_test_result');
-        
-        resultSpan.textContent = 'Testing...';
-        
-        fetch(ajaxurl, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'action=ai_http_test_connection&provider=' + provider + '&nonce=<?php echo wp_create_nonce('ai_http_nonce'); ?>'
-        }).then(response => response.json()).then(data => {
-            resultSpan.textContent = data.success ? '✓ Connected' : '✗ ' + data.message;
-            resultSpan.style.color = data.success ? '#00a32a' : '#d63638';
-        });
-    }
-
-    function aiHttpUpdateTemperatureValue(componentId, value) {
-        const valueDisplay = document.getElementById(componentId + '_temperature_value');
-        if (valueDisplay) {
-            valueDisplay.textContent = value;
-        }
-    }
-    </script>
-    <?php
-}
-add_action('admin_footer', 'ai_http_render_global_js');
-endif;
