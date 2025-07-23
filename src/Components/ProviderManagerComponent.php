@@ -209,14 +209,12 @@ class AI_HTTP_ProviderManager_Component {
             <?php endif; ?>
         </div>
 
-        <script>
-        <?php echo $this->render_javascript($unique_id); ?>
-        </script>
-
-        
         <?php
-        // Ensure global JavaScript functions are available
+        // Ensure global JavaScript functions are available first
         $this->render_required_javascript();
+        
+        // Then render instance-specific JavaScript
+        $this->render_instance_javascript($unique_id);
         ?>
         <?php
 
@@ -300,17 +298,33 @@ class AI_HTTP_ProviderManager_Component {
     /**
      * Render minimal JavaScript for functionality
      */
-    private function render_javascript($unique_id) {
-        return "
-        // Provider change handler - just refresh models, no auto-save
-        const providerSelect = document.getElementById('{$unique_id}_provider');
-        if (providerSelect) {
-            providerSelect.addEventListener('change', function() {
-                aiHttpProviderChanged('$unique_id', this.value);
+    /**
+     * Render instance-specific JavaScript for this component
+     */
+    private function render_instance_javascript($unique_id) {
+        // Use global tracking to prevent duplicate instance scripts
+        global $ai_http_client_instance_js_rendered;
+        if (!isset($ai_http_client_instance_js_rendered)) {
+            $ai_http_client_instance_js_rendered = array();
+        }
+        
+        if (in_array($unique_id, $ai_http_client_instance_js_rendered)) {
+            return; // Already rendered this instance
+        }
+        
+        $ai_http_client_instance_js_rendered[] = $unique_id;
+        
+        ?>
+        <script>
+        // Provider change handler for <?php echo esc_js($unique_id); ?>
+        const providerSelect_<?php echo esc_js($unique_id); ?> = document.getElementById('<?php echo esc_js($unique_id); ?>_provider');
+        if (providerSelect_<?php echo esc_js($unique_id); ?>) {
+            providerSelect_<?php echo esc_js($unique_id); ?>.addEventListener('change', function() {
+                aiHttpProviderChanged('<?php echo esc_js($unique_id); ?>', this.value);
             });
         }
-
-        ";
+        </script>
+        <?php
     }
 
     /**
@@ -318,9 +332,10 @@ class AI_HTTP_ProviderManager_Component {
      * This ensures the component works even if admin_footer hook doesn't run
      */
     private function render_required_javascript() {
-        static $js_rendered = false;
-        if ($js_rendered) return;
-        $js_rendered = true;
+        // Use WordPress global to prevent duplicate JavaScript across all plugins
+        global $ai_http_client_js_rendered;
+        if ($ai_http_client_js_rendered) return;
+        $ai_http_client_js_rendered = true;
         
         $nonce = wp_create_nonce('ai_http_nonce');
         ?>
