@@ -114,15 +114,15 @@ class AI_HTTP_Component_Registry {
      */
     public static function register_component($name, $class, $allow_override = false) {
         if (self::component_exists($name) && !$allow_override) {
-            throw new Exception("Component '{$name}' already exists");
+            throw new Exception("Component '" . esc_html($name) . "' already exists");
         }
         
         if (!class_exists($class)) {
-            throw new Exception("Component class '{$class}' does not exist");
+            throw new Exception("Component class '" . esc_html($class) . "' does not exist");
         }
         
         if (!is_subclass_of($class, 'AI_HTTP_Component_Interface')) {
-            throw new Exception("Component class '{$class}' must implement AI_HTTP_Component_Interface");
+            throw new Exception("Component class '" . esc_html($class) . "' must implement AI_HTTP_Component_Interface");
         }
         
         self::$custom_components[$name] = $class;
@@ -172,7 +172,7 @@ class AI_HTTP_Component_Registry {
         $class = self::get_component_class($name);
         
         if (!$class) {
-            throw new Exception("Component '{$name}' not found");
+            throw new Exception("Component '" . esc_html($name) . "' not found");
         }
         
         return call_user_func([$class, 'render'], $unique_id, $config, $current_values);
@@ -189,7 +189,7 @@ class AI_HTTP_Component_Registry {
         $class = self::get_component_class($name);
         
         if (!$class) {
-            throw new Exception("Component '{$name}' not found");
+            throw new Exception("Component '" . esc_html($name) . "' not found");
         }
         
         return call_user_func([$class, 'get_defaults']);
@@ -207,7 +207,7 @@ class AI_HTTP_Component_Registry {
         $class = self::get_component_class($name);
         
         if (!$class) {
-            throw new Exception("Component '{$name}' not found");
+            throw new Exception("Component '" . esc_html($name) . "' not found");
         }
         
         return call_user_func([$class, 'validate_config'], $config);

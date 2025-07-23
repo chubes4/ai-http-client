@@ -34,15 +34,24 @@ class AI_HTTP_Options_Manager {
     private $plugin_context;
 
     /**
+     * Whether the options manager is properly configured
+     */
+    private $is_configured = false;
+
+    /**
      * Constructor with plugin context
      *
      * @param string $plugin_context Plugin context for scoped configuration
      */
     public function __construct($plugin_context = null) {
-        if (empty($plugin_context)) {
-            throw new InvalidArgumentException('Plugin context is required for OptionsManager');
-        }
-        $this->plugin_context = sanitize_key($plugin_context);
+        // Validate plugin context using centralized helper
+        $context_validation = AI_HTTP_Plugin_Context_Helper::validate_for_constructor(
+            $plugin_context,
+            'AI_HTTP_Options_Manager'
+        );
+        
+        $this->plugin_context = AI_HTTP_Plugin_Context_Helper::get_context($context_validation);
+        $this->is_configured = AI_HTTP_Plugin_Context_Helper::is_configured($context_validation);
     }
 
     /**
@@ -314,6 +323,14 @@ class AI_HTTP_Options_Manager {
      * @return array Configuration ready for AI_HTTP_Client
      */
     public function get_client_config() {
+        // Return empty config if not properly configured
+        if (!$this->is_configured) {
+            return array(
+                'default_provider' => null,
+                'providers' => array()
+            );
+        }
+        
         $selected_provider = $this->get_selected_provider();
         $provider_settings = $this->get_provider_settings($selected_provider);
         
@@ -487,6 +504,15 @@ class AI_HTTP_Options_Manager {
             error_log('AI HTTP Client: Load provider settings AJAX failed: ' . $e->getMessage());
             wp_send_json_error('Failed to load settings: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Check if options manager is properly configured
+     *
+     * @return bool True if configured, false otherwise
+     */
+    public function is_configured() {
+        return $this->is_configured;
     }
 }
 

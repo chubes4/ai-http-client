@@ -17,15 +17,24 @@ class AI_HTTP_ProviderManager_Component {
     private $options_manager;
     private $client;
     private $plugin_context;
+    private $is_configured = false;
 
     public function __construct($plugin_context = null) {
-        if (empty($plugin_context)) {
-            throw new InvalidArgumentException('Plugin context is required for ProviderManagerComponent');
+        // Validate plugin context using centralized helper
+        $context_validation = AI_HTTP_Plugin_Context_Helper::validate_for_constructor(
+            $plugin_context,
+            'AI_HTTP_ProviderManager_Component'
+        );
+        
+        $this->plugin_context = AI_HTTP_Plugin_Context_Helper::get_context($context_validation);
+        $this->is_configured = AI_HTTP_Plugin_Context_Helper::is_configured($context_validation);
+        
+        // Only initialize dependent objects if properly configured
+        if ($this->is_configured) {
+            $this->options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+            $this->client = new AI_HTTP_Client(['plugin_context' => $this->plugin_context]);
         }
         
-        $this->plugin_context = sanitize_key($plugin_context);
-        $this->options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
-        $this->client = new AI_HTTP_Client(['plugin_context' => $this->plugin_context]);
         self::$instance_count++;
     }
 
@@ -37,11 +46,21 @@ class AI_HTTP_ProviderManager_Component {
      * @throws InvalidArgumentException If plugin_context is missing
      */
     public static function render($args = array()) {
-        if (empty($args['plugin_context'])) {
-            throw new InvalidArgumentException('plugin_context is required in args for ProviderManagerComponent::render()');
+        // Validate plugin context using centralized helper
+        $context_validation = AI_HTTP_Plugin_Context_Helper::validate_for_static_method(
+            $args,
+            'AI_HTTP_ProviderManager_Component::render'
+        );
+        
+        // Return error HTML if not properly configured
+        if (!AI_HTTP_Plugin_Context_Helper::is_configured($context_validation)) {
+            return AI_HTTP_Plugin_Context_Helper::create_admin_error_html(
+                'AI HTTP Provider Manager',
+                'Component cannot render without valid plugin context.'
+            );
         }
         
-        $plugin_context = $args['plugin_context'];
+        $plugin_context = AI_HTTP_Plugin_Context_Helper::get_context($context_validation);
         unset($args['plugin_context']); // Remove from args so it doesn't interfere with other config
         
         $component = new self($plugin_context);
@@ -55,6 +74,14 @@ class AI_HTTP_ProviderManager_Component {
      * @return string Rendered HTML
      */
     public function render_component($args = array()) {
+        // Return error message if not properly configured
+        if (!$this->is_configured) {
+            return AI_HTTP_Plugin_Context_Helper::create_admin_error_html(
+                'AI HTTP Provider Manager',
+                'Component cannot render due to configuration issues.'
+            );
+        }
+        
         $defaults = array(
             'title' => 'AI Provider Configuration',
             'components' => array(

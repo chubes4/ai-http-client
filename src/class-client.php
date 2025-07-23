@@ -38,24 +38,36 @@ class AI_HTTP_Client {
     private $plugin_context;
 
     /**
+     * Whether the client is properly configured
+     */
+    private $is_configured = false;
+
+    /**
      * Constructor with unified normalizers and plugin context support
      *
-     * @param array $config Client configuration - must include 'plugin_context'
-     * @throws InvalidArgumentException If plugin_context is missing
+     * @param array $config Client configuration - should include 'plugin_context'
      */
     public function __construct($config = array()) {
-        // Validate required plugin context
+        // Graceful fallback for missing plugin context
         if (empty($config['plugin_context'])) {
-            throw new InvalidArgumentException('Plugin context is required for AI_HTTP_Client');
+            $this->handle_missing_plugin_context();
+            return;
         }
         
         $this->plugin_context = sanitize_key($config['plugin_context']);
+        $this->is_configured = true;
         
         // Auto-read from WordPress options if no provider config provided
         if (empty($config['default_provider']) && class_exists('AI_HTTP_Options_Manager')) {
-            $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
-            $auto_config = $options_manager->get_client_config();
-            $config = array_merge($auto_config, $config);
+            try {
+                $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+                $auto_config = $options_manager->get_client_config();
+                $config = array_merge($auto_config, $config);
+            } catch (Exception $e) {
+                $this->log_error('Failed to load options: ' . $e->getMessage());
+                $this->is_configured = false;
+                return;
+            }
         }
         
         // Set default configuration
@@ -82,6 +94,11 @@ class AI_HTTP_Client {
      * @return array Standardized "round plug" output
      */
     public function send_request($request, $provider_name = null) {
+        // Return error if client is not properly configured
+        if (!$this->is_configured) {
+            return $this->create_error_response('AI HTTP Client is not properly configured - plugin context is required');
+        }
+        
         $provider_name = $provider_name ?: $this->config['default_provider'];
         
         try {
@@ -122,6 +139,12 @@ class AI_HTTP_Client {
      * @throws Exception If streaming fails
      */
     public function send_streaming_request($request, $provider_name = null, $completion_callback = null) {
+        // Return early if client is not properly configured
+        if (!$this->is_configured) {
+            AI_HTTP_Plugin_Context_Helper::log_context_error('Streaming request failed - client not properly configured', 'AI_HTTP_Client');
+            return;
+        }
+        
         $provider_name = $provider_name ?: $this->config['default_provider'];
 
         try {
@@ -340,5 +363,14 @@ class AI_HTTP_Client {
             'provider' => $provider_name,
             'raw_response' => null
         );
+    }
+
+    /**
+     * Check if client is properly configured
+     *
+     * @return bool True if configured, false otherwise
+     */
+    public function is_configured() {
+        return $this->is_configured;
     }
 }

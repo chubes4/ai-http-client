@@ -98,7 +98,7 @@ class AI_HTTP_Tool_Executor {
         
         // Check timeout after filter execution
         if ((time() - $start_time) > $timeout_seconds) {
-            throw new Exception("Tool execution timeout exceeded ({$timeout_seconds}s)");
+            throw new Exception("Tool execution timeout exceeded (" . esc_html($timeout_seconds) . "s)");
         }
         
         if ($result !== null) {
@@ -127,7 +127,7 @@ class AI_HTTP_Tool_Executor {
         $result = call_user_func($handler, $arguments, $call_id);
         
         if ((time() - $start_time) > $timeout_seconds) {
-            throw new Exception("Tool execution timeout exceeded ({$timeout_seconds}s)");
+            throw new Exception("Tool execution timeout exceeded (" . esc_html($timeout_seconds) . "s)");
         }
         
         return $result;

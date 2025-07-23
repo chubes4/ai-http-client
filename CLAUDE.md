@@ -114,6 +114,7 @@ ai_http_client_shared_api_keys = [
 ### WordPress Integration
 - **OptionsManager** - Plugin-scoped WordPress options storage (`src/Utils/OptionsManager.php`)
 - **PromptManager** - Modular prompt building (`src/Utils/PromptManager.php`)
+- **WordPressSSEHandler** - WordPress-native SSE streaming endpoint (`src/Utils/WordPressSSEHandler.php`)
 - **ProviderManagerComponent** - Complete admin UI with plugin context support (`src/Components/ProviderManagerComponent.php`)
 
 ## Development Commands
