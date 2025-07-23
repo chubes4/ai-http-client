@@ -301,28 +301,35 @@ class AI_HTTP_ProviderManager_Component {
             return;
         }
         
-        // Enqueue the component JavaScript file
-        $script_url = defined('AI_HTTP_CLIENT_URL') ? AI_HTTP_CLIENT_URL . 'assets/js/provider-manager.js' : '';
+        // Create plugin-specific script handle to prevent conflicts between multiple plugins
+        $script_handle = 'ai-http-provider-manager-' . $this->plugin_context;
+        
+        // Use plugin_dir_url to get the correct URL for this plugin's copy of the library
+        // This ensures each plugin loads assets from its own directory
+        $script_url = plugin_dir_url(__FILE__) . '../../assets/js/provider-manager.js';
         
         if (!empty($script_url)) {
-            wp_enqueue_script(
-                'ai-http-provider-manager',
-                $script_url,
-                array('jquery'),
-                AI_HTTP_CLIENT_VERSION,
-                true
-            );
+            // Only enqueue once per plugin context, even if multiple components exist
+            if (!wp_script_is($script_handle, 'enqueued')) {
+                wp_enqueue_script(
+                    $script_handle,
+                    $script_url,
+                    array('jquery'),
+                    AI_HTTP_CLIENT_VERSION,
+                    true
+                );
+            }
             
-            // Pass configuration to JavaScript
-            wp_localize_script('ai-http-provider-manager', 'aiHttpConfig_' . $unique_id, array(
+            // Pass configuration to JavaScript for this specific component
+            wp_localize_script($script_handle, 'aiHttpConfig_' . $unique_id, array(
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('ai_http_nonce'),
                 'plugin_context' => $this->plugin_context,
                 'component_id' => $unique_id
             ));
             
-            // Initialize the component instance
-            wp_add_inline_script('ai-http-provider-manager', 
+            // Initialize the component instance - this will run for each component
+            wp_add_inline_script($script_handle, 
                 "jQuery(document).ready(function($) {
                     if (window.AIHttpProviderManager) {
                         window.AIHttpProviderManager.init('{$unique_id}', window.aiHttpConfig_{$unique_id});
