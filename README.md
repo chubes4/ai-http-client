@@ -2,20 +2,6 @@
 
 A professional WordPress library for unified AI provider communication with **multi-plugin support**. Drop-in solution for WordPress plugin developers who need AI functionality with minimal integration effort.
 
-## 🚨 Breaking Changes (Multi-Plugin Architecture)
-
-**Version 1.1+** introduces plugin context requirements for multi-plugin compatibility:
-
-```php
-// OLD (no longer supported)
-$client = new AI_HTTP_Client();
-echo AI_HTTP_ProviderManager_Component::render();
-
-// NEW (required)
-$client = new AI_HTTP_Client(['plugin_context' => 'my-plugin-slug']);
-echo AI_HTTP_ProviderManager_Component::render(['plugin_context' => 'my-plugin-slug']);
-```
-
 ## Why This Library?
 
 This is for WordPress plugin developers who want to ship AI features fast.
