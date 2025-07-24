@@ -128,14 +128,19 @@ class AI_HTTP_ProviderManager_Component {
                         : array();
                     
                     try {
-                        echo AI_HTTP_Component_Registry::render_component(
+                        $component_html = AI_HTTP_Component_Registry::render_component(
                             $component_name,
                             $unique_id,
                             $component_config,
                             $current_values
                         );
+                        echo $component_html;
+                        // Debug: Add a comment to verify component rendering
+                        echo '<!-- Component ' . esc_html($component_name) . ' rendered successfully -->';
                     } catch (Exception $e) {
                         echo '<!-- Error rendering component ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . ' -->';
+                        // Fallback: Show error visibly for debugging
+                        echo '<tr><td colspan="2"><strong>Debug Error:</strong> Failed to render ' . esc_html($component_name) . ': ' . esc_html($e->getMessage()) . '</td></tr>';
                     }
                 }
                 

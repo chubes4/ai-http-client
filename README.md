@@ -4,7 +4,7 @@ A professional WordPress library for unified AI provider communication with **mu
 
 ## 🚨 Breaking Changes (Multi-Plugin Architecture)
 
-**Version 2.0+** introduces plugin context requirements for multi-plugin compatibility:
+**Version 1.1+** introduces plugin context requirements for multi-plugin compatibility:
 
 ```php
 // OLD (no longer supported)
@@ -34,7 +34,7 @@ This is for WordPress plugin developers who want to ship AI features fast.
 
 ### Method 1: Composer (New)
 ```bash
-composer require chubes/ai-http-client
+composer require chubes4/ai-http-client
 ```
 
 Then in your code:

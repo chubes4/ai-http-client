@@ -1,5 +1,5 @@
 {
-    "name": "chubes/ai-http-client",
+    "name": "chubes4/ai-http-client",
     "description": "A professional WordPress library for unified AI provider communication. Supports OpenAI, Anthropic, Google Gemini, Grok, and OpenRouter with standardized request/response formats.",
     "type": "library",
     "license": "GPL-2.0-or-later",
