@@ -373,4 +373,165 @@ class AI_HTTP_Client {
     public function is_configured() {
         return $this->is_configured;
     }
+
+    // === STEP-AWARE REQUEST METHODS ===
+
+    /**
+     * Send a request using step-specific configuration
+     * 
+     * This convenience method automatically loads the step configuration
+     * and merges it with the provided request parameters.
+     *
+     * @param string $step_key Step identifier
+     * @param array $request Base request parameters
+     * @return array Standardized response
+     */
+    public function send_step_request($step_key, $request) {
+        // Return error if client is not properly configured
+        if (!$this->is_configured) {
+            return $this->create_error_response('AI HTTP Client is not properly configured - plugin context is required');
+        }
+        
+        try {
+            // Load step configuration
+            $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+            $step_config = $options_manager->get_step_configuration($step_key);
+            
+            if (empty($step_config)) {
+                return $this->create_error_response("No configuration found for step: {$step_key}");
+            }
+            
+            // Merge step configuration with request
+            $enhanced_request = $this->merge_step_config_with_request($request, $step_config);
+            
+            // Get provider from step config
+            $provider = $step_config['provider'] ?? null;
+            if (!$provider) {
+                return $this->create_error_response("No provider configured for step: {$step_key}");
+            }
+            
+            // Send request using step-configured provider  
+            return $this->send_request($enhanced_request, $provider);
+            
+        } catch (Exception $e) {
+            return $this->create_error_response("Step request failed: " . $e->getMessage(), $step_key);
+        }
+    }
+    
+    /**
+     * Get step configuration for debugging/inspection
+     *
+     * @param string $step_key Step identifier
+     * @return array Step configuration
+     */
+    public function get_step_configuration($step_key) {
+        if (!$this->is_configured) {
+            return array();
+        }
+        
+        $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+        return $options_manager->get_step_configuration($step_key);
+    }
+    
+    /**
+     * Check if a step has configuration
+     *
+     * @param string $step_key Step identifier
+     * @return bool True if step is configured
+     */
+    public function has_step_configuration($step_key) {
+        if (!$this->is_configured) {
+            return false;
+        }
+        
+        $options_manager = new AI_HTTP_Options_Manager($this->plugin_context);
+        return $options_manager->has_step_configuration($step_key);
+    }
+    
+    /**
+     * Merge step configuration with request parameters
+     *
+     * @param array $request Base request
+     * @param array $step_config Step configuration
+     * @return array Enhanced request
+     */
+    private function merge_step_config_with_request($request, $step_config) {
+        // Start with the base request
+        $enhanced_request = $request;
+        
+        // Override with step-specific settings (request params take precedence)
+        if (isset($step_config['model']) && !isset($request['model'])) {
+            $enhanced_request['model'] = $step_config['model'];
+        }
+        
+        if (isset($step_config['temperature']) && !isset($request['temperature'])) {
+            $enhanced_request['temperature'] = $step_config['temperature'];
+        }
+        
+        if (isset($step_config['max_tokens']) && !isset($request['max_tokens'])) {
+            $enhanced_request['max_tokens'] = $step_config['max_tokens'];
+        }
+        
+        if (isset($step_config['top_p']) && !isset($request['top_p'])) {
+            $enhanced_request['top_p'] = $step_config['top_p'];
+        }
+        
+        // Handle step-specific system prompt
+        if (isset($step_config['system_prompt']) && !empty($step_config['system_prompt'])) {
+            // Ensure messages array exists
+            if (!isset($enhanced_request['messages'])) {
+                $enhanced_request['messages'] = array();
+            }
+            
+            // Check if there's already a system message
+            $has_system_message = false;
+            foreach ($enhanced_request['messages'] as $message) {
+                if (isset($message['role']) && $message['role'] === 'system') {
+                    $has_system_message = true;
+                    break;
+                }
+            }
+            
+            // Add step system prompt if no system message exists
+            if (!$has_system_message) {
+                array_unshift($enhanced_request['messages'], array(
+                    'role' => 'system',
+                    'content' => $step_config['system_prompt']
+                ));
+            }
+        }
+        
+        // Handle step-specific tools
+        if (isset($step_config['tools_enabled']) && is_array($step_config['tools_enabled']) && !isset($request['tools'])) {
+            $enhanced_request['tools'] = array();
+            foreach ($step_config['tools_enabled'] as $tool_name) {
+                // Convert tool names to tool definitions
+                $enhanced_request['tools'][] = $this->convert_tool_name_to_definition($tool_name);
+            }
+        }
+        
+        return $enhanced_request;
+    }
+    
+    /**
+     * Convert tool name to tool definition
+     *
+     * @param string $tool_name Tool name  
+     * @return array Tool definition
+     */
+    private function convert_tool_name_to_definition($tool_name) {
+        // Map common tool names to definitions
+        $tool_definitions = array(
+            'web_search_preview' => array(
+                'type' => 'web_search_preview',
+                'search_context_size' => 'low'
+            ),
+            'web_search' => array(
+                'type' => 'web_search_preview',
+                'search_context_size' => 'medium'
+            )
+        );
+        
+        return $tool_definitions[$tool_name] ?? array('type' => $tool_name);
+    }
 }

@@ -454,27 +454,55 @@ class AI_HTTP_Options_Manager {
                 wp_send_json_error('Plugin context is required');
             }
             
-            $provider = sanitize_text_field($_POST['ai_provider']);
-            $settings = array(
-                'api_key' => sanitize_text_field($_POST['ai_api_key']),
-                'model' => sanitize_text_field($_POST['ai_model']),
-                'temperature' => isset($_POST['ai_temperature']) ? floatval($_POST['ai_temperature']) : null,
-                'system_prompt' => isset($_POST['ai_system_prompt']) ? sanitize_textarea_field($_POST['ai_system_prompt']) : '',
-                'instructions' => isset($_POST['instructions']) ? sanitize_textarea_field($_POST['instructions']) : ''
-            );
-
-            // Handle custom fields
-            foreach ($_POST as $key => $value) {
-                if (strpos($key, 'custom_') === 0) {
-                    $settings[$key] = sanitize_text_field($value);
-                }
-            }
-
+            $step_key = isset($_POST['step_key']) ? sanitize_key($_POST['step_key']) : null;
             $options_manager = new self($plugin_context);
-            $options_manager->save_provider_settings($provider, $settings);
-            $options_manager->set_selected_provider($provider);
+            
+            if ($step_key) {
+                // Step-aware form processing
+                $field_prefix = "ai_step_{$step_key}_";
+                
+                $provider = sanitize_text_field($_POST[$field_prefix . 'provider']);
+                $step_settings = array(
+                    'provider' => $provider,
+                    'model' => sanitize_text_field($_POST[$field_prefix . 'model']),
+                    'temperature' => isset($_POST[$field_prefix . 'temperature']) ? floatval($_POST[$field_prefix . 'temperature']) : null,
+                    'system_prompt' => isset($_POST[$field_prefix . 'system_prompt']) ? sanitize_textarea_field($_POST[$field_prefix . 'system_prompt']) : '',
+                );
+                
+                // Handle step-specific custom fields
+                foreach ($_POST as $key => $value) {
+                    if (strpos($key, $field_prefix) === 0 && strpos($key, 'custom_') !== false) {
+                        $clean_key = str_replace($field_prefix, '', $key);
+                        $step_settings[$clean_key] = sanitize_text_field($value);
+                    }
+                }
+                
+                // Save step configuration
+                $options_manager->save_step_configuration($step_key, $step_settings);
+                wp_send_json_success('Step settings saved');
+                
+            } else {
+                // Global form processing (existing behavior)
+                $provider = sanitize_text_field($_POST['ai_provider']);
+                $settings = array(
+                    'api_key' => sanitize_text_field($_POST['ai_api_key']),
+                    'model' => sanitize_text_field($_POST['ai_model']),
+                    'temperature' => isset($_POST['ai_temperature']) ? floatval($_POST['ai_temperature']) : null,
+                    'system_prompt' => isset($_POST['ai_system_prompt']) ? sanitize_textarea_field($_POST['ai_system_prompt']) : '',
+                    'instructions' => isset($_POST['instructions']) ? sanitize_textarea_field($_POST['instructions']) : ''
+                );
 
-            wp_send_json_success('Settings saved');
+                // Handle custom fields
+                foreach ($_POST as $key => $value) {
+                    if (strpos($key, 'custom_') === 0) {
+                        $settings[$key] = sanitize_text_field($value);
+                    }
+                }
+
+                $options_manager->save_provider_settings($provider, $settings);
+                $options_manager->set_selected_provider($provider);
+                wp_send_json_success('Settings saved');
+            }
             
         } catch (Exception $e) {
             error_log('AI HTTP Client: Save settings AJAX failed: ' . $e->getMessage());
@@ -483,7 +511,7 @@ class AI_HTTP_Options_Manager {
     }
     
     /**
-     * AJAX handler for loading provider settings with plugin context
+     * AJAX handler for loading provider settings with plugin context and step support
      */
     public static function ajax_load_provider_settings() {
         check_ajax_referer('ai_http_nonce', 'nonce');
@@ -495,8 +523,16 @@ class AI_HTTP_Options_Manager {
             }
             
             $provider = sanitize_text_field($_POST['provider']);
+            $step_key = isset($_POST['step_key']) ? sanitize_key($_POST['step_key']) : null;
+            
             $options_manager = new self($plugin_context);
-            $settings = $options_manager->get_provider_settings($provider);
+            
+            // Use step-aware method if step_key is provided
+            if ($step_key) {
+                $settings = $options_manager->get_provider_settings_with_step($provider, $step_key);
+            } else {
+                $settings = $options_manager->get_provider_settings($provider);  
+            }
             
             wp_send_json_success($settings);
             
@@ -513,6 +549,149 @@ class AI_HTTP_Options_Manager {
      */
     public function is_configured() {
         return $this->is_configured;
+    }
+
+    // === STEP-AWARE CONFIGURATION METHODS ===
+
+    /**
+     * Base option name for step-scoped configuration
+     */
+    const STEP_CONFIG_OPTION_BASE = 'ai_http_client_step_config';
+
+    /**
+     * Get configuration for a specific step
+     *
+     * @param string $step_key Step identifier
+     * @return array Step configuration
+     */
+    public function get_step_configuration($step_key) {
+        if (!$this->is_configured) {
+            return array();
+        }
+        
+        $step_configs = get_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), array());
+        return isset($step_configs[$step_key]) ? $step_configs[$step_key] : array();
+    }
+
+    /**
+     * Save configuration for a specific step
+     *
+     * @param string $step_key Step identifier  
+     * @param array $config Step configuration
+     * @return bool True if saved successfully
+     */
+    public function save_step_configuration($step_key, $config) {
+        if (!$this->is_configured) {
+            return false;
+        }
+        
+        $step_configs = get_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), array());
+        $step_configs[$step_key] = $this->sanitize_step_settings($config);
+        
+        return update_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), $step_configs);
+    }
+
+    /**
+     * Get all step configurations for this plugin context
+     *
+     * @return array All step configurations
+     */
+    public function get_all_step_configurations() {
+        if (!$this->is_configured) {
+            return array();
+        }
+        
+        return get_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), array());
+    }
+
+    /**
+     * Get provider settings with step context (step-specific settings take priority)
+     *
+     * @param string $provider_name Provider name
+     * @param string $step_key Optional step identifier for step-specific settings
+     * @return array Provider settings with merged API key and step-specific overrides
+     */
+    public function get_provider_settings_with_step($provider_name, $step_key = null) {
+        // Start with global provider settings
+        $provider_settings = $this->get_provider_settings($provider_name);
+        
+        // If step_key provided, merge with step-specific configuration
+        if ($step_key) {
+            $step_config = $this->get_step_configuration($step_key);
+            
+            // If this step is configured for the specified provider, merge step settings
+            if (isset($step_config['provider']) && $step_config['provider'] === $provider_name) {
+                $provider_settings = array_merge($provider_settings, $step_config);
+            }
+        }
+        
+        return $provider_settings;
+    }
+
+    /**
+     * Delete configuration for a specific step
+     *
+     * @param string $step_key Step identifier
+     * @return bool True if deleted successfully
+     */
+    public function delete_step_configuration($step_key) {
+        if (!$this->is_configured) {
+            return false;
+        }
+        
+        $step_configs = get_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), array());
+        
+        if (isset($step_configs[$step_key])) {
+            unset($step_configs[$step_key]);
+            return update_option($this->get_scoped_option_name(self::STEP_CONFIG_OPTION_BASE), $step_configs);
+        }
+        
+        return true; // Already doesn't exist
+    }
+
+    /**
+     * Check if a step has configuration
+     *
+     * @param string $step_key Step identifier
+     * @return bool True if step has configuration
+     */
+    public function has_step_configuration($step_key) {
+        $step_config = $this->get_step_configuration($step_key);
+        return !empty($step_config);
+    }
+
+    /**
+     * Sanitize step settings
+     *
+     * @param array $settings Raw step settings
+     * @return array Sanitized step settings
+     */
+    private function sanitize_step_settings($settings) {
+        $allowed_fields = array(
+            'provider' => 'sanitize_text_field',
+            'model' => 'sanitize_text_field', 
+            'temperature' => 'floatval',
+            'max_tokens' => 'intval',
+            'top_p' => 'floatval',
+            'system_prompt' => 'wp_kses_post',
+            'tools_enabled' => 'sanitize_tools_array'
+        );
+        
+        $sanitized = array();
+        
+        foreach ($settings as $key => $value) {
+            if (isset($allowed_fields[$key])) {
+                $sanitizer = $allowed_fields[$key];
+                
+                if ($sanitizer === 'sanitize_tools_array') {
+                    $sanitized[$key] = is_array($value) ? array_map('sanitize_text_field', $value) : array();
+                } else {
+                    $sanitized[$key] = call_user_func($sanitizer, $value);
+                }
+            }
+        }
+        
+        return $sanitized;
     }
 }
 

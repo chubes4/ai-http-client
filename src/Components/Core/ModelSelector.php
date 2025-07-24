@@ -27,6 +27,12 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         $provider = $current_values['provider'] ?? 'openai';
         $selected_model = $current_values['model'] ?? '';
         
+        // Generate step-aware field name
+        $field_name = 'ai_model';
+        if (isset($config['step_key']) && !empty($config['step_key'])) {
+            $field_name = 'ai_step_' . sanitize_key($config['step_key']) . '_model';
+        }
+        
         $html = '<tr class="form-field">';
         $html .= '<th scope="row">';
         $html .= '<label for="' . esc_attr($unique_id) . '_model">' . esc_html($config['label']) . '</label>';
@@ -34,7 +40,7 @@ class AI_HTTP_Core_ModelSelector implements AI_HTTP_Component_Interface {
         $html .= '<td>';
         $html .= '<div>';
         $html .= '<select id="' . esc_attr($unique_id) . '_model" ';
-        $html .= 'name="ai_model" ';
+        $html .= 'name="' . esc_attr($field_name) . '" ';
         $html .= 'data-component-id="' . esc_attr($unique_id) . '" ';
         $html .= 'data-component-type="model_selector" ';
         $html .= 'data-provider="' . esc_attr($provider) . '" ';

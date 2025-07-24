@@ -79,6 +79,12 @@
             formData.append('nonce', config.nonce);
             formData.append('plugin_context', config.plugin_context);
             
+            // Add step_key if this is a step-aware component
+            const stepKey = elements.component.getAttribute('data-step-key');
+            if (stepKey) {
+                formData.append('step_key', stepKey);
+            }
+            
             // Collect all form inputs
             elements.component.querySelectorAll('input, select, textarea').forEach(input => {
                 if (input.name) {
@@ -226,6 +232,12 @@
                 plugin_context: config.plugin_context,
                 nonce: config.nonce
             });
+            
+            // Add step_key if this is a step-aware component
+            const stepKey = elements.component.getAttribute('data-step-key');
+            if (stepKey) {
+                requestBody.append('step_key', stepKey);
+            }
             
             fetch(config.ajax_url, {
                 method: 'POST',

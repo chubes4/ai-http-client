@@ -26,10 +26,16 @@ class AI_HTTP_Extended_SystemPromptField implements AI_HTTP_Component_Interface 
         
         $system_prompt = $current_values['system_prompt'] ?? $config['default_value'];
         
+        // Generate step-aware field name
+        $field_name = 'ai_system_prompt';
+        if (isset($config['step_key']) && !empty($config['step_key'])) {
+            $field_name = 'ai_step_' . sanitize_key($config['step_key']) . '_system_prompt';
+        }
+        
         $html = '<div class="ai-field-group ai-system-prompt-field">';
         $html .= '<label for="' . esc_attr($unique_id) . '_system_prompt">' . esc_html($config['label']) . ':</label>';
         $html .= '<textarea id="' . esc_attr($unique_id) . '_system_prompt" ';
-        $html .= 'name="ai_system_prompt" ';
+        $html .= 'name="' . esc_attr($field_name) . '" ';
         $html .= 'rows="' . esc_attr($config['rows']) . '" ';
         $html .= 'cols="' . esc_attr($config['cols']) . '" ';
         $html .= 'placeholder="' . esc_attr($config['placeholder']) . '" ';

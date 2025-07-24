@@ -92,25 +92,49 @@ class AI_HTTP_ProviderManager_Component {
             'allowed_providers' => array(), // Empty = all providers
             'default_provider' => 'openai',
             'wrapper_class' => 'ai-http-provider-manager',
-            'component_configs' => array()
+            'component_configs' => array(),
+            'step_key' => null // NEW: Step identifier for multi-step workflows
         );
 
         $args = array_merge($defaults, $args);
-        $unique_id = 'ai-provider-manager-' . $this->plugin_context . '-' . uniqid();
+        $step_key = $args['step_key'];
         
-        $current_settings = $this->options_manager->get_all_providers();
-        $selected_provider = isset($current_settings['selected_provider']) 
-            ? $current_settings['selected_provider'] 
-            : $args['default_provider'];
+        // Generate unique ID with step context if provided
+        $unique_id = 'ai-provider-manager-' . $this->plugin_context;
+        if ($step_key) {
+            $unique_id .= '-step-' . sanitize_html_class($step_key);
+        }
+        $unique_id .= '-' . uniqid();
+        
+        // Load configuration (step-aware or global)
+        if ($step_key) {
+            // Step-aware configuration
+            $step_config = $this->options_manager->get_step_configuration($step_key);
+            $selected_provider = isset($step_config['provider']) 
+                ? $step_config['provider'] 
+                : $args['default_provider'];
+            
+            $current_values = array_merge(
+                $this->options_manager->get_provider_settings_with_step($selected_provider, $step_key),
+                array('provider' => $selected_provider),
+                $step_config // Step config takes priority
+            );
+        } else {
+            // Global configuration (existing behavior)
+            $current_settings = $this->options_manager->get_all_providers();
+            $selected_provider = isset($current_settings['selected_provider']) 
+                ? $current_settings['selected_provider'] 
+                : $args['default_provider'];
 
-        $current_values = array_merge(
-            $this->options_manager->get_provider_settings($selected_provider),
-            array('provider' => $selected_provider)
-        );
+            $current_values = array_merge(
+                $this->options_manager->get_provider_settings($selected_provider),
+                array('provider' => $selected_provider)
+            );
+        }
 
         ob_start();
         ?>
-        <div class="<?php echo esc_attr($args['wrapper_class']); ?>" id="<?php echo esc_attr($unique_id); ?>" data-plugin-context="<?php echo esc_attr($this->plugin_context); ?>">
+        <div class="<?php echo esc_attr($args['wrapper_class']); ?>" id="<?php echo esc_attr($unique_id); ?>" data-plugin-context="<?php echo esc_attr($this->plugin_context); ?>"<?php if ($step_key): ?> data-step-key="<?php echo esc_attr($step_key); ?>"<?php endif; ?>>
             
             <?php if ($args['title']): ?>
                 <h3><?php echo esc_html($args['title']); ?></h3>
@@ -126,6 +150,11 @@ class AI_HTTP_ProviderManager_Component {
                     $component_config = isset($args['component_configs'][$component_name]) 
                         ? $args['component_configs'][$component_name] 
                         : array();
+                    
+                    // Add step_key to component config for step-aware field naming
+                    if ($step_key) {
+                        $component_config['step_key'] = $step_key;
+                    }
                     
                     try {
                         $component_html = AI_HTTP_Component_Registry::render_component(
@@ -150,6 +179,11 @@ class AI_HTTP_ProviderManager_Component {
                         ? $args['component_configs'][$component_name] 
                         : array();
                     
+                    // Add step_key to component config for step-aware field naming
+                    if ($step_key) {
+                        $component_config['step_key'] = $step_key;
+                    }
+                    
                     try {
                         echo AI_HTTP_Component_Registry::render_component(
                             $component_name,
@@ -168,6 +202,11 @@ class AI_HTTP_ProviderManager_Component {
                     $component_config = isset($args['component_configs'][$component_name]) 
                         ? $args['component_configs'][$component_name] 
                         : array();
+                    
+                    // Add step_key to component config for step-aware field naming
+                    if ($step_key) {
+                        $component_config['step_key'] = $step_key;
+                    }
                     
                     try {
                         echo AI_HTTP_Component_Registry::render_component(

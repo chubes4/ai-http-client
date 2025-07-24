@@ -27,13 +27,19 @@ class AI_HTTP_Core_ProviderSelector implements AI_HTTP_Component_Interface {
         $available_providers = self::get_available_providers($config['allowed_providers']);
         $selected_provider = $current_values['provider'] ?? $config['default_provider'];
         
+        // Generate step-aware field name
+        $field_name = 'ai_provider';
+        if (isset($config['step_key']) && !empty($config['step_key'])) {
+            $field_name = 'ai_step_' . sanitize_key($config['step_key']) . '_provider';
+        }
+        
         $html = '<tr class="form-field">';
         $html .= '<th scope="row">';
         $html .= '<label for="' . esc_attr($unique_id) . '_provider">' . esc_html($config['label']) . '</label>';
         $html .= '</th>';
         $html .= '<td>';
         $html .= '<select id="' . esc_attr($unique_id) . '_provider" ';
-        $html .= 'name="ai_provider" ';
+        $html .= 'name="' . esc_attr($field_name) . '" ';
         $html .= 'class="regular-text" ';
         $html .= 'data-component-id="' . esc_attr($unique_id) . '" ';
         $html .= 'data-component-type="provider_selector">';

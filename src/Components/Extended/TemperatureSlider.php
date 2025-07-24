@@ -26,12 +26,18 @@ class AI_HTTP_Extended_TemperatureSlider implements AI_HTTP_Component_Interface 
         
         $temperature = $current_values['temperature'] ?? $config['default_value'];
         
+        // Generate step-aware field name
+        $field_name = 'ai_temperature';
+        if (isset($config['step_key']) && !empty($config['step_key'])) {
+            $field_name = 'ai_step_' . sanitize_key($config['step_key']) . '_temperature';
+        }
+        
         $html = '<div class="ai-field-group ai-temperature-slider">';
         $html .= '<label for="' . esc_attr($unique_id) . '_temperature">' . esc_html($config['label']) . ':</label>';
         $html .= '<div class="ai-slider-container">';
         $html .= '<input type="range" ';
         $html .= 'id="' . esc_attr($unique_id) . '_temperature" ';
-        $html .= 'name="ai_temperature" ';
+        $html .= 'name="' . esc_attr($field_name) . '" ';
         $html .= 'min="' . esc_attr($config['min']) . '" ';
         $html .= 'max="' . esc_attr($config['max']) . '" ';
         $html .= 'step="' . esc_attr($config['step']) . '" ';
