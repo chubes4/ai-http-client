@@ -6,16 +6,10 @@ AI HTTP Client - WordPress library for multi-type AI provider communication with
 
 ## Development Commands
 
-### Testing & Analysis
+### Static Analysis
 ```bash
-# Run PHPUnit tests
-composer test
-
 # Run PHPStan static analysis (level 5)
 composer analyse
-
-# Run both tests and analysis
-composer check
 
 # Check PHP syntax for individual files
 php -l src/Providers/LLM/openai.php
@@ -63,20 +57,18 @@ Standard Input → Unified Normalizers → Provider APIs → Standard Output
 
 1. **Standard Input**: Unified request format across all providers
 2. **Unified Normalizers**: Convert standard format to provider-specific formats
-3. **Provider Classes**: Pure API communication (recently refactored with Base_LLM_Provider)
+3. **Provider Classes**: Individual implementations with standardized interfaces
 4. **Standard Output**: Unified response format regardless of provider
 
-### Provider Architecture (Recently Refactored)
-**Base Class Hierarchy**:
-- `Base_LLM_Provider` - Common HTTP operations, auth patterns, error handling
-- Provider-specific classes extend base class with minimal customization:
-  - `AI_HTTP_OpenAI_Provider` - OpenAI Responses API + organization headers
-  - `AI_HTTP_Anthropic_Provider` - x-api-key + anthropic-version headers
-  - `AI_HTTP_Gemini_Provider` - Model-in-URL pattern + x-goog-api-key
-  - `AI_HTTP_Grok_Provider` - Standard Bearer token (simplest implementation)
-  - `AI_HTTP_OpenRouter_Provider` - Bearer token + HTTP-Referer + X-Title
+### Provider Architecture (Filter-Based Registration)
+**Individual Provider Classes**:
+- `AI_HTTP_OpenAI_Provider` - Bearer token + OpenAI-Organization headers
+- `AI_HTTP_Anthropic_Provider` - x-api-key + anthropic-version headers
+- `AI_HTTP_Gemini_Provider` - Model-in-URL pattern + x-goog-api-key
+- `AI_HTTP_Grok_Provider` - Standard Bearer token
+- `AI_HTTP_OpenRouter_Provider` - Bearer token + HTTP-Referer + X-Title
 
-**Refactoring Impact**: Eliminated 330+ lines of duplicated code (31% reduction) while maintaining 100% API compatibility.
+**Registration System**: Providers register via WordPress filters (`ai_providers`) enabling third-party provider registration without code modification.
 
 ### Multi-Plugin Isolation System
 **Configuration Scoping**:
@@ -101,7 +93,7 @@ AI_HTTP_Client
 ├── init_normalizers_for_type() -> Routes to LLM/Upscaling/Generative normalizers
 ├── send_request()
 │   ├── validate_request()
-│   ├── get_provider() -> Creates/caches provider instance from Base_LLM_Provider
+│   ├── get_provider() -> Creates/caches provider instance via filter-based discovery
 │   ├── request_normalizer->normalize() -> Converts to provider format
 │   ├── provider->send_raw_request() -> Pure API call
 │   └── response_normalizer->normalize() -> Converts to standard format
@@ -131,16 +123,18 @@ AI_HTTP_Client
 - Plugin-aware admin components with zero styling
 - Follows WordPress coding standards and security practices
 
-### Component System
+### Component System (Component-Owned Architecture)
 **Modular UI Components**:
 - `AI_HTTP_ProviderManager_Component` - Complete admin interface
-- Core components: provider_selector, api_key_input, model_selector, test_connection
-- Extended components: temperature_slider, system_prompt_field, max_tokens_input
+- Core components: provider_selector, api_key_input, model_selector
+- Extended components: temperature_slider, system_prompt_field
 
 **Component Registry Pattern**:
 ```php
 AI_HTTP_Component_Registry::get_component('provider_selector')->render($args)
 ```
+
+**Recent Implementation**: Component-owned architecture with auto-save, auto-fetch models, and conditional save button features.
 
 ### Debug Logging
 - **Conditional Logging**: Debug logs only appear when `WP_DEBUG` is `true` in WordPress configuration
@@ -172,7 +166,7 @@ $client = new AI_HTTP_Client([
 
 ### OptionsManager Usage
 ```php
-// REQUIRED parameters - constructor updated in v2.x.x
+// REQUIRED parameters - both plugin_context and ai_type required
 $options = new AI_HTTP_Options_Manager('my-plugin-slug', 'llm');
 ```
 
@@ -210,17 +204,22 @@ $client = new AI_HTTP_Client([
 - **Set `WP_DEBUG` to `false`** in production environments to disable debug logging
 - Ensure proper WordPress security settings and API key protection
 - Verify all provider API keys are properly configured before deployment
-- Test provider connectivity using the built-in test connection component
 
-## Breaking Changes History
+**Recent Features**:
+- Auto-save settings functionality
+- Auto-fetch models from providers
+- Conditional save button display
+- Component-owned architecture for UI consistency
 
-### v2.x.x - AI Type Scoping
-**Constructor Changes**:
-- `AI_HTTP_Options_Manager($plugin_context, $ai_type)` - added required ai_type parameter
-- `AI_HTTP_Client(['plugin_context' => '...', 'ai_type' => '...'])` - added required ai_type
+## Current Version: 1.1.0
+
+### Constructor Requirements
+**Required Parameters**:
+- `AI_HTTP_Options_Manager($plugin_context, $ai_type)` - both parameters required
+- `AI_HTTP_Client(['plugin_context' => '...', 'ai_type' => '...'])` - both parameters required
 - All component rendering requires ai_type parameter
 
-**Migration**: Add 'llm' as second parameter for existing LLM functionality.
+**No Defaults**: Explicit configuration required for proper multi-plugin isolation.
 
 ## Architecture Scalability
 
@@ -229,19 +228,22 @@ Current architecture supports future AI types:
 - `src/Normalizers/LLM/` - Text AI normalizers (implemented)
 - `src/Normalizers/Upscaling/` - Image upscaling normalizers (planned)
 - `src/Normalizers/Generative/` - Image generation normalizers (planned)
-- `src/Providers/LLM/` - Text AI providers (implemented with Base_LLM_Provider)
+- `src/Providers/LLM/` - Text AI providers (implemented)
 - `src/Providers/Upscaling/` - Image upscaling providers (planned)
 - `src/Providers/Generative/` - Image generation providers (planned)
 
 ### Adding New Providers
-1. Create provider class extending `Base_LLM_Provider`
-2. Override `get_default_base_url()`, `get_provider_name()`, `get_auth_headers()`
-3. Implement `send_raw_request()`, `send_raw_streaming_request()`, `get_raw_models()`
-4. Add provider routing to `AI_HTTP_Client::create_llm_provider()`
-5. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
-6. Update manual loading in `ai-http-client.php`
+1. Create provider class implementing standardized interface methods:
+   - `is_configured()` - Check if provider has required configuration
+   - `send_raw_request($provider_request)` - Send non-streaming request
+   - `send_raw_streaming_request($provider_request, $callback)` - Send streaming request
+   - `get_raw_models()` - Retrieve available models
+   - `upload_file($file_path, $purpose)` - Files API integration
+2. Register provider via `ai_providers` WordPress filter in `src/Filters.php`
+3. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
+4. Update manual loading in `ai-http-client.php`
 
-**Provider Requirements**: ~80 lines of code (vs ~220 before base class refactoring)
+**Provider Implementation**: Individual classes with standardized interface (~220 lines typical)
 
 ## Streaming & Advanced Features
 
@@ -259,5 +261,10 @@ Current architecture supports future AI types:
 - Plugin-specific step configurations for different AI use cases
 - Automatic prompt/parameter injection based on step context
 - Dynamic tool enabling per step
+
+### File Upload System
+- Files API integration across all providers
+- NO base64 encoding - direct file uploads
+- Multi-provider file upload support
 
 This architecture enables WordPress plugin developers to integrate multiple AI providers with minimal code while maintaining complete isolation between plugins and AI types.

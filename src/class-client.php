@@ -3,7 +3,7 @@
  * AI HTTP Client - Main Orchestrator
  * 
  * Single Responsibility: Orchestrate AI requests using unified normalizers
- * Acts as the "round plug" interface with simplified provider architecture
+ * Acts as the "round plug" interface with filter-based provider architecture
  *
  * @package AIHttpClient
  * @author Chris Huber <https://chubes.net>

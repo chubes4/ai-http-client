@@ -191,12 +191,12 @@ $continuation = $client->continue_with_tool_results($conversation_history, $tool
 
 ## Supported Providers
 
-All providers are **fully refactored** with unified architecture and support **dynamic model fetching** - no hardcoded model lists. Models are fetched live from each provider's API.
+All providers use individual classes with filter-based registration and support **dynamic model fetching** - no hardcoded model lists. Models are fetched live from each provider's API.
 
-- **OpenAI** - GPT models via Responses API, streaming, function calling, vision
-- **Anthropic** - Claude models, streaming, function calling, vision
-- **Google Gemini** - Gemini models via 2025 API, streaming, function calling, multi-modal
-- **Grok/X.AI** - Grok models with reasoning_effort parameter, streaming
+- **OpenAI** - GPT models via Chat Completions API, streaming, function calling, Files API
+- **Anthropic** - Claude models, streaming, function calling
+- **Google Gemini** - Gemini models, streaming, function calling
+- **Grok/X.AI** - Grok models, streaming
 - **OpenRouter** - 100+ models via unified API with provider routing
 
 ## Architecture
@@ -205,7 +205,7 @@ All providers are **fully refactored** with unified architecture and support **d
 
 **Multi-Plugin Architecture** - Complete plugin isolation with shared API key efficiency
 
-**Unified Architecture** - Shared normalizers handle all provider differences, simple providers handle pure API communication
+**Filter-Based Architecture** - Individual provider classes register via WordPress filters, shared normalizers handle all provider differences
 
 **WordPress-Native** - Uses WordPress HTTP API, options system, and admin patterns
 
@@ -319,11 +319,17 @@ ai_http_client_shared_api_keys = [
 
 ```php
 // Plugin A: Content Editor using GPT-4
-$client_a = new AI_HTTP_Client(['plugin_context' => 'content-editor']);
+$client_a = new AI_HTTP_Client([
+    'plugin_context' => 'content-editor',
+    'ai_type' => 'llm'  // REQUIRED
+]);
 // Uses OpenAI GPT-4 with temperature 0.3
 
 // Plugin B: Chat Bot using Claude  
-$client_b = new AI_HTTP_Client(['plugin_context' => 'chat-bot']);
+$client_b = new AI_HTTP_Client([
+    'plugin_context' => 'chat-bot',
+    'ai_type' => 'llm'  // REQUIRED
+]);
 // Uses Anthropic Claude with temperature 0.8
 
 // Both share the same API keys but have completely different configurations
@@ -341,36 +347,46 @@ Designed for **flexible distribution**:
 
 ### Adding New Providers
 
-1. Create simple provider class in `src/Providers/` (e.g., `newprovider.php`)
-2. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
-3. Add provider case to `AI_HTTP_Client::get_provider()`
+1. Create provider class in `src/Providers/LLM/` (e.g., `newprovider.php`)
+2. Register provider via `ai_providers` WordPress filter in `src/Filters.php`
+3. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
 4. Add provider loading to `ai-http-client.php`
 
-Each provider needs only 4 methods:
-- `send_raw_request()` - Send API request
-- `send_raw_streaming_request()` - Send streaming request
+Each provider implements standardized interface:
+- `send_raw_request($provider_request)` - Send API request
+- `send_raw_streaming_request($provider_request, $callback)` - Send streaming request
 - `get_raw_models()` - Fetch available models
 - `is_configured()` - Check if provider is configured
+- `upload_file($file_path, $purpose)` - Files API integration
 
-## Breaking Changes
+## Current Version: 1.1.0
 
-### v2.x.x - AI Type Scoping (Current)
+### Constructor Requirements
 
-**OptionsManager Constructor Change:**
+**OptionsManager Constructor:**
 ```php
-// OLD (no longer works)
-$options_manager = new AI_HTTP_Options_Manager('my-plugin-slug');
-
-// NEW (required)
+// REQUIRED - both parameters required
 $options_manager = new AI_HTTP_Options_Manager('my-plugin-slug', 'llm');
 ```
 
-**Impact:** All plugins using `AI_HTTP_Options_Manager` directly must update their constructor calls to include the `ai_type` parameter.
+**Client Constructor:**
+```php
+// REQUIRED - both parameters required
+$client = new AI_HTTP_Client([
+    'plugin_context' => 'my-plugin-slug',
+    'ai_type' => 'llm'
+]);
+```
 
-**Migration:**
-- Add `'llm'` as second parameter for existing LLM functionality
-- Use `'upscaling'` or `'generative'` for new AI types
-- Settings will be automatically scoped by AI type (no data loss)
+**No Defaults:** Explicit configuration required for proper multi-plugin isolation. Library fails fast with clear errors when not configured properly.
+
+**Current Features:**
+- Auto-save settings functionality
+- Auto-fetch models from providers
+- Conditional save button display
+- Component-owned architecture for UI consistency
+- Filter-based provider registration
+- Files API integration across providers
 
 ## Examples
 
