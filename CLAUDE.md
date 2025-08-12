@@ -182,14 +182,22 @@ echo AI_HTTP_ProviderManager_Component::render([
 ## Distribution & Integration
 
 ### WordPress Plugin Integration
-**Recommended Pattern** (like Action Scheduler):
+**Pure WordPress Filter Pattern** (Recommended):
 ```php
 // In plugin main file
 require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
 
-// Usage in plugin
+// Usage anywhere in plugin - auto-discovers plugin context
+$client = apply_filters('ai_client', null);           // Get AI client
+$config = apply_filters('ai_config', null);           // Get global config
+$step_config = apply_filters('ai_config', $step_id);  // Get step-specific config
+```
+
+**Legacy Pattern** (Manual Parameters):
+```php
+// Old approach - no longer needed
 $client = new AI_HTTP_Client([
-    'plugin_context' => get_option('stylesheet'), // or plugin slug
+    'plugin_context' => 'my-plugin-slug',
     'ai_type' => 'llm'
 ]);
 ```
@@ -211,15 +219,19 @@ $client = new AI_HTTP_Client([
 - Conditional save button display
 - Component-owned architecture for UI consistency
 
-## Current Version: 1.1.0
+## Current Version: 1.2.0
 
-### Constructor Requirements
-**Required Parameters**:
-- `AI_HTTP_Options_Manager($plugin_context, $ai_type)` - both parameters required
-- `AI_HTTP_Client(['plugin_context' => '...', 'ai_type' => '...'])` - both parameters required
-- All component rendering requires ai_type parameter
+### Usage Patterns
+**Recommended (Auto-Discovery)**:
+- `apply_filters('ai_client', null)` - Returns configured AI client
+- `apply_filters('ai_config', null)` - Returns global configuration  
+- `apply_filters('ai_config', $step_id)` - Returns step-specific configuration
 
-**No Defaults**: Explicit configuration required for proper multi-plugin isolation.
+**Legacy (Manual Parameters)**:
+- `AI_HTTP_Client(['plugin_context' => '...', 'ai_type' => '...'])` - Manual instantiation
+- `AI_HTTP_Options_Manager($plugin_context, $ai_type)` - Manual options access
+
+**Auto-Discovery**: Plugin context automatically detected from call stack, AI type defaults to 'llm'.
 
 ## Architecture Scalability
 

@@ -83,48 +83,41 @@ class AI_HTTP_Client {
         
         // Store configuration - no operational defaults
         $this->config = $config;
-
-        // Initialize type-specific normalizers
-        $this->init_normalizers_for_type();
     }
 
     /**
-     * Initialize normalizers for the specified AI type
+     * Initialize normalizers based on selected provider's configuration
+     * Uses provider self-registration to load appropriate normalizers dynamically
      *
-     * @throws Exception If ai_type is not supported
+     * @param string $provider_name The provider to initialize normalizers for
+     * @throws Exception If provider not found or missing normalizers configuration
      */
-    private function init_normalizers_for_type() {
-        switch ($this->ai_type) {
-            case 'llm':
-                $this->request_normalizer = new AI_HTTP_Unified_Request_Normalizer();
-                $this->response_normalizer = new AI_HTTP_Unified_Response_Normalizer();
-                $this->streaming_normalizer = new AI_HTTP_Unified_Streaming_Normalizer();
-                $this->tool_results_normalizer = new AI_HTTP_Unified_Tool_Results_Normalizer();
-                
-                // Set up Files API callback for file uploads (NO BASE64) - MULTI-PROVIDER
-                $this->request_normalizer->set_files_api_callback(function($file_path, $purpose = 'user_data', $provider_name = 'openai') {
-                    return $this->upload_file_to_provider_files_api($file_path, $purpose, $provider_name);
-                });
-                break;
-                
-            case 'upscaling':
-                // Note: These classes don't exist yet, will be created later
-                $this->request_normalizer = new AI_HTTP_Upscaling_Request_Normalizer();
-                $this->response_normalizer = new AI_HTTP_Upscaling_Response_Normalizer();
-                $this->streaming_normalizer = null; // Upscaling typically doesn't use streaming
-                $this->tool_results_normalizer = null; // Upscaling doesn't use tools
-                break;
-                
-            case 'generative':
-                // Note: These classes don't exist yet, will be created later
-                $this->request_normalizer = new AI_HTTP_Generative_Request_Normalizer();
-                $this->response_normalizer = new AI_HTTP_Generative_Response_Normalizer();
-                $this->streaming_normalizer = null; // May add later for progressive generation
-                $this->tool_results_normalizer = null; // Generative typically doesn't use tools
-                break;
-                
-            default:
-                throw new Exception('Unsupported ai_type specified');
+    private function init_normalizers_for_provider($provider_name) {
+        // Get all registered providers
+        $all_providers = apply_filters('ai_providers', []);
+        $provider_info = $all_providers[strtolower($provider_name)] ?? null;
+        
+        if (!$provider_info) {
+            throw new Exception("Provider '{$provider_name}' not found in registered providers");
+        }
+        
+        if (!isset($provider_info['normalizers'])) {
+            throw new Exception("Provider '{$provider_name}' missing required normalizers configuration");
+        }
+        
+        $normalizers = $provider_info['normalizers'];
+        
+        // Instantiate normalizers from provider configuration
+        $this->request_normalizer = new $normalizers['request']();
+        $this->response_normalizer = new $normalizers['response']();
+        $this->streaming_normalizer = new $normalizers['streaming']();
+        $this->tool_results_normalizer = new $normalizers['tool_results']();
+        
+        // Set up Files API callback for file uploads (NO BASE64) - MULTI-PROVIDER
+        if (method_exists($this->request_normalizer, 'set_files_api_callback')) {
+            $this->request_normalizer->set_files_api_callback(function($file_path, $purpose = 'user_data', $provider_name = 'openai') {
+                return $this->upload_file_to_provider_files_api($file_path, $purpose, $provider_name);
+            });
         }
     }
 
@@ -154,23 +147,26 @@ class AI_HTTP_Client {
         }
         
         try {
-            // Step 1: Validate standard input
+            // Step 1: Initialize normalizers for the selected provider
+            $this->init_normalizers_for_provider($provider_name);
+            
+            // Step 2: Validate standard input
             $this->validate_request($request);
             
-            // Step 2: Get or create provider instance
+            // Step 3: Get or create provider instance
             $provider = $this->get_provider($provider_name);
             
-            // Step 3: Normalize request for provider
+            // Step 4: Normalize request for provider
             $provider_config = $this->get_provider_config($provider_name);
             $provider_request = $this->request_normalizer->normalize($request, $provider_name, $provider_config);
             
-            // Step 4: Send raw request to provider
+            // Step 5: Send raw request to provider
             $raw_response = $provider->send_raw_request($provider_request);
             
-            // Step 5: Normalize response to standard format
+            // Step 6: Normalize response to standard format
             $standard_response = $this->response_normalizer->normalize($raw_response, $provider_name);
             
-            // Step 6: Add metadata
+            // Step 7: Add metadata
             $standard_response['provider'] = $provider_name;
             $standard_response['success'] = true;
             
@@ -191,11 +187,6 @@ class AI_HTTP_Client {
      * @throws Exception If streaming fails
      */
     public function send_streaming_request($request, $provider_name = null, $completion_callback = null) {
-        // Check if streaming is supported for this AI type
-        if ($this->streaming_normalizer === null) {
-            throw new Exception('Streaming is not supported for specified ai_type');
-        }
-        
         // Return early if client is not properly configured
         if (!$this->is_configured) {
             AI_HTTP_Plugin_Context_Helper::log_context_error('Streaming request failed - client not properly configured', 'AI_HTTP_Client');
@@ -215,13 +206,21 @@ class AI_HTTP_Client {
         }
 
         try {
-            // Step 1: Validate standard input
+            // Step 1: Initialize normalizers for the selected provider
+            $this->init_normalizers_for_provider($provider_name);
+            
+            // Check if streaming is supported for this provider
+            if ($this->streaming_normalizer === null) {
+                throw new Exception('Streaming is not supported for specified provider');
+            }
+            
+            // Step 2: Validate standard input
             $this->validate_request($request);
             
-            // Step 2: Get or create provider instance
+            // Step 3: Get or create provider instance
             $provider = $this->get_provider($provider_name);
             
-            // Step 3: Normalize request for streaming
+            // Step 4: Normalize request for streaming
             $provider_config = $this->get_provider_config($provider_name);
             $provider_request = $this->request_normalizer->normalize($request, $provider_name, $provider_config);
             $streaming_request = $this->streaming_normalizer->normalize_streaming_request($provider_request, $provider_name);
@@ -445,8 +444,11 @@ class AI_HTTP_Client {
         error_log("[AI_HTTP_Client Debug] Provider: {$provider_name}");
         error_log("[AI_HTTP_Client Debug] Plugin context: {$this->plugin_context}, AI type: {$this->ai_type}");
         
-        $options_manager = new AI_HTTP_Options_Manager($this->plugin_context, $this->ai_type);
-        $config = $options_manager->get_provider_settings($provider_name);
+        // Use ai_config filter for universal configuration access
+        $all_providers_config = apply_filters('ai_config', [], $this->plugin_context, $this->ai_type);
+        
+        // Extract provider-specific settings from global configuration
+        $config = isset($all_providers_config[$provider_name]) ? $all_providers_config[$provider_name] : [];
         
         // Debug API key status
         $api_key_status = isset($config['api_key']) && !empty($config['api_key']) ? 'SET_LENGTH_' . strlen($config['api_key']) : 'EMPTY';

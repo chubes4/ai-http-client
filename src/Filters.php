@@ -43,60 +43,8 @@ function ai_http_client_register_provider_filters() {
         return $types;
     });
     
-    // Register LLM providers
-    add_filter('ai_providers', function($providers) {
-        $providers['openai'] = [
-            'class' => 'AI_HTTP_OpenAI_Provider',
-            'type' => 'llm',
-            'name' => 'OpenAI',
-            'tool_format' => [
-                'id_field' => 'tool_call_id',
-                'content_field' => 'content'
-            ]
-        ];
-        
-        $providers['anthropic'] = [
-            'class' => 'AI_HTTP_Anthropic_Provider', 
-            'type' => 'llm',
-            'name' => 'Anthropic',
-            'tool_format' => [
-                'id_field' => 'tool_use_id',
-                'content_field' => 'content'
-            ]
-        ];
-        
-        $providers['gemini'] = [
-            'class' => 'AI_HTTP_Gemini_Provider',
-            'type' => 'llm',
-            'name' => 'Google Gemini',
-            'tool_format' => [
-                'id_field' => 'function_name',
-                'content_field' => 'result'
-            ]
-        ];
-        
-        $providers['grok'] = [
-            'class' => 'AI_HTTP_Grok_Provider',
-            'type' => 'llm',
-            'name' => 'Grok',
-            'tool_format' => [
-                'id_field' => 'tool_call_id',
-                'content_field' => 'content'
-            ]
-        ];
-        
-        $providers['openrouter'] = [
-            'class' => 'AI_HTTP_OpenRouter_Provider',
-            'type' => 'llm',
-            'name' => 'OpenRouter',
-            'tool_format' => [
-                'id_field' => 'tool_call_id',
-                'content_field' => 'content'
-            ]
-        ];
-        
-        return $providers;
-    });
+    // Note: LLM providers now self-register in their individual files
+    // This eliminates central coordination and enables true modular architecture
     
     // Centralized HTTP request handling for AI API calls
     // Usage: $result = apply_filters('ai_request', [], 'POST', $url, $args, 'Provider Context', false, $callback);
@@ -254,13 +202,21 @@ function ai_http_client_register_provider_filters() {
         ];
     }, 10, 7);
     
-    // Universal AI configuration access filter
-    // Usage: $config = apply_filters('ai_config', [], $plugin_context, $ai_type, $step_id);
-    // For sitewide: $config = apply_filters('ai_config', [], $plugin_context, $ai_type);
-    add_filter('ai_config', function($default, $plugin_context, $ai_type, $step_id = null) {
-        if (empty($plugin_context) || empty($ai_type)) {
-            return $default;
+    // AI configuration filter with auto-discovery
+    // Usage: $config = apply_filters('ai_config', $step_id); // Step-specific config
+    // Usage: $config = apply_filters('ai_config', null); // Global config
+    add_filter('ai_config', function($step_id = null) {
+        // Auto-detect plugin context
+        $plugin_context = ai_http_detect_plugin_context();
+        if (empty($plugin_context)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[AI HTTP Client] ai_config filter: Could not auto-detect plugin context');
+            }
+            return [];
         }
+        
+        // Default to LLM type
+        $ai_type = 'llm';
         
         try {
             $options_manager = new AI_HTTP_Options_Manager($plugin_context, $ai_type);
@@ -269,17 +225,95 @@ function ai_http_client_register_provider_filters() {
                 // Step-specific configuration
                 return $options_manager->get_step_configuration($step_id);
             } else {
-                // Sitewide/global configuration  
+                // Global configuration  
                 return $options_manager->get_all_providers();
             }
         } catch (Exception $e) {
-            // Graceful fallback if options manager fails
-            return $default;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("[AI HTTP Client] ai_config filter: Exception - " . $e->getMessage());
+            }
+            return [];
         }
-    }, 10, 4);
+    }, 10, 1);
+    
+    // AI Client factory filter with auto-discovery
+    // Usage: $client = apply_filters('ai_client', null);
+    add_filter('ai_client', function($default = null) {
+        // Auto-detect plugin context
+        $plugin_context = ai_http_detect_plugin_context();
+        if (empty($plugin_context)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[AI HTTP Client] ai_client filter: Could not auto-detect plugin context');
+            }
+            return null;
+        }
+        
+        // Default to LLM type
+        $ai_type = 'llm';
+        
+        try {
+            // Create and return configured AI HTTP Client
+            return new AI_HTTP_Client([
+                'plugin_context' => $plugin_context,
+                'ai_type' => $ai_type
+            ]);
+            
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("[AI HTTP Client] ai_client filter: Failed to create client - " . $e->getMessage());
+            }
+            return null;
+        }
+    }, 10, 1);
     
     // TODO: Future provider types (upscaling, generative) can be added here
     // when their provider classes are implemented
+}
+
+/**
+ * Auto-detect plugin context from call stack
+ * 
+ * Analyzes debug backtrace to determine which plugin is calling the AI HTTP Client
+ * 
+ * @return string|null Plugin context (directory name) or null if not detectable
+ * @since 1.2.0
+ */
+function ai_http_detect_plugin_context() {
+    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+    
+    foreach ($backtrace as $frame) {
+        if (!isset($frame['file'])) {
+            continue;
+        }
+        
+        $file_path = $frame['file'];
+        
+        // Check if file is in a plugin directory
+        if (strpos($file_path, '/wp-content/plugins/') !== false) {
+            // Extract plugin directory name
+            $plugin_path = substr($file_path, strpos($file_path, '/wp-content/plugins/') + 20);
+            $plugin_parts = explode('/', $plugin_path);
+            
+            if (!empty($plugin_parts[0])) {
+                // Return the plugin directory name as context
+                return $plugin_parts[0];
+            }
+        }
+        
+        // Check if file is in a theme directory (fallback)
+        if (strpos($file_path, '/wp-content/themes/') !== false) {
+            $theme_path = substr($file_path, strpos($file_path, '/wp-content/themes/') + 19);
+            $theme_parts = explode('/', $theme_path);
+            
+            if (!empty($theme_parts[0])) {
+                // Return theme directory name as context
+                return 'theme-' . $theme_parts[0];
+            }
+        }
+    }
+    
+    // Fallback: return null if context cannot be determined
+    return null;
 }
 
 // Initialize provider filters on WordPress init

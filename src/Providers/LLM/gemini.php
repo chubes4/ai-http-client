@@ -12,6 +12,29 @@
 
 defined('ABSPATH') || exit;
 
+/**
+ * Self-register Gemini provider with complete configuration
+ * Includes normalizer specifications for self-contained provider architecture
+ */
+add_filter('ai_providers', function($providers) {
+    $providers['gemini'] = [
+        'class' => 'AI_HTTP_Gemini_Provider',
+        'type' => 'llm',
+        'name' => 'Google Gemini',
+        'normalizers' => [
+            'request' => 'AI_HTTP_Unified_Request_Normalizer',
+            'response' => 'AI_HTTP_Unified_Response_Normalizer',
+            'streaming' => 'AI_HTTP_Unified_Streaming_Normalizer',
+            'tool_results' => 'AI_HTTP_Unified_Tool_Results_Normalizer'
+        ],
+        'tool_format' => [
+            'id_field' => 'function_name',
+            'content_field' => 'result'
+        ]
+    ];
+    return $providers;
+});
+
 class AI_HTTP_Gemini_Provider {
 
     private $api_key;

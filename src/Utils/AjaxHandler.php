@@ -134,24 +134,25 @@ class AI_HTTP_Ajax_Handler {
         }
         
         try {
-            $options_manager = new AI_HTTP_Options_Manager($plugin_context, 'llm');
-            
             if (!empty($step_id)) {
-                // Step-aware configuration
-                $step_config = $options_manager->get_step_configuration($step_id);
+                // Step-aware configuration using ai_config filter
+                $step_config = apply_filters('ai_config', [], $plugin_context, 'llm', $step_id);
                 $selected_provider = $step_config['provider'] ?? null;
                 
-                // Get provider settings with step context
-                $settings = $options_manager->get_provider_settings_with_step($selected_provider, $step_id);
+                // Get global provider settings using ai_config filter
+                $all_providers_config = apply_filters('ai_config', [], $plugin_context, 'llm');
+                $provider_settings = isset($all_providers_config[$selected_provider]) ? $all_providers_config[$selected_provider] : [];
+                
+                $settings = array_merge($provider_settings, $step_config);
                 $settings['provider'] = $selected_provider;
-                $settings = array_merge($settings, $step_config);
                 
             } else {
-                // Global configuration
-                $all_settings = $options_manager->get_all_providers();
+                // Global configuration using ai_config filter
+                $all_settings = apply_filters('ai_config', [], $plugin_context, 'llm');
                 $selected_provider = $all_settings['selected_provider'] ?? null;
                 
-                $settings = $options_manager->get_provider_settings($provider ?: $selected_provider);
+                $provider_to_load = $provider ?: $selected_provider;
+                $settings = isset($all_settings[$provider_to_load]) ? $all_settings[$provider_to_load] : [];
                 $settings['provider'] = $selected_provider;
             }
             
@@ -187,9 +188,9 @@ class AI_HTTP_Ajax_Handler {
         }
         
         try {
-            // Use same working pattern as ModelSelector
-            $options_manager = new AI_HTTP_Options_Manager($plugin_context, 'llm');
-            $provider_config = $options_manager->get_provider_settings($provider);
+            // Use ai_config filter for provider configuration access
+            $all_providers_config = apply_filters('ai_config', [], $plugin_context, 'llm');
+            $provider_config = isset($all_providers_config[$provider]) ? $all_providers_config[$provider] : [];
             
             // Use unified model fetcher (same as working ModelSelector)
             $models = AI_HTTP_Unified_Model_Fetcher::fetch_models($provider, $provider_config);

@@ -12,6 +12,29 @@
 
 defined('ABSPATH') || exit;
 
+/**
+ * Self-register Grok provider with complete configuration
+ * Includes normalizer specifications for self-contained provider architecture
+ */
+add_filter('ai_providers', function($providers) {
+    $providers['grok'] = [
+        'class' => 'AI_HTTP_Grok_Provider',
+        'type' => 'llm',
+        'name' => 'Grok',
+        'normalizers' => [
+            'request' => 'AI_HTTP_Unified_Request_Normalizer',
+            'response' => 'AI_HTTP_Unified_Response_Normalizer',
+            'streaming' => 'AI_HTTP_Unified_Streaming_Normalizer',
+            'tool_results' => 'AI_HTTP_Unified_Tool_Results_Normalizer'
+        ],
+        'tool_format' => [
+            'id_field' => 'tool_call_id',
+            'content_field' => 'content'
+        ]
+    ];
+    return $providers;
+});
+
 class AI_HTTP_Grok_Provider {
 
     private $api_key;

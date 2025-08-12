@@ -14,7 +14,6 @@ defined('ABSPATH') || exit;
 class AI_HTTP_ProviderManager_Component {
 
     private static $instance_count = 0;
-    private $options_manager;
     private $client;
     private $plugin_context;
     private $ai_type;
@@ -33,7 +32,6 @@ class AI_HTTP_ProviderManager_Component {
         
         // Only initialize dependent objects if properly configured
         if ($this->is_configured) {
-            $this->options_manager = new AI_HTTP_Options_Manager($this->plugin_context, $this->ai_type);
             $this->client = new AI_HTTP_Client([
                 'plugin_context' => $this->plugin_context,
                 'ai_type' => $this->ai_type
@@ -132,26 +130,33 @@ class AI_HTTP_ProviderManager_Component {
         
         // Load configuration (step-aware or global)
         if ($step_id) {
-            // Step-aware configuration
-            $step_config = $this->options_manager->get_step_configuration($step_id);
+            // Step-aware configuration using ai_config filter
+            $step_config = apply_filters('ai_config', [], $this->plugin_context, $this->ai_type, $step_id);
             $selected_provider = isset($step_config['provider']) 
                 ? $step_config['provider'] 
                 : null;
             
+            // Get provider settings using ai_config filter
+            $all_providers_config = apply_filters('ai_config', [], $this->plugin_context, $this->ai_type);
+            $provider_settings = isset($all_providers_config[$selected_provider]) ? $all_providers_config[$selected_provider] : [];
+            
             $current_values = array_merge(
-                $this->options_manager->get_provider_settings_with_step($selected_provider, $step_id),
+                $provider_settings,
                 array('provider' => $selected_provider),
                 $step_config // Step config takes priority
             );
         } else {
-            // Global configuration (existing behavior)
-            $current_settings = $this->options_manager->get_all_providers();
+            // Global configuration using ai_config filter
+            $current_settings = apply_filters('ai_config', [], $this->plugin_context, $this->ai_type);
             $selected_provider = isset($current_settings['selected_provider']) 
                 ? $current_settings['selected_provider'] 
                 : null;
 
+            // Get provider-specific settings using ai_config filter
+            $provider_settings = isset($current_settings[$selected_provider]) ? $current_settings[$selected_provider] : [];
+            
             $current_values = array_merge(
-                $this->options_manager->get_provider_settings($selected_provider),
+                $provider_settings,
                 array('provider' => $selected_provider)
             );
         }
@@ -408,10 +413,12 @@ class AI_HTTP_ProviderManager_Component {
     }
 
     /**
-     * Get provider setting value
+     * Get provider setting value using ai_config filter
      */
     private function get_provider_setting($provider, $key, $default = '') {
-        $settings = $this->options_manager->get_provider_settings($provider);
+        // Use ai_config filter for configuration access
+        $all_providers_config = apply_filters('ai_config', [], $this->plugin_context, $this->ai_type);
+        $settings = isset($all_providers_config[$provider]) ? $all_providers_config[$provider] : [];
         return isset($settings[$key]) ? $settings[$key] : $default;
     }
 
