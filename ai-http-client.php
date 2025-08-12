@@ -9,7 +9,7 @@
  * Modeled after Action Scheduler for enterprise WordPress development.
  *
  * @package AIHttpClient
- * @version 1.1.0
+ * @version 1.1.1
  * @author Chris Huber <https://chubes.net>
  * @link https://github.com/chubes/ai-http-client
  */
@@ -21,7 +21,7 @@ defined('ABSPATH') || exit;
  * Prevents conflicts when multiple plugins include different versions
  */
 if (!defined('AI_HTTP_CLIENT_VERSION')) {
-    define('AI_HTTP_CLIENT_VERSION', '1.1.0');
+    define('AI_HTTP_CLIENT_VERSION', '1.1.1');
 }
 
 // Check if we should load this version

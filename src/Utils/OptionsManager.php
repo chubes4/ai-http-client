@@ -438,12 +438,12 @@ class AI_HTTP_Options_Manager {
         }
         
         try {
-            $plugin_context = sanitize_key($_POST['plugin_context']);
+            $plugin_context = sanitize_key(wp_unslash($_POST['plugin_context']));
             if (empty($plugin_context)) {
                 wp_send_json_error('Plugin context is required');
             }
             
-            $step_id = isset($_POST['step_id']) ? sanitize_key($_POST['step_id']) : null;
+            $step_id = isset($_POST['step_id']) ? sanitize_key(wp_unslash($_POST['step_id'])) : null;
             $options_manager = new self($plugin_context, 'llm');
             
             if ($step_id) {
@@ -515,13 +515,13 @@ class AI_HTTP_Options_Manager {
         }
         
         try {
-            $plugin_context = sanitize_key($_POST['plugin_context']);
+            $plugin_context = sanitize_key(wp_unslash($_POST['plugin_context']));
             if (empty($plugin_context)) {
                 wp_send_json_error('Plugin context is required');
             }
             
             $provider = sanitize_text_field(wp_unslash($_POST['provider']));
-            $step_id = isset($_POST['step_id']) ? sanitize_key($_POST['step_id']) : null;
+            $step_id = isset($_POST['step_id']) ? sanitize_key(wp_unslash($_POST['step_id'])) : null;
             
             $options_manager = new self($plugin_context, 'llm');
             
