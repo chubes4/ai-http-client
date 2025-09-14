@@ -6,25 +6,32 @@ WordPress-native AI provider integration via pure filter architecture.
 - WordPress filter system integration
 - Self-contained provider classes
 - Shared API key storage
-- Streaming support
 - Dynamic model discovery
 - Template-based UI components
 
 ## Installation
 
-**Git Subtree** (recommended):
+**Composer** (recommended for standalone use):
+```bash
+composer require chubes4/ai-http-client
+```
+
+**Git Subtree** (recommended for plugin embedding):
 ```bash
 git subtree add --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main --squash
 ```
 
-**Direct Download**: Place in `/lib/ai-http-client/`
+**Manual Installation**: Download and place in your plugin directory
 
-**Requirements**: `composer install` in library directory
+**Requirements**: PHP 7.4+
 
 ## Usage
 
 **Include Library**:
 ```php
+// Composer: Auto-loads via Composer (no includes needed)
+
+// Git Subtree/Manual: Include in your plugin
 require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
 ```
 
@@ -135,11 +142,11 @@ $all_tools = apply_filters('ai_tools', []);
 
 ## Distribution
 
-- Composer package installation
-- Git subtree integration
-- No external dependencies
-- Version conflict resolution
-- Multiple plugin support
+- **Packagist**: Available via `composer require chubes4/ai-http-client`
+- **GitHub**: https://github.com/chubes4/ai-http-client
+- **Version**: 1.0.0 - Clean, simplified architecture
+- **Dependencies**: None (pure WordPress integration)
+- **Multi-plugin**: Safe for multiple WordPress plugins to use
 
 ### Adding Providers
 
@@ -155,15 +162,15 @@ add_filter('ai_providers', function($providers) {
 });
 ```
 
-## Version 1.2.0
+## Version 1.0.0
 
 **Core Features**:
 - Filter-based provider registration
 - Auto-fetch models from APIs
 - Component-based admin UI
-- Files API integration
-- Streaming support
+- WordPress-native patterns
 - Multi-plugin configuration
+- Composer package distribution
 
 ## Examples
 
