@@ -35,8 +35,8 @@ class AI_HTTP_Anthropic_Provider {
      *
      * @param array $config Provider configuration
      */
-    public function __construct($config = array()) {
-        $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
+    public function __construct($config = []) {
+        $this->api_key = $config['api_key'] ?? '';
         
         if (isset($config['base_url']) && !empty($config['base_url'])) {
             $this->base_url = rtrim($config['base_url'], '/');
@@ -94,7 +94,7 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic');
         
         if (!$result['success']) {
-            throw new Exception('Anthropic API request failed: ' . $result['error']);
+            throw new Exception('Anthropic API request failed: ' . esc_html($result['error']));
         }
         
         $raw_response = json_decode($result['data'], true);
@@ -132,7 +132,7 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic Streaming', true, $callback);
         
         if (!$result['success']) {
-            throw new Exception('Anthropic streaming request failed: ' . $result['error']);
+            throw new Exception('Anthropic streaming request failed: ' . esc_html($result['error']));
         }
 
         // Return standardized streaming response
@@ -158,12 +158,12 @@ class AI_HTTP_Anthropic_Provider {
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
-            return array();
+            return [];
         }
 
         // Anthropic doesn't have a models endpoint
         // Model names are hardcoded: claude-3-5-sonnet-20241022, claude-3-haiku-20240307, etc.
-        return array();
+        return [];
     }
 
     /**
@@ -180,7 +180,7 @@ class AI_HTTP_Anthropic_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         // Anthropic file upload endpoint
@@ -214,7 +214,7 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic File Upload');
 
         if (!$result['success']) {
-            throw new Exception('Anthropic file upload failed: ' . $result['error']);
+            throw new Exception('Anthropic file upload failed: ' . esc_html($result['error']));
         }
 
         $response_body = $result['data'];
@@ -247,7 +247,7 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic File Delete');
 
         if (!$result['success']) {
-            throw new Exception('Anthropic file delete failed: ' . $result['error']);
+            throw new Exception('Anthropic file delete failed: ' . esc_html($result['error']));
         }
 
         return $result['status_code'] === 200;
@@ -271,14 +271,14 @@ class AI_HTTP_Anthropic_Provider {
      * @return array Normalized models array
      */
     private function normalize_models_response($raw_models) {
-        $models = array();
+        $models = [];
         
         // Anthropic returns: { "data": [{"id": "claude-3-5-sonnet-20241022", "display_name": "Claude 3.5 Sonnet", ...}, ...] }
-        $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
+        $data = $raw_models['data'] ?? $raw_models;
         if (is_array($data)) {
             foreach ($data as $model) {
                 if (isset($model['id'])) {
-                    $display_name = isset($model['display_name']) ? $model['display_name'] : $model['id'];
+                    $display_name = $model['display_name'] ?? $model['id'];
                     $models[$model['id']] = $display_name;
                 }
             }
@@ -339,7 +339,7 @@ class AI_HTTP_Anthropic_Provider {
      */
     private function format_response($anthropic_response) {
         $content = '';
-        $tool_calls = array();
+        $tool_calls = [];
 
         // Extract content
         if (isset($anthropic_response['content']) && is_array($anthropic_response['content'])) {
@@ -353,7 +353,7 @@ class AI_HTTP_Anthropic_Provider {
                             // Convert Anthropic tool_use to standard format
                             $tool_calls[] = array(
                                 'name' => $content_block['name'] ?? '',
-                                'parameters' => $content_block['input'] ?? array()
+                                'parameters' => $content_block['input'] ?? []
                             );
                             break;
                     }
@@ -363,8 +363,8 @@ class AI_HTTP_Anthropic_Provider {
 
         // Extract usage
         $usage = array(
-            'prompt_tokens' => isset($anthropic_response['usage']['input_tokens']) ? $anthropic_response['usage']['input_tokens'] : 0,
-            'completion_tokens' => isset($anthropic_response['usage']['output_tokens']) ? $anthropic_response['usage']['output_tokens'] : 0,
+            'prompt_tokens' => $anthropic_response['usage']['input_tokens'] ?? 0,
+            'completion_tokens' => $anthropic_response['usage']['output_tokens'] ?? 0,
             'total_tokens' => 0
         );
         $usage['total_tokens'] = $usage['prompt_tokens'] + $usage['completion_tokens'];
@@ -510,5 +510,6 @@ class AI_HTTP_Anthropic_Provider {
         
         return $anthropic_tools;
     }
+
 
 }

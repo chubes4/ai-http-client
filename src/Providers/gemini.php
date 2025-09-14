@@ -35,7 +35,7 @@ class AI_HTTP_Gemini_Provider {
      *
      * @param array $config Provider configuration
      */
-    public function __construct($config = array()) {
+    public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
         
         if (isset($config['base_url']) && !empty($config['base_url'])) {
@@ -110,7 +110,7 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini');
         
         if (!$result['success']) {
-            throw new Exception('Gemini API request failed: ' . $result['error']);
+            throw new Exception('Gemini API request failed: ' . esc_html($result['error']));
         }
         
         $raw_response = json_decode($result['data'], true);
@@ -148,7 +148,7 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini Streaming', true, $callback);
         
         if (!$result['success']) {
-            throw new Exception('Gemini streaming request failed: ' . $result['error']);
+            throw new Exception('Gemini streaming request failed: ' . esc_html($result['error']));
         }
 
         // Return standardized streaming response
@@ -185,7 +185,7 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini');
 
         if (!$result['success']) {
-            throw new Exception('Gemini API request failed: ' . $result['error']);
+            throw new Exception('Gemini API request failed: ' . esc_html($result['error']));
         }
 
         return json_decode($result['data'], true);
@@ -205,7 +205,7 @@ class AI_HTTP_Gemini_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         // Google Gemini file upload endpoint
@@ -246,7 +246,7 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini File Upload');
 
         if (!$result['success']) {
-            throw new Exception('Gemini file upload failed: ' . $result['error']);
+            throw new Exception('Gemini file upload failed: ' . esc_html($result['error']));
         }
 
         $response_body = $result['data'];
@@ -279,7 +279,7 @@ class AI_HTTP_Gemini_Provider {
         $result = apply_filters('ai_http', [], 'DELETE', $url, [], 'Gemini File Delete');
 
         if (!$result['success']) {
-            throw new Exception('Gemini file delete failed: ' . $result['error']);
+            throw new Exception('Gemini file delete failed: ' . esc_html($result['error']));
         }
 
         return $result['status_code'] === 200;
@@ -303,7 +303,7 @@ class AI_HTTP_Gemini_Provider {
      * @return array Normalized models array
      */
     private function normalize_models_response($raw_models) {
-        $models = array();
+        $models = [];
         
         // Gemini returns: { "models": [{"name": "models/gemini-pro", "displayName": "Gemini Pro", ...}, ...] }
         $data = isset($raw_models['models']) ? $raw_models['models'] : $raw_models;
@@ -376,7 +376,7 @@ class AI_HTTP_Gemini_Provider {
      */
     private function format_response($gemini_response) {
         $content = '';
-        $tool_calls = array();
+        $tool_calls = [];
 
         // Extract content from candidates
         if (isset($gemini_response['candidates']) && is_array($gemini_response['candidates'])) {
@@ -474,7 +474,7 @@ class AI_HTTP_Gemini_Provider {
      * @return array Gemini contents format
      */
     private function convert_to_gemini_contents($messages) {
-        $contents = array();
+        $contents = [];
 
         foreach ($messages as $message) {
             if (!isset($message['role']) || !isset($message['content'])) {
@@ -507,7 +507,7 @@ class AI_HTTP_Gemini_Provider {
      * @return array Gemini-formatted tools
      */
     private function normalize_gemini_tools($standard_tools) {
-        $gemini_tools = array();
+        $gemini_tools = [];
         
         foreach ($standard_tools as $tool) {
             if (isset($tool['name'], $tool['description'])) {
@@ -518,11 +518,11 @@ class AI_HTTP_Gemini_Provider {
                 
                 // Convert parameters to Gemini parameters format
                 if (isset($tool['parameters']) && is_array($tool['parameters'])) {
-                    $properties = array();
-                    $required = array();
+                    $properties = [];
+                    $required = [];
                     
                     foreach ($tool['parameters'] as $param_name => $param_config) {
-                        $properties[$param_name] = array();
+                        $properties[$param_name] = [];
                         
                         if (isset($param_config['type'])) {
                             $properties[$param_name]['type'] = $param_config['type'];
@@ -551,5 +551,6 @@ class AI_HTTP_Gemini_Provider {
         
         return $gemini_tools;
     }
+    
     
 }

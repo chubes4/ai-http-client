@@ -31,14 +31,13 @@ class AI_HTTP_OpenAI_Provider {
     private $base_url;
     private $organization;
     private $files_api_callback = null;
-    private $last_response_id = null;
 
     /**
      * Constructor
      *
      * @param array $config Provider configuration
      */
-    public function __construct($config = array()) {
+    public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
         $this->organization = isset($config['organization']) ? $config['organization'] : '';
         
@@ -94,18 +93,6 @@ class AI_HTTP_OpenAI_Provider {
         
         $url = $this->base_url . '/responses';
         
-        // Debug logging for tool requests
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            do_action('dm_log', 'debug', 'OpenAI Provider: Final request to API', [
-                'url' => $url,
-                'has_tools' => isset($provider_request['tools']),
-                'tools_count' => isset($provider_request['tools']) ? count($provider_request['tools']) : 0,
-                'tools_array' => $provider_request['tools'] ?? 'NOT_SET',
-                'has_tool_choice' => isset($provider_request['tool_choice']),
-                'tool_choice_value' => $provider_request['tool_choice'] ?? 'NOT_SET',
-                'request_keys' => array_keys($provider_request)
-            ]);
-        }
         
         // Use centralized ai_http filter
         $headers = $this->get_auth_headers();
@@ -117,22 +104,11 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI');
         
         if (!$result['success']) {
-            throw new Exception('OpenAI API request failed: ' . $result['error']);
+            throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
         }
         
         $raw_response = json_decode($result['data'], true);
         
-        // Debug: Log raw OpenAI response to see what we actually get back
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            do_action('dm_log', 'debug', 'OpenAI Provider: Raw response from API', [
-                'response_structure' => array_keys($raw_response ?? []),
-                'has_output' => isset($raw_response['output']),
-                'output_count' => isset($raw_response['output']) ? count($raw_response['output']) : 0,
-                'output_items' => $raw_response['output'] ?? 'NOT_SET',
-                'status' => $raw_response['status'] ?? 'NOT_SET',
-                'error' => $raw_response['error'] ?? 'NOT_SET'
-            ]);
-        }
         
         // Convert OpenAI format to standard format
         return $this->format_response($raw_response);
@@ -171,7 +147,7 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI Streaming', true, $callback);
         
         if (!$result['success']) {
-            throw new Exception('OpenAI streaming request failed: ' . $result['error']);
+            throw new Exception('OpenAI streaming request failed: ' . esc_html($result['error']));
         }
 
         // Return standardized streaming response
@@ -208,7 +184,7 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI');
 
         if (!$result['success']) {
-            throw new Exception('OpenAI API request failed: ' . $result['error']);
+            throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
         }
 
         return json_decode($result['data'], true);
@@ -228,7 +204,7 @@ class AI_HTTP_OpenAI_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         // OpenAI file upload endpoint
@@ -262,7 +238,7 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI File Upload');
 
         if (!$result['success']) {
-            throw new Exception('OpenAI file upload failed: ' . $result['error']);
+            throw new Exception('OpenAI file upload failed: ' . esc_html($result['error']));
         }
 
         $response_body = $result['data'];
@@ -295,7 +271,7 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI File Delete');
 
         if (!$result['success']) {
-            throw new Exception('OpenAI file delete failed: ' . $result['error']);
+            throw new Exception('OpenAI file delete failed: ' . esc_html($result['error']));
         }
 
         return $result['status_code'] === 200;
@@ -319,7 +295,7 @@ class AI_HTTP_OpenAI_Provider {
      * @return array Normalized models array
      */
     private function normalize_models_response($raw_models) {
-        $models = array();
+        $models = [];
         
         // OpenAI returns: { "data": [{"id": "gpt-4", "object": "model", ...}, ...] }
         $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
@@ -343,14 +319,6 @@ class AI_HTTP_OpenAI_Provider {
         $this->files_api_callback = $callback;
     }
     
-    /**
-     * Set last response ID for continuation
-     *
-     * @param string $response_id Response ID from OpenAI
-     */
-    public function set_last_response_id($response_id) {
-        $this->last_response_id = $response_id;
-    }
     
     /**
      * Format unified request to OpenAI Responses API format
@@ -387,6 +355,7 @@ class AI_HTTP_OpenAI_Provider {
         if (isset($request['temperature']) && !empty($request['temperature'])) {
             $request['temperature'] = max(0, min(1, floatval($request['temperature'])));
         }
+
 
         return $request;
     }
@@ -460,19 +429,20 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Normalize OpenAI messages for multi-modal support
+     * Normalize OpenAI messages for Responses API format
      *
      * @param array $messages Array of messages
      * @return array OpenAI-formatted messages
      */
     private function normalize_openai_messages($messages) {
-        $normalized = array();
+        $normalized = [];
 
         foreach ($messages as $message) {
             if (!isset($message['role']) || !isset($message['content'])) {
                 $normalized[] = $message;
                 continue;
             }
+
 
             $normalized_message = array('role' => $message['role']);
 
@@ -483,9 +453,9 @@ class AI_HTTP_OpenAI_Provider {
                 $normalized_message['content'] = $message['content'];
             }
 
-            // Preserve other fields (tool_calls, etc.)
+            // Preserve other fields (excluding tool_calls for Responses API compatibility)
             foreach ($message as $key => $value) {
-                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files'))) {
+                if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files', 'tool_calls'))) {
                     $normalized_message[$key] = $value;
                 }
             }
@@ -503,7 +473,7 @@ class AI_HTTP_OpenAI_Provider {
      * @return array OpenAI multi-modal content format
      */
     private function build_openai_multimodal_content($message) {
-        $content = array();
+        $content = [];
 
         // Handle content array format (from AIStep)
         if (is_array($message['content'])) {
@@ -572,7 +542,7 @@ class AI_HTTP_OpenAI_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         return call_user_func($this->files_api_callback, $file_path, 'user_data', 'openai');
@@ -585,7 +555,7 @@ class AI_HTTP_OpenAI_Provider {
      * @return array OpenAI-formatted tools
      */
     private function normalize_openai_tools($tools) {
-        $normalized = array();
+        $normalized = [];
 
         foreach ($tools as $tool) {
             // Handle nested format (Chat Completions) - convert to flat format (Responses API)
@@ -630,8 +600,8 @@ class AI_HTTP_OpenAI_Provider {
         }
         
         // Convert library standard format to OpenAI JSON Schema
-        $properties = array();
-        $required = array();
+        $properties = [];
+        $required = [];
         
         foreach ($library_parameters as $param_name => $param_config) {
             if (!is_array($param_config)) {
@@ -639,15 +609,23 @@ class AI_HTTP_OpenAI_Provider {
             }
             
             // Extract type and description
-            $properties[$param_name] = array();
+            $properties[$param_name] = [];
             if (isset($param_config['type'])) {
                 $properties[$param_name]['type'] = $param_config['type'];
+                
+                // OpenAI requires 'items' property for array types
+                if ($param_config['type'] === 'array' && !isset($param_config['items'])) {
+                    $properties[$param_name]['items'] = array('type' => 'string');
+                }
             }
             if (isset($param_config['description'])) {
                 $properties[$param_name]['description'] = $param_config['description'];
             }
             if (isset($param_config['enum'])) {
                 $properties[$param_name]['enum'] = $param_config['enum'];
+            }
+            if (isset($param_config['items'])) {
+                $properties[$param_name]['items'] = $param_config['items'];
             }
             
             // Handle required flag
@@ -677,15 +655,10 @@ class AI_HTTP_OpenAI_Provider {
      * @return array Standard format
      */
     private function normalize_openai_responses_api($response) {
-        // Extract response ID for continuation
-        $response_id = isset($response['id']) ? $response['id'] : null;
-        if ($response_id) {
-            $this->set_last_response_id($response_id);
-        }
         
         // Extract content and tool calls from output
         $content = '';
-        $tool_calls = array();
+        $tool_calls = [];
         
         if (isset($response['output']) && is_array($response['output'])) {
             foreach ($response['output'] as $output_item) {
@@ -724,7 +697,7 @@ class AI_HTTP_OpenAI_Provider {
                     // Parse JSON arguments
                     $function_arguments = json_decode($function_arguments_json, true);
                     if (json_last_error() !== JSON_ERROR_NONE) {
-                        $function_arguments = array();
+                        $function_arguments = [];
                     }
                     
                     if (!empty($function_name)) {
@@ -753,16 +726,6 @@ class AI_HTTP_OpenAI_Provider {
             'total_tokens' => isset($response['usage']['total_tokens']) ? $response['usage']['total_tokens'] : 0
         );
 
-        // Debug: Log final parsed response before returning to AIStep
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            do_action('dm_log', 'debug', 'OpenAI Provider: Final parsed response', [
-                'content_length' => strlen($content),
-                'content_preview' => substr($content, 0, 100) . '...',
-                'tool_calls_count' => count($tool_calls),
-                'tool_calls' => $tool_calls,
-                'finish_reason' => isset($response['status']) ? $response['status'] : 'unknown'
-            ]);
-        }
 
         return array(
             'success' => true,
@@ -771,8 +734,7 @@ class AI_HTTP_OpenAI_Provider {
                 'usage' => $usage,
                 'model' => isset($response['model']) ? $response['model'] : '',
                 'finish_reason' => isset($response['status']) ? $response['status'] : 'unknown',
-                'tool_calls' => !empty($tool_calls) ? $tool_calls : null,
-                'response_id' => $response_id
+                'tool_calls' => !empty($tool_calls) ? $tool_calls : null
             ),
             'error' => null,
             'provider' => 'openai',
@@ -808,5 +770,6 @@ class AI_HTTP_OpenAI_Provider {
             'raw_response' => $response
         );
     }
+
 
 }

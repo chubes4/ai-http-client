@@ -7,22 +7,26 @@
  *
  * Available variables:
  * @var string $unique_id - Unique form identifier
+ * @var string $plugin_context - Plugin context for configuration isolation
  * @var array $provider_config - Provider configuration data
+ * @var string $step_id - Optional step ID for step-aware field naming
  * @var array $config - Component-specific configuration
  */
 
 defined('ABSPATH') || exit;
 
-// Use standard field name - AI HTTP Client no longer stores step-specific configuration
+// Generate step-aware field name
 $field_name = 'ai_temperature';
+if (!empty($step_id)) {
+    $field_name = 'ai_step_' . sanitize_key($step_id) . '_temperature';
+}
 
-// Get current temperature value from passed config (step-scoped)
-// Temperature is OPTIONAL - no default value provided, only use if explicitly configured
-$current_temp = isset($config['value']) ? $config['value'] : '';
-$label = $config['label'] ?? 'Temperature (Optional)';
-$help_text = $config['help_text'] ?? 'Controls randomness. Leave empty to use provider defaults. Note: Not supported by all models (e.g., OpenAI reasoning models).';
+// Get current temperature value and component configuration
+$current_temp = $provider_config['temperature'] ?? 0.7;
+$label = $config['label'] ?? 'Temperature';
+$help_text = $config['help_text'] ?? 'Controls randomness. Lower values are more focused, higher values are more creative.';
 $min_value = $config['min'] ?? 0;
-$max_value = $config['max'] ?? 1;
+$max_value = $config['max'] ?? 2;
 $step_value = $config['step'] ?? 0.1;
 ?>
 

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AI HTTP Client - WordPress library for AI provider communication using pure filter architecture.
+AI HTTP Client - WordPress library for multi-type AI provider communication with plugin-scoped configuration.
 
 ## Development Commands
 
@@ -42,62 +42,73 @@ git subtree push --prefix=lib/ai-http-client origin main
 
 ## Core Architecture
 
-### Pure Filter Architecture
-The library uses WordPress filters exclusively for all operations:
+### Multi-Type AI System
+The library supports three AI types via a single unified interface:
+- **LLM** (`ai_type: 'llm'`) - Text generation (OpenAI, Anthropic, Gemini, Grok, OpenRouter)
+- **Upscaling** (`ai_type: 'upscaling'`) - Image upscaling (planned)
+- **Generative** (`ai_type: 'generative'`) - Image generation (planned)
 
-**Core Filters**:
-```php
-// Provider discovery
-$providers = apply_filters('ai_providers', []);
+**Critical Rule**: ALL instantiation requires explicit `ai_type` parameter - no defaults exist.
 
-// HTTP requests 
-$result = apply_filters('ai_http', [], 'POST', $url, $args, 'context');
-
-// AI requests
-$result = apply_filters('ai_request', null, $request_data, $provider);
-
-// Model discovery
-$models = apply_filters('ai_models', $provider, $config);
-
-// API key management
-$keys = apply_filters('ai_provider_api_keys', null);
+### "Round Plug" Design Pattern
+```
+Standard Input → Unified Normalizers → Provider APIs → Standard Output
 ```
 
-### Self-Contained Provider Architecture
+1. **Standard Input**: Unified request format across all providers
+2. **Unified Normalizers**: Convert standard format to provider-specific formats
+3. **Provider Classes**: Individual implementations with standardized interfaces
+4. **Standard Output**: Unified response format regardless of provider
+
+### Provider Architecture (Filter-Based Registration)
 **Individual Provider Classes**:
-- `AI_HTTP_OpenAI_Provider` - OpenAI Responses API
-- `AI_HTTP_Anthropic_Provider` - Anthropic Messages API  
-- `AI_HTTP_Gemini_Provider` - Google Gemini API
-- `AI_HTTP_Grok_Provider` - xAI Grok API
-- `AI_HTTP_OpenRouter_Provider` - OpenRouter API
+- `AI_HTTP_OpenAI_Provider` - Bearer token + OpenAI-Organization headers
+- `AI_HTTP_Anthropic_Provider` - x-api-key + anthropic-version headers
+- `AI_HTTP_Gemini_Provider` - Model-in-URL pattern + x-goog-api-key
+- `AI_HTTP_Grok_Provider` - Standard Bearer token
+- `AI_HTTP_OpenRouter_Provider` - Bearer token + HTTP-Referer + X-Title
 
-**Key Design Principles**:
-- Self-contained format conversion within each provider
-- No external normalizers or utilities
-- Filter-based registration for provider discovery
-- Standardized interface across all providers
+**Registration System**: Providers register via WordPress filters (`ai_providers`) enabling third-party provider registration without code modification.
 
-### Simplified Loading System
-**Single Loading Strategy**:
-- **Composer Autoloader Required** - No fallback loading
-- Direct file inclusion for providers and filters
-- Error logging if Composer not available
+### Multi-Plugin Isolation System
+**Configuration Scoping**:
+```php
+// Plugin-specific settings (isolated)
+ai_http_client_providers_myplugin_llm = [...provider configs...]
+ai_http_client_selected_provider_myplugin_llm = 'openai'
+
+// Shared API keys (efficient, no duplication)
+ai_http_client_shared_api_keys = ['openai' => 'sk-...', 'anthropic' => 'sk-...']
+```
+
+**Benefits**:
+- Multiple plugins can use different providers simultaneously
+- API keys shared across all plugins for efficiency
+- Zero configuration conflicts between plugins
+- Each plugin maintains independent AI settings
 
 ### Request Flow Architecture
 ```
-Filter Request → Provider Class → API Call → Standardized Response
-
-apply_filters('ai_request', null, $request_data, $provider)
-├── Provider::request() -> Self-contained format conversion
-├── Provider HTTP call via ai_http filter
-└── Provider::format_response() -> Standard format return
+AI_HTTP_Client
+├── init_normalizers_for_type() -> Routes to LLM/Upscaling/Generative normalizers
+├── send_request()
+│   ├── validate_request()
+│   ├── get_provider() -> Creates/caches provider instance via filter-based discovery
+│   ├── request_normalizer->normalize() -> Converts to provider format
+│   ├── provider->send_raw_request() -> Pure API call
+│   └── response_normalizer->normalize() -> Converts to standard format
+└── Plugin-scoped OptionsManager -> Retrieves configuration by plugin_context + ai_type
 ```
 
-**Simplified Flow**:
-- Direct filter-based provider access
-- Self-contained format conversion within providers
-- No external normalizers or complex routing
-- Standardized response format across all providers
+### Loading System
+**Dual Loading Strategy**:
+1. **Composer Autoloader** (preferred for modern development)
+2. **Manual Loading** (WordPress compatibility via `ai_http_client_manual_load()`)
+
+**Version Conflict Resolution**:
+- Multiple plugins can include different versions
+- Highest version wins globally via `ai_http_client_version_check()`
+- Prevents duplicate class loading
 
 ## Key Implementation Patterns
 
@@ -112,26 +123,29 @@ apply_filters('ai_request', null, $request_data, $provider)
 - Plugin-aware admin components with zero styling
 - Follows WordPress coding standards and security practices
 
-### Template System
-**WordPress-Native Templates**:
-- Template-based UI components using PHP includes
-- Located in `src/templates/` directory
-- Standard WordPress template variables and escaping
-- Core templates: core.php, max-tokens.php, system-prompt.php, temperature.php
+### Component System (Component-Owned Architecture)
+**Modular UI Components**:
+- `AI_HTTP_ProviderManager_Component` - Complete admin interface
+- Core components: provider_selector, api_key_input, model_selector
+- Extended components: temperature_slider, system_prompt_field
 
-**Template Rendering**:
+**Component Registry Pattern**:
 ```php
-// Template variables extracted from configuration
-extract($template_vars);
-include AI_HTTP_CLIENT_PATH . '/src/templates/core.php';
+AI_HTTP_Component_Registry::get_component('provider_selector')->render($args)
 ```
 
-### Error Reporting
-- **No Built-in Logging**: Library does not log by default - clean and lightweight
-- **Hook-Based Errors**: Uses `ai_api_error` action hook for error reporting
-- **Plugin Integration**: Consuming plugins choose how to handle errors
-- **Raw Error Data**: Provides complete error context including provider responses
-- **Production Ready**: No debug output unless plugins explicitly add logging
+**Recent Implementation**: Component-owned architecture with auto-save, auto-fetch models, and conditional save button features.
+
+### Debug Logging
+- **Conditional Logging**: Debug logs only appear when `WP_DEBUG` is `true` in WordPress configuration
+- **Production Safety**: Prevents unnecessary log generation in production environments
+- **Comprehensive Coverage**: Provides detailed information for:
+  - API request/response cycles in providers (OpenAI, Anthropic, etc.)
+  - Tool execution and validation in ToolExecutor
+  - Streaming SSE events and connection handling in WordPressSSEHandler
+  - System events during development and troubleshooting
+- **WordPress Native**: Uses WordPress native `error_log()` function for consistent logging
+- **Performance Optimized**: Debug checks use `defined('WP_DEBUG') && WP_DEBUG` pattern to minimize overhead
 
 ### Security Considerations
 - API keys stored in WordPress options with proper sanitization
@@ -139,178 +153,130 @@ include AI_HTTP_CLIENT_PATH . '/src/templates/core.php';
 - Input sanitization via WordPress functions
 - Plugin context validation prevents unauthorized access
 
-## Usage Patterns
+## Critical Configuration Requirements
 
-### Filter-Based Access
+### Client Instantiation
 ```php
-// Core filters for library access
-$providers = apply_filters('ai_providers', []);
-$result = apply_filters('ai_request', null, $request_data, $provider);
-$models = apply_filters('ai_models', $provider, $config);
-$api_keys = apply_filters('ai_provider_api_keys', null);
+// REQUIRED parameters - will fail without both
+$client = new AI_HTTP_Client([
+    'plugin_context' => 'my-plugin-slug',  // Plugin isolation
+    'ai_type' => 'llm'                     // AI type routing
+]);
 ```
 
-### Direct Provider Access
+### OptionsManager Usage
 ```php
-// Get provider instance directly
-$providers = apply_filters('ai_providers', []);
-if (isset($providers['openai'])) {
-    $provider_class = $providers['openai']['class'];
-    $provider = new $provider_class($config);
-    $result = $provider->request($standard_request);
-}
+// REQUIRED parameters - both plugin_context and ai_type required
+$options = new AI_HTTP_Options_Manager('my-plugin-slug', 'llm');
 ```
 
-## Optional Parameters & Model Compatibility
-
-### Temperature Parameter
-- **Support**: Optional across all providers
-- **Default**: Not sent to API unless explicitly configured
-- **Model Restrictions**: 
-  - OpenAI reasoning models (o1*, o3*, o4*): Not supported - will cause API errors if sent
-  - All other models: Supported (typically 0.0 - 2.0 range)
-- **Recommendation**: Only configure if you need specific creativity control
-
-### Max Tokens Parameter  
-- **Support**: Optional across all providers
-- **Default**: Not sent to API unless explicitly configured
-- **Model Restrictions**:
-  - OpenAI reasoning models (o1*, o3*, o4*): Not supported - will cause API errors if sent
-  - Some models: Have different parameter names (auto-converted by providers)
-- **Provider Handling**: Automatically converted to provider-specific format when provided
-
-### Safe Usage Pattern
+### Component Rendering
 ```php
-// RECOMMENDED: Only include optional parameters when explicitly needed
-$request = [
-    'messages' => [['role' => 'user', 'content' => 'Hello']],
-    'model' => 'gpt-4'  // Required parameters only
-    // temperature: not included - uses provider default
-    // max_tokens: not included - uses provider default
-];
-
-$response = apply_filters('ai_request', $request, 'openai');
-
-// ADVANCED: Include optional parameters only when necessary
-$request_with_options = [
-    'messages' => [['role' => 'user', 'content' => 'Hello']],
-    'model' => 'gpt-4',
-    'temperature' => 0.7,  // Only include if you need specific temperature
-    'max_tokens' => 1000   // Only include if you need token limit
-];
-
-// Library will only send parameters that are explicitly provided and not empty
-$response = apply_filters('ai_request', $request_with_options, 'openai');
+// REQUIRED parameters for admin UI
+echo AI_HTTP_ProviderManager_Component::render([
+    'plugin_context' => 'my-plugin-slug',
+    'ai_type' => 'llm'
+]);
 ```
-
-### Model-Specific Behavior
-- **Traditional Models** (gpt-4, claude, gemini): Accept temperature and max_tokens
-- **Reasoning Models** (o1*, o3*, o4*): Reject temperature and max_tokens with API errors
-- **Provider Handling**: Library only sends parameters if explicitly provided and non-empty
 
 ## Distribution & Integration
 
 ### WordPress Plugin Integration
-**Simple Include Pattern**:
+**Pure WordPress Filter Pattern** (Recommended):
 ```php
 // In plugin main file
 require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php';
 
-// Usage via filters
-$result = apply_filters('ai_request', null, [
-    'messages' => [['role' => 'user', 'content' => 'Hello']],
-    'model' => 'gpt-4',
-    'max_tokens' => 100
-], 'openai');
+// Usage anywhere in plugin - auto-discovers plugin context
+$client = apply_filters('ai_client', null);           // Get AI client
+$config = apply_filters('ai_config', null);           // Get global config
+$step_config = apply_filters('ai_config', $step_id);  // Get step-specific config
 ```
 
-### Requirements
-- Composer autoloader must be available
-- WordPress environment for filter system
-- Provider-specific API keys via filter configuration
-
-### Production Deployment
-**WordPress Configuration Requirements**:
-- Ensure proper WordPress security settings and API key protection
-- Verify all provider API keys are properly configured before deployment
-
-## Error Handling & Logging
-
-### ai_api_error Hook
-The library provides a clean error handling hook instead of debug logging:
-
-**Hook Structure**:
+**Legacy Pattern** (Manual Parameters):
 ```php
-do_action('ai_api_error', [
-    'message' => 'Human-readable error message',
-    'provider' => 'provider_name', // e.g., 'OpenAI', 'Anthropic'
-    'error_type' => 'error_category', // 'api_error', 'connection_error', 'curl_error'
-    'http_code' => 400, // For HTTP errors
-    'response_body' => 'raw_response', // For API errors
-    'details' => 'additional_context' // For connection errors
+// Old approach - no longer needed
+$client = new AI_HTTP_Client([
+    'plugin_context' => 'my-plugin-slug',
+    'ai_type' => 'llm'
 ]);
 ```
 
-**Error Types**:
-- `api_error`: HTTP 4xx/5xx responses from providers (includes raw response body)
-- `connection_error`: WordPress HTTP errors (timeouts, network issues)  
-- `curl_error`: cURL failures in streaming requests
-- `http_error`: HTTP status errors in streaming
+### Version Management
+- Library manages its own versioning and conflicts
+- Multiple plugins can safely include different versions
+- No external dependencies beyond WordPress
 
-**Usage Examples**:
-```php
-// Plugin integration - log to custom system
-add_action('ai_api_error', function($error_data) {
-    error_log("AI Error: " . $error_data['message']);
-    // Or integrate with your plugin's logging system
-    do_action('my_plugin_log', 'error', $error_data['message'], $error_data);
-});
+### Production Deployment
+**WordPress Configuration Requirements**:
+- **Set `WP_DEBUG` to `false`** in production environments to disable debug logging
+- Ensure proper WordPress security settings and API key protection
+- Verify all provider API keys are properly configured before deployment
 
-// Debug mode - detailed logging
-add_action('ai_api_error', function($error_data) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("AI API Error Details: " . wp_json_encode($error_data));
-    }
-});
-```
+**Recent Features**:
+- Auto-save settings functionality
+- Auto-fetch models from providers
+- Conditional save button display
+- Component-owned architecture for UI consistency
 
-**Benefits**:
-- ✅ No built-in logging - clean library by default
-- ✅ Plugin developers choose how to handle errors
-- ✅ Raw provider responses available for debugging
-- ✅ Structured error data for programmatic handling
-- ✅ Hook fires only on actual errors, not successful requests
+## Current Version: 1.2.0
 
-## Current Version: 1.1.1
+### Usage Patterns
+**Recommended (Auto-Discovery)**:
+- `apply_filters('ai_client', null)` - Returns configured AI client
+- `apply_filters('ai_config', null)` - Returns global configuration  
+- `apply_filters('ai_config', $step_id)` - Returns step-specific configuration
+
+**Legacy (Manual Parameters)**:
+- `AI_HTTP_Client(['plugin_context' => '...', 'ai_type' => '...'])` - Manual instantiation
+- `AI_HTTP_Options_Manager($plugin_context, $ai_type)` - Manual options access
+
+**Auto-Discovery**: Plugin context automatically detected from call stack, AI type defaults to 'llm'.
+
+## Architecture Scalability
+
+### Multi-Type Readiness
+Current architecture supports future AI types:
+- `src/Normalizers/LLM/` - Text AI normalizers (implemented)
+- `src/Normalizers/Upscaling/` - Image upscaling normalizers (planned)
+- `src/Normalizers/Generative/` - Image generation normalizers (planned)
+- `src/Providers/LLM/` - Text AI providers (implemented)
+- `src/Providers/Upscaling/` - Image upscaling providers (planned)
+- `src/Providers/Generative/` - Image generation providers (planned)
 
 ### Adding New Providers
-1. Create provider class implementing standardized interface:
+1. Create provider class implementing standardized interface methods:
    - `is_configured()` - Check if provider has required configuration
-   - `request($standard_request)` - Send non-streaming request with internal format conversion
-   - `streaming_request($standard_request, $callback)` - Send streaming request
+   - `send_raw_request($provider_request)` - Send non-streaming request
+   - `send_raw_streaming_request($provider_request, $callback)` - Send streaming request
    - `get_raw_models()` - Retrieve available models
    - `upload_file($file_path, $purpose)` - Files API integration
-2. Register provider via `ai_providers` WordPress filter
-3. Self-contained format conversion within provider class
-4. Add provider file to loading in `ai-http-client.php`
+2. Register provider via `ai_providers` WordPress filter in `src/Filters.php`
+3. Add normalization logic to `UnifiedRequestNormalizer` and `UnifiedResponseNormalizer`
+4. Update manual loading in `ai-http-client.php`
 
-**Provider Implementation**: Self-contained classes with internal format conversion (~300-400 lines typical)
+**Provider Implementation**: Individual classes with standardized interface (~220 lines typical)
 
 ## Streaming & Advanced Features
 
 ### Streaming Support
-- Uses cURL for real-time streaming responses via `ai_http` filter
-- WordPress `wp_remote_post()` fallback for non-streaming requests
-- Provider-specific streaming implementation within each provider class
+- Uses cURL for real-time streaming responses
+- WordPress-native fallback for non-streaming requests
+- Provider-agnostic streaming via unified normalizers
 
 ### Tool/Function Calling
 - Unified tool format across all providers
-- Provider-specific tool normalization within each provider
-- Self-contained tool format conversion (OpenAI vs Anthropic formats)
+- Provider-specific tool normalization (OpenAI vs Anthropic formats)
+- Continuation support for multi-turn tool interactions
+
+### Step-Aware Configuration
+- Plugin-specific step configurations for different AI use cases
+- Automatic prompt/parameter injection based on step context
+- Dynamic tool enabling per step
 
 ### File Upload System
-- Files API integration for providers that support it
-- Direct file uploads without base64 encoding
-- Provider-specific file upload implementation
+- Files API integration across all providers
+- NO base64 encoding - direct file uploads
+- Multi-provider file upload support
 
-This simplified architecture enables WordPress plugin developers to integrate AI providers with minimal configuration while maintaining clean separation between providers and standardized responses.
+This architecture enables WordPress plugin developers to integrate multiple AI providers with minimal code while maintaining complete isolation between plugins and AI types.

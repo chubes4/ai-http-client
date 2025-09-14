@@ -35,7 +35,7 @@ class AI_HTTP_Grok_Provider {
      *
      * @param array $config Provider configuration
      */
-    public function __construct($config = array()) {
+    public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
         
         if (isset($config['base_url']) && !empty($config['base_url'])) {
@@ -102,7 +102,7 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok');
         
         if (!$result['success']) {
-            throw new Exception('Grok API request failed: ' . $result['error']);
+            throw new Exception('Grok API request failed: ' . esc_html($result['error']));
         }
         
         $raw_response = json_decode($result['data'], true);
@@ -140,7 +140,7 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok Streaming', true, $callback);
         
         if (!$result['success']) {
-            throw new Exception('Grok streaming request failed: ' . $result['error']);
+            throw new Exception('Grok streaming request failed: ' . esc_html($result['error']));
         }
 
         // Return standardized streaming response
@@ -166,7 +166,7 @@ class AI_HTTP_Grok_Provider {
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
-            return array();
+            return [];
         }
 
         $url = $this->base_url . '/models';
@@ -177,7 +177,7 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok');
 
         if (!$result['success']) {
-            throw new Exception('Grok API request failed: ' . $result['error']);
+            throw new Exception('Grok API request failed: ' . esc_html($result['error']));
         }
 
         return json_decode($result['data'], true);
@@ -197,7 +197,7 @@ class AI_HTTP_Grok_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         // Grok uses OpenAI-compatible file upload endpoint
@@ -231,7 +231,7 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok File Upload');
 
         if (!$result['success']) {
-            throw new Exception('Grok file upload failed: ' . $result['error']);
+            throw new Exception('Grok file upload failed: ' . esc_html($result['error']));
         }
 
         $response_body = $result['data'];
@@ -264,7 +264,7 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok File Delete');
 
         if (!$result['success']) {
-            throw new Exception('Grok file delete failed: ' . $result['error']);
+            throw new Exception('Grok file delete failed: ' . esc_html($result['error']));
         }
 
         return $result['status_code'] === 200;
@@ -288,7 +288,7 @@ class AI_HTTP_Grok_Provider {
      * @return array Normalized models array
      */
     private function normalize_models_response($raw_models) {
-        $models = array();
+        $models = [];
         
         // Grok uses OpenAI-compatible format: { "data": [{"id": "grok-beta", "object": "model", ...}, ...] }
         $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
@@ -363,10 +363,10 @@ class AI_HTTP_Grok_Provider {
 
         // Extract content and tool calls
         $content = isset($message['content']) ? $message['content'] : '';
-        $raw_tool_calls = isset($message['tool_calls']) ? $message['tool_calls'] : array();
+        $raw_tool_calls = isset($message['tool_calls']) ? $message['tool_calls'] : [];
         
         // Convert OpenAI-style tool calls to standard format
-        $tool_calls = array();
+        $tool_calls = [];
         if (!empty($raw_tool_calls)) {
             foreach ($raw_tool_calls as $tool_call) {
                 if (isset($tool_call['function']['name'])) {
@@ -375,7 +375,7 @@ class AI_HTTP_Grok_Provider {
                     
                     $tool_calls[] = array(
                         'name' => $tool_call['function']['name'],
-                        'parameters' => $decoded_args ? $decoded_args : array()
+                        'parameters' => $decoded_args ? $decoded_args : []
                     );
                 }
             }
@@ -457,7 +457,7 @@ class AI_HTTP_Grok_Provider {
      * @return array Grok-formatted tools (OpenAI-compatible)
      */
     private function normalize_grok_tools($standard_tools) {
-        $grok_tools = array();
+        $grok_tools = [];
         
         foreach ($standard_tools as $tool) {
             if (isset($tool['name'], $tool['description'])) {
@@ -471,11 +471,11 @@ class AI_HTTP_Grok_Provider {
                 
                 // Convert parameters to OpenAI JSON Schema format
                 if (isset($tool['parameters']) && is_array($tool['parameters'])) {
-                    $properties = array();
-                    $required = array();
+                    $properties = [];
+                    $required = [];
                     
                     foreach ($tool['parameters'] as $param_name => $param_config) {
-                        $properties[$param_name] = array();
+                        $properties[$param_name] = [];
                         
                         if (isset($param_config['type'])) {
                             $properties[$param_name]['type'] = $param_config['type'];
@@ -504,5 +504,6 @@ class AI_HTTP_Grok_Provider {
         
         return $grok_tools;
     }
+    
     
 }

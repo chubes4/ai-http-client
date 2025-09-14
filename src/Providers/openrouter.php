@@ -38,7 +38,7 @@ class AI_HTTP_OpenRouter_Provider {
      *
      * @param array $config Provider configuration
      */
-    public function __construct($config = array()) {
+    public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
         $this->http_referer = isset($config['http_referer']) ? $config['http_referer'] : '';
         $this->app_title = isset($config['app_title']) ? $config['app_title'] : 'AI HTTP Client';
@@ -109,7 +109,7 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter');
         
         if (!$result['success']) {
-            throw new Exception('OpenRouter API request failed: ' . $result['error']);
+            throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
         }
         
         $raw_response = json_decode($result['data'], true);
@@ -147,7 +147,7 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter Streaming', true, $callback);
         
         if (!$result['success']) {
-            throw new Exception('OpenRouter streaming request failed: ' . $result['error']);
+            throw new Exception('OpenRouter streaming request failed: ' . esc_html($result['error']));
         }
 
         // Return standardized streaming response
@@ -173,7 +173,7 @@ class AI_HTTP_OpenRouter_Provider {
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
-            return array();
+            return [];
         }
 
         $url = $this->base_url . '/models';
@@ -184,7 +184,7 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter');
 
         if (!$result['success']) {
-            throw new Exception('OpenRouter API request failed: ' . $result['error']);
+            throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
         }
 
         return json_decode($result['data'], true);
@@ -204,7 +204,7 @@ class AI_HTTP_OpenRouter_Provider {
         }
 
         if (!file_exists($file_path)) {
-            throw new Exception("File not found: {$file_path}");
+            throw new Exception('File not found: ' . esc_html($file_path));
         }
 
         // OpenRouter uses OpenAI-compatible file upload endpoint
@@ -238,7 +238,7 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter File Upload');
 
         if (!$result['success']) {
-            throw new Exception('OpenRouter file upload failed: ' . $result['error']);
+            throw new Exception('OpenRouter file upload failed: ' . esc_html($result['error']));
         }
 
         $response_body = $result['data'];
@@ -271,7 +271,7 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter File Delete');
 
         if (!$result['success']) {
-            throw new Exception('OpenRouter file delete failed: ' . $result['error']);
+            throw new Exception('OpenRouter file delete failed: ' . esc_html($result['error']));
         }
 
         return $result['status_code'] === 200;
@@ -295,7 +295,7 @@ class AI_HTTP_OpenRouter_Provider {
      * @return array Normalized models array
      */
     private function normalize_models_response($raw_models) {
-        $models = array();
+        $models = [];
         
         // OpenRouter returns: { "data": [{"id": "model-name", "name": "Display Name", ...}, ...] }
         $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
@@ -459,5 +459,6 @@ class AI_HTTP_OpenRouter_Provider {
 
         return $request;
     }
+    
     
 }
