@@ -65,14 +65,14 @@ $step_context = $all_config['step_context'] ?? [];
             <label for="<?php echo esc_attr($unique_id); ?>_api_key"><?php esc_html_e('API Key', 'ai-http-client'); ?></label>
         </th>
         <td>
-            <input type="password" 
-                   id="<?php echo esc_attr($unique_id); ?>_api_key" 
-                   name="<?php echo esc_attr($api_key_field); ?>" 
-                   value="<?php echo esc_attr($current_api_key); ?>" 
-                   data-component-id="<?php echo esc_attr($unique_id); ?>" 
-                   data-component-type="api_key_input" 
-                   data-provider="<?php echo esc_attr($selected_provider); ?>" 
-                   class="regular-text" 
+            <input type="text"
+                   id="<?php echo esc_attr($unique_id); ?>_api_key"
+                   name="<?php echo esc_attr($api_key_field); ?>"
+                   value="<?php echo esc_attr($current_api_key); ?>"
+                   data-component-id="<?php echo esc_attr($unique_id); ?>"
+                   data-component-type="api_key_input"
+                   data-provider="<?php echo esc_attr($selected_provider); ?>"
+                   class="regular-text"
                    placeholder="<?php esc_attr_e('Enter API key', 'ai-http-client'); ?>" />
             <br><small class="description"><?php esc_html_e('Enter your API key for the selected provider.', 'ai-http-client'); ?></small>
         </td>
