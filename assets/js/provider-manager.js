@@ -10,6 +10,9 @@
     // Global object to store component instances and prevent conflicts
     window.AIHttpProviderManager = window.AIHttpProviderManager || {
         instances: {},
+
+        // Session-based memory cache for model responses
+        modelCache: new Map(),
         
         // Initialize a component instance
         init: function(componentId, config) {
@@ -122,35 +125,44 @@
             }, 500); // Wait 500ms after user stops typing
         },
         
-        // Fetch models for provider (unified method)
+        // Fetch models for provider (unified method with memory caching)
         fetchModels: function(componentId, provider = null) {
             const elements = this.instances[componentId].elements;
             const config = this.instances[componentId].config;
-            
+
             if (!elements.modelSelect) return;
-            
+
             // Auto-detect provider if not provided
             if (!provider) {
                 provider = elements.providerSelect ? elements.providerSelect.value : '';
             }
-            
+
             const apiKey = elements.apiKeyInput ? elements.apiKeyInput.value.trim() : '';
-            
+
             // Clear models if no provider or API key
             if (!provider || !apiKey) {
                 elements.modelSelect.innerHTML = '<option value="">Select provider and enter API key first</option>';
                 return;
             }
-            
+
+            // Check memory cache first (match PHP cache key pattern)
+            const cacheKey = `ai_models_${provider}_${this.hashApiKey(apiKey)}`;
+            const cachedModels = this.modelCache.get(cacheKey);
+
+            if (cachedModels) {
+                this.populateModelSelect(elements.modelSelect, cachedModels);
+                return;
+            }
+
             // Fetch models via AJAX
             elements.modelSelect.innerHTML = '<option value="">Loading models...</option>';
-            
+
             const requestBody = new URLSearchParams({
                 action: 'ai_http_get_models',
                 provider: provider,
                 nonce: config.nonce
             });
-            
+
             fetch(config.ajax_url, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -159,20 +171,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    elements.modelSelect.innerHTML = '';
-                    const selectedModel = elements.modelSelect.getAttribute('data-selected-model') || '';
-                    
-                    // Debug logging to understand model data format
-                    
-                    Object.entries(data.data).forEach(([key, value]) => {
-                        const option = document.createElement('option');
-                        option.value = key;
-                        // Ensure value is always a string for display
-                        option.textContent = typeof value === 'object' ? 
-                            (value.name || value.id || key) : 
-                            value;
-                        option.selected = (key === selectedModel);
-                        elements.modelSelect.appendChild(option);
+                    // Cache the successful response
+                    this.modelCache.set(cacheKey, {
+                        success: true,
+                        data: data.data
+                    });
+
+                    this.populateModelSelect(elements.modelSelect, {
+                        success: true,
+                        data: data.data
                     });
                 } else {
                     const errorMessage = data.data || 'Error loading models';
@@ -183,6 +190,40 @@
                 // Model fetch failed
                 elements.modelSelect.innerHTML = '<option value="">Connection error</option>';
             });
+        },
+
+        // Helper method to populate model select options
+        populateModelSelect: function(selectElement, response) {
+            if (response.success) {
+                selectElement.innerHTML = '';
+                const selectedModel = selectElement.getAttribute('data-selected-model') || '';
+
+                Object.entries(response.data).forEach(([key, value]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    // Ensure value is always a string for display
+                    option.textContent = typeof value === 'object' ?
+                        (value.name || value.id || key) :
+                        value;
+                    option.selected = (key === selectedModel);
+                    selectElement.appendChild(option);
+                });
+            }
+        },
+
+        // Hash API key for cache key generation (matches PHP pattern)
+        hashApiKey: function(apiKey) {
+            if (!apiKey) return 'nokey';
+
+            // Simple hash for session-based caching (matches PHP substr(md5()) pattern)
+            let hash = 0;
+            for (let i = 0; i < apiKey.length; i++) {
+                const char = apiKey.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            // Return 8-character hex string to match PHP substr(md5(), 0, 8)
+            return Math.abs(hash).toString(16).padStart(8, '0').substr(0, 8);
         },
         
         // Save API key to WordPress options (site-level)

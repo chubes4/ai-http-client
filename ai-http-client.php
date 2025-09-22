@@ -36,11 +36,13 @@ function ai_http_client_init() {
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/anthropic.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/grok.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openrouter.php';
-    
+
+    require_once AI_HTTP_CLIENT_PATH . '/src/Actions/Cache.php';
+    require_once AI_HTTP_CLIENT_PATH . '/src/Actions/Error.php';
+    require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Requests.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Models.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Tools.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Admin.php';
-    require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Requests.php';
     
     // Hook into WordPress for any setup needed
     if (function_exists('add_action')) {
@@ -49,6 +51,12 @@ function ai_http_client_init() {
 }
 
 function ai_http_client_wordpress_init() {
+    // Register cache management system
+    AIHttpCache::register();
+
+    // Register error handling system
+    AIHttpError::register();
+
     // WordPress-specific initialization
     if (function_exists('do_action')) {
         do_action('ai_http_client_loaded');
