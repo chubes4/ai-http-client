@@ -14,18 +14,18 @@ defined('ABSPATH') || exit;
 class AIHttpCache {
 
     /**
-     * Cache key constants for WordPress transient management.
+     * Cache key constants
      */
     const MODEL_CACHE_PREFIX = 'ai_models_';
     const CACHE_TTL = 24 * HOUR_IN_SECONDS; // 24 hours
 
     /**
-     * Supported AI providers for cache management.
+     * Supported AI providers
      */
     const SUPPORTED_PROVIDERS = ['openai', 'anthropic', 'gemini', 'grok', 'openrouter'];
 
     /**
-     * Register cache clearing action hooks.
+     * Register cache clearing action hooks
      */
     public static function register() {
         $instance = new self();
@@ -35,7 +35,7 @@ class AIHttpCache {
     }
 
     /**
-     * Clear model cache for specific provider.
+     * Clear model cache for specific provider
      */
     public function handle_clear_model_cache($provider) {
         if (empty($provider)) {
@@ -44,24 +44,22 @@ class AIHttpCache {
 
         $this->clear_model_cache($provider);
 
-        // Signal that provider cache was cleared
         do_action('ai_model_cache_cleared', $provider);
     }
 
     /**
-     * Clear all model caches for all providers.
+     * Clear all model caches
      */
     public function handle_clear_all_cache() {
         foreach (self::SUPPORTED_PROVIDERS as $provider) {
             $this->clear_model_cache($provider);
         }
 
-        // Signal that all caches were cleared
         do_action('ai_all_model_cache_cleared');
     }
 
     /**
-     * Clear model cache for specific provider (all API keys).
+     * Clear model cache for specific provider (all API keys)
      */
     private function clear_model_cache($provider) {
         global $wpdb;
@@ -69,8 +67,6 @@ class AIHttpCache {
         // Clear all cache keys matching pattern: ai_models_{provider}_*
         $cache_pattern = self::MODEL_CACHE_PREFIX . $provider . '_';
         $sql_pattern = str_replace('*', '%', $cache_pattern . '*');
-
-        // Delete transient keys
         $transient_keys = $wpdb->get_col($wpdb->prepare(
             "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
             '_transient_' . $sql_pattern
@@ -81,7 +77,6 @@ class AIHttpCache {
             delete_transient($transient_name);
         }
 
-        // Delete timeout keys
         $timeout_keys = $wpdb->get_col($wpdb->prepare(
             "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
             '_transient_timeout_' . $sql_pattern

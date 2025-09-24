@@ -13,8 +13,7 @@
 defined('ABSPATH') || exit;
 
 /**
- * Self-register Anthropic provider with complete configuration
- * Self-contained provider architecture - no external normalizers needed
+ * Self-register Anthropic provider
  */
 add_filter('ai_providers', function($providers) {
     $providers['anthropic'] = [
@@ -29,11 +28,10 @@ class AI_HTTP_Anthropic_Provider {
 
     private $api_key;
     private $base_url;
+    private $files_api_callback = null;
 
     /**
-     * Constructor
-     *
-     * @param array $config Provider configuration
+     * @param array $config
      */
     public function __construct($config = []) {
         $this->api_key = $config['api_key'] ?? '';
@@ -62,7 +60,8 @@ class AI_HTTP_Anthropic_Provider {
     private function get_auth_headers() {
         return array(
             'x-api-key' => $this->api_key,
-            'anthropic-version' => '2023-06-01'
+            'anthropic-version' => '2023-06-01',
+            'anthropic-beta' => 'files-api-2025-04-14'
         );
     }
 
@@ -151,10 +150,9 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Get available models from Anthropic API
-     * Note: Anthropic doesn't have a models endpoint, so return empty array
+     * Get available models (Anthropic doesn't have models endpoint)
      *
-     * @return array Empty array (Anthropic doesn't have a models endpoint)
+     * @return array
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
@@ -214,14 +212,35 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic File Upload');
 
         if (!$result['success']) {
-            throw new Exception('Anthropic file upload failed: ' . esc_html($result['error']));
+            $error_message = 'Anthropic file upload failed: ' . esc_html($result['error'] ?? 'Unknown error');
+
+            // Check for specific error types
+            if (isset($result['status_code'])) {
+                switch ($result['status_code']) {
+                    case 400:
+                        if (strpos($result['error'] ?? '', 'Invalid file type') !== false) {
+                            $error_message = 'Unsupported file type for Anthropic Files API';
+                        } elseif (strpos($result['error'] ?? '', 'File too large') !== false) {
+                            $error_message = 'File exceeds Anthropic\'s 500MB limit';
+                        }
+                        break;
+                    case 403:
+                        $error_message = 'Anthropic storage limit exceeded (100GB per organization)';
+                        break;
+                    case 413:
+                        $error_message = 'File too large - maximum size is 500MB';
+                        break;
+                }
+            }
+
+            throw new Exception($error_message);
         }
 
         $response_body = $result['data'];
 
         $data = json_decode($response_body, true);
         if (!isset($data['id'])) {
-            throw new Exception('Anthropic file upload response missing file ID');
+            throw new Exception('Anthropic file upload response missing file ID - invalid API response');
         }
 
         return $data['id'];
@@ -286,7 +305,16 @@ class AI_HTTP_Anthropic_Provider {
         
         return $models;
     }
-    
+
+    /**
+     * Set files API callback
+     *
+     * @param callable $callback Callback function for file uploads
+     */
+    public function set_files_api_callback($callback) {
+        $this->files_api_callback = $callback;
+    }
+
     /**
      * Format unified request to Anthropic API format
      *
@@ -325,6 +353,8 @@ class AI_HTTP_Anthropic_Provider {
 
         // Handle system message extraction for Anthropic
         if (isset($request['messages'])) {
+            // Process multimodal content before system message extraction
+            $request['messages'] = $this->process_anthropic_multimodal_messages($request['messages']);
             $request = $this->extract_anthropic_system_message($request);
         }
 
@@ -509,6 +539,173 @@ class AI_HTTP_Anthropic_Provider {
         }
         
         return $anthropic_tools;
+    }
+
+    /**
+     * Process messages for multimodal content (files/images)
+     *
+     * @param array $messages Array of messages
+     * @return array Processed messages with file uploads
+     */
+    private function process_anthropic_multimodal_messages($messages) {
+        $processed_messages = [];
+
+        foreach ($messages as $message) {
+            if (!isset($message['role']) || !isset($message['content'])) {
+                $processed_messages[] = $message;
+                continue;
+            }
+
+            $processed_message = array('role' => $message['role']);
+
+            // Handle multimodal content (files/images) or content arrays
+            if (is_array($message['content'])) {
+                $processed_message['content'] = $this->build_anthropic_multimodal_content($message['content']);
+            } else {
+                $processed_message['content'] = $message['content'];
+            }
+
+            // Preserve other message fields
+            foreach ($message as $key => $value) {
+                if (!in_array($key, array('role', 'content'))) {
+                    $processed_message[$key] = $value;
+                }
+            }
+
+            $processed_messages[] = $processed_message;
+        }
+
+        return $processed_messages;
+    }
+
+    /**
+     * Build Anthropic multimodal content with Files API integration
+     *
+     * @param array $content_items Array of content items
+     * @return array Anthropic multimodal content format
+     */
+    private function build_anthropic_multimodal_content($content_items) {
+        $content = [];
+
+        foreach ($content_items as $content_item) {
+            if (isset($content_item['type'])) {
+                switch ($content_item['type']) {
+                    case 'text':
+                        $content[] = array(
+                            'type' => 'text',
+                            'text' => $content_item['text'] ?? ''
+                        );
+                        break;
+
+                    case 'file':
+                        try {
+                            $file_path = $content_item['file_path'] ?? '';
+                            $mime_type = $content_item['mime_type'] ?? '';
+
+                            if (empty($file_path) || !file_exists($file_path)) {
+                                continue 2; // Skip this content item
+                            }
+
+                            if (empty($mime_type)) {
+                                $mime_type = mime_content_type($file_path);
+                            }
+
+                            // Validate file type against Anthropic's supported formats
+                            if (!$this->is_supported_file_type($mime_type)) {
+                                if (defined('WP_DEBUG') && WP_DEBUG) {
+                                    error_log("Anthropic: Unsupported file type: {$mime_type} for file: {$file_path}");
+                                }
+                                continue 2; // Skip this content item
+                            }
+
+                            // Upload file via Files API
+                            $file_id = $this->upload_file_via_files_api($file_path);
+
+                            // Determine content block type based on MIME type
+                            if (strpos($mime_type, 'image/') === 0) {
+                                $content[] = array(
+                                    'type' => 'image',
+                                    'source' => array(
+                                        'type' => 'file',
+                                        'file_id' => $file_id
+                                    )
+                                );
+                            } elseif ($mime_type === 'application/pdf' || strpos($mime_type, 'text/') === 0) {
+                                $content[] = array(
+                                    'type' => 'document',
+                                    'source' => array(
+                                        'type' => 'file',
+                                        'file_id' => $file_id
+                                    )
+                                );
+                            } else {
+                                // For other file types, try document block
+                                $content[] = array(
+                                    'type' => 'document',
+                                    'source' => array(
+                                        'type' => 'file',
+                                        'file_id' => $file_id
+                                    )
+                                );
+                            }
+                        } catch (Exception $e) {
+                            // Log error but continue processing other content
+                            if (defined('WP_DEBUG') && WP_DEBUG) {
+                                error_log('Anthropic file upload failed: ' . $e->getMessage());
+                            }
+                        }
+                        break;
+
+                    default:
+                        // Pass through other content types
+                        $content[] = $content_item;
+                        break;
+                }
+            }
+        }
+
+        return $content;
+    }
+
+    /**
+     * Upload file via Files API callback
+     *
+     * @param string $file_path Path to file to upload
+     * @return string File ID from Files API
+     * @throws Exception If upload fails
+     */
+    private function upload_file_via_files_api($file_path) {
+        if (!$this->files_api_callback) {
+            throw new Exception('Files API callback not set - cannot upload files');
+        }
+
+        if (!file_exists($file_path)) {
+            throw new Exception('File not found: ' . esc_html($file_path));
+        }
+
+        return call_user_func($this->files_api_callback, $file_path, 'user_data', 'anthropic');
+    }
+
+    /**
+     * Check if file type is supported by Anthropic Files API
+     *
+     * @param string $mime_type MIME type of the file
+     * @return bool True if supported
+     */
+    private function is_supported_file_type($mime_type) {
+        $supported_types = [
+            // Images for vision
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            // Documents
+            'application/pdf',
+            'text/plain',
+            // Add other supported types as needed
+        ];
+
+        return in_array($mime_type, $supported_types, true);
     }
 
 

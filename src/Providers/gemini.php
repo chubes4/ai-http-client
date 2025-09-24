@@ -29,6 +29,7 @@ class AI_HTTP_Gemini_Provider {
 
     private $api_key;
     private $base_url;
+    private $files_api_callback = null;
 
     /**
      * Constructor
@@ -319,7 +320,16 @@ class AI_HTTP_Gemini_Provider {
         
         return $models;
     }
-    
+
+    /**
+     * Set files API callback
+     *
+     * @param callable $callback Callback function for file uploads
+     */
+    public function set_files_api_callback($callback) {
+        $this->files_api_callback = $callback;
+    }
+
     /**
      * Format unified request to Gemini API format
      *
@@ -334,7 +344,9 @@ class AI_HTTP_Gemini_Provider {
         
         // Convert messages to Gemini contents format
         if (isset($request['messages'])) {
-            $request['contents'] = $this->convert_to_gemini_contents($request['messages']);
+            // Process multimodal content before converting to Gemini format
+            $processed_messages = $this->process_gemini_multimodal_messages($request['messages']);
+            $request['contents'] = $this->convert_to_gemini_contents($processed_messages);
             unset($request['messages']);
         }
 
@@ -470,7 +482,7 @@ class AI_HTTP_Gemini_Provider {
     /**
      * Convert messages to Gemini contents format
      *
-     * @param array $messages Standard messages
+     * @param array $messages Standard messages (may contain mixed content)
      * @return array Gemini contents format
      */
     private function convert_to_gemini_contents($messages) {
@@ -483,18 +495,47 @@ class AI_HTTP_Gemini_Provider {
 
             // Map roles
             $role = $message['role'] === 'assistant' ? 'model' : 'user';
-            
+
             // Skip system messages for now (Gemini handles differently)
             if ($message['role'] === 'system') {
                 continue;
             }
 
-            $contents[] = array(
-                'role' => $role,
-                'parts' => array(
-                    array('text' => $message['content'])
-                )
-            );
+            $parts = [];
+
+            // Handle mixed content (text + files)
+            if (is_array($message['content'])) {
+                foreach ($message['content'] as $content_item) {
+                    if (isset($content_item['type'])) {
+                        switch ($content_item['type']) {
+                            case 'text':
+                                if (!empty($content_item['content'])) {
+                                    $parts[] = array('text' => $content_item['content']);
+                                }
+                                break;
+                            case 'file':
+                                if (!empty($content_item['file_uri'])) {
+                                    $parts[] = array(
+                                        'file_data' => array(
+                                            'file_uri' => $content_item['file_uri']
+                                        )
+                                    );
+                                }
+                                break;
+                        }
+                    }
+                }
+            } else {
+                // Simple text content
+                $parts[] = array('text' => $message['content']);
+            }
+
+            if (!empty($parts)) {
+                $contents[] = array(
+                    'role' => $role,
+                    'parts' => $parts
+                );
+            }
         }
 
         return $contents;
@@ -551,6 +592,170 @@ class AI_HTTP_Gemini_Provider {
         
         return $gemini_tools;
     }
-    
-    
+
+    /**
+     * Process messages for multimodal content (files/images)
+     *
+     * @param array $messages Array of messages
+     * @return array Processed messages with file uploads
+     */
+    private function process_gemini_multimodal_messages($messages) {
+        $processed_messages = [];
+
+        foreach ($messages as $message) {
+            if (!isset($message['role']) || !isset($message['content'])) {
+                $processed_messages[] = $message;
+                continue;
+            }
+
+            $processed_message = array('role' => $message['role']);
+
+            // Handle multimodal content (files) or content arrays
+            if (is_array($message['content'])) {
+                $processed_message['content'] = $this->build_gemini_multimodal_content($message['content']);
+            } else {
+                $processed_message['content'] = $message['content'];
+            }
+
+            // Preserve other message fields
+            foreach ($message as $key => $value) {
+                if (!in_array($key, array('role', 'content'))) {
+                    $processed_message[$key] = $value;
+                }
+            }
+
+            $processed_messages[] = $processed_message;
+        }
+
+        return $processed_messages;
+    }
+
+    /**
+     * Build Gemini multimodal content with Files API integration
+     *
+     * @param array $content_items Array of content items
+     * @return array Mixed content (text + file URIs)
+     */
+    private function build_gemini_multimodal_content($content_items) {
+        $mixed_content = [];
+
+        foreach ($content_items as $content_item) {
+            if (isset($content_item['type'])) {
+                switch ($content_item['type']) {
+                    case 'text':
+                        $mixed_content[] = array(
+                            'type' => 'text',
+                            'content' => $content_item['text'] ?? ''
+                        );
+                        break;
+
+                    case 'file':
+                        try {
+                            $file_path = $content_item['file_path'] ?? '';
+                            $mime_type = $content_item['mime_type'] ?? '';
+
+                            if (empty($file_path) || !file_exists($file_path)) {
+                                continue 2; // Skip this content item
+                            }
+
+                            if (empty($mime_type)) {
+                                $mime_type = mime_content_type($file_path);
+                            }
+
+                            // Validate file type against Gemini's supported formats
+                            if (!$this->is_supported_file_type($mime_type)) {
+                                if (defined('WP_DEBUG') && WP_DEBUG) {
+                                    error_log("Gemini: Unsupported file type: {$mime_type} for file: {$file_path}");
+                                }
+                                continue 2; // Skip this content item
+                            }
+
+                            // Upload file via Files API and get URI
+                            $file_uri = $this->upload_file_via_files_api($file_path);
+
+                            $mixed_content[] = array(
+                                'type' => 'file',
+                                'file_uri' => $file_uri
+                            );
+
+                        } catch (Exception $e) {
+                            // Log error but continue processing other content
+                            if (defined('WP_DEBUG') && WP_DEBUG) {
+                                error_log('Gemini file upload failed: ' . $e->getMessage());
+                            }
+                        }
+                        break;
+
+                    default:
+                        // Pass through other content types
+                        $mixed_content[] = $content_item;
+                        break;
+                }
+            }
+        }
+
+        return $mixed_content;
+    }
+
+    /**
+     * Upload file via Files API callback
+     *
+     * @param string $file_path Path to file to upload
+     * @return string File URI from Files API
+     * @throws Exception If upload fails
+     */
+    private function upload_file_via_files_api($file_path) {
+        if (!$this->files_api_callback) {
+            throw new Exception('Files API callback not set - cannot upload files');
+        }
+
+        if (!file_exists($file_path)) {
+            throw new Exception('File not found: ' . esc_html($file_path));
+        }
+
+        return call_user_func($this->files_api_callback, $file_path, 'user_data', 'gemini');
+    }
+
+    /**
+     * Check if file type is supported by Gemini Files API
+     *
+     * @param string $mime_type MIME type of the file
+     * @return bool True if supported
+     */
+    private function is_supported_file_type($mime_type) {
+        $supported_types = [
+            // Images
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            // Audio
+            'audio/wav',
+            'audio/mp3',
+            'audio/mpeg',
+            'audio/aiff',
+            'audio/aac',
+            'audio/ogg',
+            'audio/flac',
+            // Video
+            'video/mp4',
+            'video/mpeg',
+            'video/mov',
+            'video/avi',
+            'video/x-flv',
+            'video/mpg',
+            'video/webm',
+            'video/wmv',
+            'video/3gpp',
+            // Documents
+            'application/pdf',
+            'text/plain',
+            // Add other Gemini supported types as needed
+        ];
+
+        return in_array($mime_type, $supported_types, true);
+    }
+
+
 }

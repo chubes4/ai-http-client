@@ -14,7 +14,6 @@
 
 defined('ABSPATH') || exit;
 
-// Define component constants
 if (!defined('AI_HTTP_CLIENT_PATH')) {
     define('AI_HTTP_CLIENT_PATH', __DIR__);
 }
@@ -24,12 +23,9 @@ if (!defined('AI_HTTP_CLIENT_URL')) {
 }
 
 /**
- * Initialize AI HTTP Client library
- * Loads all components using WordPress native loading
+ * Initialize AI HTTP Client library with WordPress-native loading
  */
 function ai_http_client_init() {
-    // No external dependencies - WordPress native loading only
-    
     // Load providers and filters
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/gemini.php';
@@ -43,21 +39,16 @@ function ai_http_client_init() {
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Models.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Tools.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Admin.php';
-    
-    // Hook into WordPress for any setup needed
+
     if (function_exists('add_action')) {
         add_action('init', 'ai_http_client_wordpress_init', 1);
     }
 }
 
 function ai_http_client_wordpress_init() {
-    // Register cache management system
     AIHttpCache::register();
-
-    // Register error handling system
     AIHttpError::register();
 
-    // WordPress-specific initialization
     if (function_exists('do_action')) {
         do_action('ai_http_client_loaded');
     }

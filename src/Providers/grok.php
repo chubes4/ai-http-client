@@ -13,8 +13,7 @@
 defined('ABSPATH') || exit;
 
 /**
- * Self-register Grok provider with complete configuration
- * Self-contained provider architecture - no external normalizers needed
+ * Self-register Grok provider
  */
 add_filter('ai_providers', function($providers) {
     $providers['grok'] = [
@@ -31,9 +30,7 @@ class AI_HTTP_Grok_Provider {
     private $base_url;
 
     /**
-     * Constructor
-     *
-     * @param array $config Provider configuration
+     * @param array $config
      */
     public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';

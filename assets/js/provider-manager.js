@@ -7,17 +7,13 @@
 (function($) {
     'use strict';
 
-    // Global object to store component instances and prevent conflicts
     window.AIHttpProviderManager = window.AIHttpProviderManager || {
         instances: {},
-
-        // Session-based memory cache for model responses
         modelCache: new Map(),
         
-        // Initialize a component instance
         init: function(componentId, config) {
             if (this.instances[componentId]) {
-                return; // Already initialized
+                return;
             }
             
             this.instances[componentId] = {
@@ -28,7 +24,6 @@
             
             this.bindEvents(componentId);
             
-            // Trigger initial model fetch for the already-selected provider
             const elements = this.instances[componentId].elements;
             if (elements.providerSelect && elements.apiKeyInput) {
                 const provider = elements.providerSelect.value;
@@ -39,7 +34,6 @@
             }
         },
         
-        // Get DOM elements for the component
         getElements: function(componentId) {
             return {
                 component: document.getElementById(componentId),
@@ -52,18 +46,15 @@
             };
         },
         
-        // Bind events for the component
         bindEvents: function(componentId) {
             const elements = this.instances[componentId].elements;
             
-            // Provider change handler
             if (elements.providerSelect) {
                 elements.providerSelect.addEventListener('change', (e) => {
                     this.onProviderChange(componentId, e.target.value);
                 });
             }
-            
-            // API key change handler - fetch models when API key is entered
+
             if (elements.apiKeyInput) {
                 elements.apiKeyInput.addEventListener('input', (e) => {
                     this.onApiKeyChange(componentId, e.target.value);
@@ -72,80 +63,63 @@
             
         },
         
-        // Handle provider change
         onProviderChange: function(componentId, provider) {
             const elements = this.instances[componentId].elements;
             
             
             this.loadProviderSettings(componentId, provider)
                 .then(() => {
-                    // Only attempt to fetch models after provider settings are loaded
-                    // This prevents unnecessary requests when switching to providers without API keys
                     this.fetchModels(componentId);
                 })
                 .catch(error => {
-                    // Failed to load provider settings
-                    
-                    // Still attempt to fetch models in case of load failure
                     this.fetchModels(componentId);
                 });
         },
         
-        // Handle API key change
         onApiKeyChange: function(componentId, apiKey) {
-            // Ensure component is initialized
             const instance = this.instances[componentId];
             if (!instance) {
-                // Component not initialized
                 return;
             }
             
-            // Debounce API key input to avoid excessive requests
             clearTimeout(instance.apiKeyTimeout);
             
             instance.apiKeyTimeout = setTimeout(() => {
                 const elements = instance.elements;
                 const selectedProvider = elements.providerSelect ? elements.providerSelect.value : '';
                 const apiKey = elements.apiKeyInput ? elements.apiKeyInput.value.trim() : '';
-                
-                // Auto-save API key to site-level storage
+
                 if (selectedProvider && apiKey) {
                     this.saveApiKey(componentId, selectedProvider, apiKey)
                         .then(() => {
-                            // Fetch models after API key is saved
                             this.fetchModels(componentId);
                         })
                         .catch(error => {
                             // Failed to save API key
                         });
                 } else if (!apiKey) {
-                    // Clear models if API key is removed
                     this.fetchModels(componentId);
                 }
-            }, 500); // Wait 500ms after user stops typing
+            }, 500);
         },
         
-        // Fetch models for provider (unified method with memory caching)
         fetchModels: function(componentId, provider = null) {
             const elements = this.instances[componentId].elements;
             const config = this.instances[componentId].config;
 
             if (!elements.modelSelect) return;
 
-            // Auto-detect provider if not provided
             if (!provider) {
                 provider = elements.providerSelect ? elements.providerSelect.value : '';
             }
 
             const apiKey = elements.apiKeyInput ? elements.apiKeyInput.value.trim() : '';
 
-            // Clear models if no provider or API key
             if (!provider || !apiKey) {
                 elements.modelSelect.innerHTML = '<option value="">Select provider and enter API key first</option>';
                 return;
             }
 
-            // Check memory cache first (match PHP cache key pattern)
             const cacheKey = `ai_models_${provider}_${this.hashApiKey(apiKey)}`;
             const cachedModels = this.modelCache.get(cacheKey);
 
@@ -154,7 +128,6 @@
                 return;
             }
 
-            // Fetch models via AJAX
             elements.modelSelect.innerHTML = '<option value="">Loading models...</option>';
 
             const requestBody = new URLSearchParams({
@@ -171,7 +144,6 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Cache the successful response
                     this.modelCache.set(cacheKey, {
                         success: true,
                         data: data.data
@@ -187,12 +159,10 @@
                 }
             })
             .catch(error => {
-                // Model fetch failed
                 elements.modelSelect.innerHTML = '<option value="">Connection error</option>';
             });
         },
 
-        // Helper method to populate model select options
         populateModelSelect: function(selectElement, response) {
             if (response.success) {
                 selectElement.innerHTML = '';
@@ -201,7 +171,6 @@
                 Object.entries(response.data).forEach(([key, value]) => {
                     const option = document.createElement('option');
                     option.value = key;
-                    // Ensure value is always a string for display
                     option.textContent = typeof value === 'object' ?
                         (value.name || value.id || key) :
                         value;
@@ -211,22 +180,19 @@
             }
         },
 
-        // Hash API key for cache key generation (matches PHP pattern)
         hashApiKey: function(apiKey) {
             if (!apiKey) return 'nokey';
 
-            // Simple hash for session-based caching (matches PHP substr(md5()) pattern)
+            // Simple hash for session-based caching
             let hash = 0;
             for (let i = 0; i < apiKey.length; i++) {
                 const char = apiKey.charCodeAt(i);
                 hash = ((hash << 5) - hash) + char;
                 hash = hash & hash; // Convert to 32-bit integer
             }
-            // Return 8-character hex string to match PHP substr(md5(), 0, 8)
             return Math.abs(hash).toString(16).padStart(8, '0').substr(0, 8);
         },
         
-        // Save API key to WordPress options (site-level)
         saveApiKey: function(componentId, provider, apiKey) {
             const instance = this.instances[componentId];
             const config = instance.config;
@@ -253,11 +219,9 @@
         },
         
         
-        // Load provider settings (returns Promise for chaining)
         loadProviderSettings: function(componentId, provider) {
             const instance = this.instances[componentId];
             if (!instance) {
-                // Component not initialized
                 return Promise.reject('Component not initialized');
             }
             
@@ -270,9 +234,6 @@
                 nonce: config.nonce
             });
             
-            // AI HTTP Client no longer uses step-aware configuration
-            
-            // Return Promise for chaining
             return fetch(config.ajax_url, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -283,23 +244,16 @@
                 if (data.success) {
                     const settings = data.data;
                     
-                    // Update PROVIDER-SPECIFIC fields only (API key and model)
-                    
                     if (elements.apiKeyInput) {
                         elements.apiKeyInput.value = settings.api_key || '';
                     }
                     
                     if (elements.modelSelect) {
-                        // Store the saved model for selection after models are fetched
-                        // Ensure model value is always a string, not an object
-                        
-                        const modelValue = typeof settings.model === 'object' ? 
-                            (settings.model.id || settings.model.value || '') : 
+                        const modelValue = typeof settings.model === 'object' ?
+                            (settings.model.id || settings.model.value || '') :
                             (settings.model || '');
-                            
-                        
+
                         elements.modelSelect.setAttribute('data-selected-model', modelValue);
-                        // Also set the select value directly in case models are already loaded
                         if (modelValue) {
                             elements.modelSelect.value = modelValue;
                         }
@@ -310,10 +264,7 @@
                         elements.instructionsTextarea.value = settings.instructions || '';
                     }
                     
-                    // Update provider status
                     this.updateProviderStatus(componentId, settings.api_key);
-                    
-                    // Handle custom fields
                     Object.keys(settings).forEach(key => {
                         if (key.startsWith('custom_')) {
                             const customInput = document.getElementById(componentId + '_' + key);
@@ -325,17 +276,14 @@
                     
                     return data;
                 } else {
-                    // Failed to load provider settings
                     throw new Error(data.message || 'Failed to load provider settings');
                 }
             })
             .catch(error => {
-                // Provider settings load failed
                 throw error;
             });
         },
         
-        // Update provider status display
         updateProviderStatus: function(componentId, apiKey = null) {
             const elements = this.instances[componentId].elements;
             
@@ -352,7 +300,5 @@
             }
         }
     };
-    
-    // Backward-compatibility globals removed intentionally.
 
 })(jQuery);

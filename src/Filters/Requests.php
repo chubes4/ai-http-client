@@ -14,121 +14,81 @@ defined('ABSPATH') || exit;
 
 /**
  * Register AI request processing filters
- * 
- * Enables complete AI request pipeline from HTTP to provider response
- * 
- * @since 1.2.0
  */
 function ai_http_client_register_provider_filters() {
-    
-    // Note: Providers now self-register in their individual files
-    // This eliminates central coordination and enables true modular architecture
-    
-    
-    // Universal file-to-base64 conversion filter for AI providers
+
+    // Universal file-to-base64 conversion filter
     // Usage: $base64_data_url = apply_filters('ai_file_to_base64', '', $file_path, $options);
     // Returns: "data:image/jpeg;base64,/9j/4AAQ..." format or empty string on failure
     add_filter('ai_file_to_base64', function($default, $file_path, $options = []) {
-        // Validate file path
         if (empty($file_path) || !is_string($file_path)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return '';
         }
-        
-        // Check if file exists and is readable
+
         if (!file_exists($file_path) || !is_readable($file_path)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return '';
         }
         
-        // Get file size and check limits (default 10MB max)
         $max_size = $options['max_size'] ?? (10 * 1024 * 1024);
         $file_size = filesize($file_path);
         if ($file_size > $max_size) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return '';
         }
         
-        // Get MIME type
         $mime_type = mime_content_type($file_path);
         if (!$mime_type) {
-            // Fallback to WordPress MIME type detection
             $file_info = wp_check_filetype($file_path);
             $mime_type = $file_info['type'] ?? 'application/octet-stream';
         }
         
-        // Validate supported MIME types (images by default)
         $supported_types = $options['supported_types'] ?? [
             'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'
         ];
-        
+
         if (!in_array($mime_type, $supported_types)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return '';
         }
         
-        // Read and encode file content
         $file_content = file_get_contents($file_path);
         if ($file_content === false) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return '';
         }
-        
-        // Create base64 data URL
+
         $base64_content = base64_encode($file_content);
-        $data_url = "data:{$mime_type};base64,{$base64_content}";
-        
-        // Debug logging
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-        }
-        
-        return $data_url;
+        return "data:{$mime_type};base64,{$base64_content}";
     }, 10, 3);
     
     // Internal HTTP request handling for AI API calls
     // Usage: $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Provider Context', false, $callback);
-    // For streaming: $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Provider Context', true, $callback);
+    // Streaming: $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Provider Context', true, $callback);
     add_filter('ai_http', function($default, $method, $url, $args, $context, $streaming = false, $callback = null) {
-        // Input validation
         $valid_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
         $method = strtoupper($method);
         if (!in_array($method, $valid_methods)) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-            }
             return ['success' => false, 'error' => 'Invalid HTTP method'];
         }
 
-        // Default args with AI HTTP Client user agent and timeout
         $args = wp_parse_args($args, [
-            'user-agent' => sprintf('AI-HTTP-Client/%s (+WordPress)', 
+            'user-agent' => sprintf('AI-HTTP-Client/%s (+WordPress)',
                 defined('AI_HTTP_CLIENT_VERSION') ? AI_HTTP_CLIENT_VERSION : '1.0'),
-            'timeout' => 120  // 120-second timeout for AI operations
+            'timeout' => 120
         ]);
 
-        // Set method for non-GET requests
         if ($method !== 'GET') {
             $args['method'] = $method;
         }
 
 
-        // Handle streaming requests with cURL
         if ($streaming) {
-            // Streaming requires cURL as WordPress wp_remote_* functions don't support it
             $headers = $args['headers'] ?? [];
             $body = $args['body'] ?? '';
-            
-            // Format headers for cURL
+
             $formatted_headers = [];
             foreach ($headers as $key => $value) {
                 $formatted_headers[] = $key . ': ' . $value;
             }
-            
-            // Add stream=true to the request if it's JSON
+
+            // Add stream=true to JSON requests
             if (isset($headers['Content-Type']) && $headers['Content-Type'] === 'application/json' && !empty($body)) {
                 $decoded_body = json_decode($body, true);
                 if (is_array($decoded_body)) {
@@ -144,9 +104,9 @@ function ai_http_client_register_provider_filters() {
                 CURLOPT_POST => ($method !== 'GET'),
                 CURLOPT_POSTFIELDS => ($method !== 'GET') ? $body : null,
                 CURLOPT_HTTPHEADER => $formatted_headers,
-                CURLOPT_TIMEOUT => 120,  // 120-second timeout for streaming
+                CURLOPT_TIMEOUT => 120,
                 CURLOPT_WRITEFUNCTION => function($ch, $data) use ($callback, &$response_body) {
-                    $response_body .= $data; // Capture response for error logging
+                    $response_body .= $data;
                     if ($callback && is_callable($callback)) {
                         call_user_func($callback, $data);
                     } else {
@@ -163,9 +123,7 @@ function ai_http_client_register_provider_filters() {
             $error = curl_error($ch);
             curl_close($ch);
 
-            // Handle streaming errors
             if (!empty($error)) {
-                // Fire hook for cURL errors
                 do_action('ai_api_error', [
                     'message' => "Connection error to {$context}: {$error}",
                     'provider' => $context,
@@ -173,7 +131,6 @@ function ai_http_client_register_provider_filters() {
                     'details' => $error
                 ]);
             } elseif ($http_code >= 400) {
-                // Fire hook for HTTP error responses
                 do_action('ai_api_error', [
                     'message' => "HTTP {$http_code} error from {$context}",
                     'provider' => $context,
@@ -199,30 +156,25 @@ function ai_http_client_register_provider_filters() {
             ];
         }
 
-        // Make the request using appropriate WordPress function
         $response = ($method === 'GET') ? wp_remote_get($url, $args) : wp_remote_request($url, $args);
 
-        // Handle WordPress HTTP errors (network issues, timeouts, etc.)
         if (is_wp_error($response)) {
             $error_message = "Failed to connect to {$context}: " . $response->get_error_message();
-            
-            // Fire hook for connection errors
+
             do_action('ai_api_error', [
                 'message' => $error_message,
                 'provider' => $context,
                 'error_type' => 'connection_error',
                 'wp_error' => $response->get_error_message()
             ]);
-            
+
             return ['success' => false, 'error' => $error_message];
         }
 
-        // Extract response details
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $headers = wp_remote_retrieve_headers($response);
 
-        // Fire hook for non-200 responses with raw provider response
         if ($status_code >= 400) {
             do_action('ai_api_error', [
                 'message' => "HTTP {$status_code} error from {$context}",
@@ -233,8 +185,6 @@ function ai_http_client_register_provider_filters() {
             ]);
         }
 
-        // For AI APIs, most operations expect 200, but some may expect 201, 202, etc.
-        // Let the calling code determine if the status is acceptable
         $success = ($status_code >= 200 && $status_code < 300);
         
         return [
@@ -246,43 +196,32 @@ function ai_http_client_register_provider_filters() {
         ];
     }, 10, 7);
     
-    
-    
-    
+
     // Public AI Request filter - high-level plugin interface
-    // Usage: $response = apply_filters('ai_request', $request);
-    // Usage: $response = apply_filters('ai_request', $request, $provider_name);  
-    // Usage: $response = apply_filters('ai_request', $request, null, $streaming_callback);
-    // Usage: $response = apply_filters('ai_request', $request, $provider_name, $streaming_callback, $tools);
     // Usage: $response = apply_filters('ai_request', $request, $provider_name, $streaming_callback, $tools, $conversation_data);
     add_filter('ai_request', function($request, $provider_name = null, $streaming_callback = null, $tools = null, $conversation_data = null) {
         
-        
-        // Validate request format
+
         if (!is_array($request)) {
             return ai_http_create_error_response('Request must be an array');
         }
-        
+
         if (!isset($request['messages']) || !is_array($request['messages'])) {
             return ai_http_create_error_response('Request must include messages array');
         }
-        
+
         if (empty($request['messages'])) {
             return ai_http_create_error_response('Messages array cannot be empty');
         }
         
-        // Handle tools parameter - merge with request tools
         if ($tools && is_array($tools)) {
             if (!isset($request['tools'])) {
                 $request['tools'] = [];
             }
-            // Merge tools (parameter tools take precedence)
             $request['tools'] = array_merge($request['tools'], $tools);
         }
         
-        // Handle conversation continuation data
         if ($conversation_data && is_array($conversation_data)) {
-            // Get provider instance to check conversation type
             $shared_api_keys = apply_filters('ai_provider_api_keys', null);
             $api_key = $shared_api_keys[$provider_name] ?? '';
             if (!empty($api_key)) {
@@ -295,14 +234,12 @@ function ai_http_client_register_provider_filters() {
                     if ($continuation_info && isset($continuation_info['type'])) {
                         switch ($continuation_info['type']) {
                             case 'stateful':
-                                // OpenAI-style: Use previous_response_id
                                 if (isset($conversation_data['previous_response_id'])) {
                                     $request['previous_response_id'] = $conversation_data['previous_response_id'];
                                 }
                                 break;
-                                
+
                             case 'stateless':
-                                // Anthropic/Gemini/etc style: Full conversation history required
                                 if (isset($conversation_data['conversation_history'])) {
                                     $request['messages'] = $conversation_data['conversation_history'];
                                 }

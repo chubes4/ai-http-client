@@ -13,8 +13,7 @@
 defined('ABSPATH') || exit;
 
 /**
- * Self-register OpenAI provider with complete configuration
- * Self-contained provider architecture - no external normalizers needed
+ * Self-register OpenAI provider
  */
 add_filter('ai_providers', function($providers) {
     $providers['openai'] = [
@@ -33,8 +32,6 @@ class AI_HTTP_OpenAI_Provider {
     private $files_api_callback = null;
 
     /**
-     * Constructor
-     *
      * @param array $config Provider configuration
      */
     public function __construct($config = []) {
@@ -49,19 +46,16 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Check if provider is configured
-     *
-     * @return bool True if configured
+     * @return bool
      */
     public function is_configured() {
         return !empty($this->api_key);
     }
 
     /**
-     * Get authentication headers for OpenAI API
-     * Includes organization header if configured
+     * Get authentication headers with optional organization
      *
-     * @return array Headers array
+     * @return array
      */
     private function get_auth_headers() {
         $headers = array(
@@ -76,25 +70,20 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Send request to OpenAI API
-     * Handles all format conversion internally - receives and returns standard format
+     * Send request with internal format conversion
      *
-     * @param array $standard_request Standard request format
-     * @return array Standard response format
-     * @throws Exception If request fails
+     * @param array $standard_request
+     * @return array
+     * @throws Exception
      */
     public function request($standard_request) {
         if (!$this->is_configured()) {
             throw new Exception('OpenAI provider not configured - missing API key');
         }
 
-        // Convert standard format to OpenAI format internally
         $provider_request = $this->format_request($standard_request);
-        
         $url = $this->base_url . '/responses';
-        
-        
-        // Use centralized ai_http filter
+
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
@@ -109,35 +98,26 @@ class AI_HTTP_OpenAI_Provider {
         
         $raw_response = json_decode($result['data'], true);
         
-        
-        // Convert OpenAI format to standard format
+
         return $this->format_response($raw_response);
     }
 
     /**
-     * Send streaming request to OpenAI API
-     * Handles all format conversion internally - receives and returns standard format
+     * Send streaming request with internal format conversion
      *
-     * @param array $standard_request Standard request format
-     * @param callable $callback Optional callback for each chunk
-     * @return array Standard response format
-     * @throws Exception If request fails
+     * @param array $standard_request
+     * @param callable $callback
+     * @return array
+     * @throws Exception
      */
     public function streaming_request($standard_request, $callback = null) {
         if (!$this->is_configured()) {
             throw new Exception('OpenAI provider not configured - missing API key');
         }
 
-        // Convert standard format to OpenAI format internally
         $provider_request = $this->format_request($standard_request);
-        
         $url = $this->base_url . '/responses';
-        
-        // Debug logging in development mode
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-        }
 
-        // Use centralized ai_http filter with streaming=true
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
@@ -150,7 +130,6 @@ class AI_HTTP_OpenAI_Provider {
             throw new Exception('OpenAI streaming request failed: ' . esc_html($result['error']));
         }
 
-        // Return standardized streaming response
         return [
             'success' => true,
             'data' => [
@@ -166,10 +145,8 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Get available models from OpenAI API
-     *
-     * @return array Raw models response
-     * @throws Exception If request fails
+     * @return array
+     * @throws Exception
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
@@ -177,8 +154,7 @@ class AI_HTTP_OpenAI_Provider {
         }
 
         $url = $this->base_url . '/models';
-        
-        // Use centralized ai_http filter
+
         $result = apply_filters('ai_http', [], 'GET', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenAI');
@@ -191,12 +167,10 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Upload file to OpenAI Files API
-     * 
-     * @param string $file_path Path to file to upload
-     * @param string $purpose Purpose for upload (default: 'user_data')
-     * @return string File ID from OpenAI
-     * @throws Exception If upload fails
+     * @param string $file_path
+     * @param string $purpose
+     * @return string
+     * @throws Exception
      */
     public function upload_file($file_path, $purpose = 'user_data') {
         if (!$this->is_configured()) {
@@ -207,23 +181,20 @@ class AI_HTTP_OpenAI_Provider {
             throw new Exception('File not found: ' . esc_html($file_path));
         }
 
-        // OpenAI file upload endpoint
         $url = $this->base_url . '/files';
-        
-        // Prepare multipart form data
+
         $boundary = wp_generate_uuid4();
         $headers = array_merge($this->get_auth_headers(), [
             'Content-Type' => 'multipart/form-data; boundary=' . $boundary
         ]);
 
-        // Build multipart body
         $body = '';
-        
+
         // Purpose field
         $body .= "--{$boundary}\r\n";
         $body .= "Content-Disposition: form-data; name=\"purpose\"\r\n\r\n";
         $body .= $purpose . "\r\n";
-        
+
         // File field
         $body .= "--{$boundary}\r\n";
         $body .= 'Content-Disposition: form-data; name="file"; filename="' . basename($file_path) . "\"\r\n";
@@ -231,7 +202,6 @@ class AI_HTTP_OpenAI_Provider {
         $body .= file_get_contents($file_path) . "\r\n";
         $body .= "--{$boundary}--\r\n";
 
-        // Send request using centralized ai_http filter
         $result = apply_filters('ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => $body
@@ -252,11 +222,9 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Delete file from OpenAI Files API
-     * 
-     * @param string $file_id OpenAI file ID to delete
-     * @return bool Success status
-     * @throws Exception If delete fails
+     * @param string $file_id
+     * @return bool
+     * @throws Exception
      */
     public function delete_file($file_id) {
         if (!$this->is_configured()) {
@@ -264,8 +232,7 @@ class AI_HTTP_OpenAI_Provider {
         }
 
         $url = $this->base_url . "/files/{$file_id}";
-        
-        // Send request using centralized ai_http filter
+
         $result = apply_filters('ai_http', [], 'DELETE', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenAI File Delete');
@@ -278,10 +245,8 @@ class AI_HTTP_OpenAI_Provider {
     }
 
     /**
-     * Get normalized models for UI components
-     * 
-     * @return array Key-value array of model_id => display_name
-     * @throws Exception If API call fails
+     * @return array
+     * @throws Exception
      */
     public function get_normalized_models() {
         $raw_models = $this->get_raw_models();
@@ -289,15 +254,12 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Normalize OpenAI models API response
-     * 
-     * @param array $raw_models Raw API response
-     * @return array Normalized models array
+     * @param array $raw_models
+     * @return array
      */
     private function normalize_models_response($raw_models) {
         $models = [];
         
-        // OpenAI returns: { "data": [{"id": "gpt-4", "object": "model", ...}, ...] }
         $data = isset($raw_models['data']) ? $raw_models['data'] : $raw_models;
         if (is_array($data)) {
             foreach ($data as $model) {
@@ -311,9 +273,7 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Set Files API callback for file uploads
-     *
-     * @param callable $callback Function that takes (file_path, purpose, provider_name) and returns file_id
+     * @param callable $callback
      */
     public function set_files_api_callback($callback) {
         $this->files_api_callback = $callback;
@@ -323,35 +283,31 @@ class AI_HTTP_OpenAI_Provider {
     /**
      * Format unified request to OpenAI Responses API format
      *
-     * @param array $unified_request Standard request format
-     * @return array OpenAI-formatted request
-     * @throws Exception If validation fails
+     * @param array $unified_request
+     * @return array
+     * @throws Exception
      */
     private function format_request($unified_request) {
         $this->validate_unified_request($unified_request);
         
         $request = $this->sanitize_common_fields($unified_request);
         
-        // Convert messages to input for Responses API
         if (isset($request['messages'])) {
             $request['input'] = $this->normalize_openai_messages($request['messages']);
             unset($request['messages']);
         }
 
-        // Convert max_tokens to max_output_tokens for Responses API (OPTIONAL - only if explicitly provided)
-        // Note: Not supported by reasoning models (o1*, o3*, o4*) - will cause API errors if sent
+        // Convert max_tokens to max_output_tokens - not supported by reasoning models
         if (isset($request['max_tokens']) && !empty($request['max_tokens'])) {
             $request['max_output_tokens'] = intval($request['max_tokens']);
             unset($request['max_tokens']);
         }
 
-        // Handle tools (OPTIONAL - only if explicitly provided)
         if (isset($request['tools'])) {
             $request['tools'] = $this->normalize_openai_tools($request['tools']);
         }
 
-        // Process temperature parameter (OPTIONAL - only if explicitly provided)
-        // Note: Not supported by reasoning models (o1*, o3*, o4*) - will cause API errors if sent
+        // Temperature not supported by reasoning models
         if (isset($request['temperature']) && !empty($request['temperature'])) {
             $request['temperature'] = max(0, min(1, floatval($request['temperature'])));
         }
@@ -361,19 +317,15 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Format OpenAI response to unified standard format
-     *
-     * @param array $openai_response Raw OpenAI response
-     * @return array Standard response format
-     * @throws Exception If response format invalid
+     * @param array $openai_response
+     * @return array
+     * @throws Exception
      */
     private function format_response($openai_response) {
-        // Handle OpenAI Responses API format (primary)
         if (isset($openai_response['object']) && $openai_response['object'] === 'response') {
             return $this->normalize_openai_responses_api($openai_response);
         }
-        
-        // Handle streaming format
+
         if (isset($openai_response['content']) && !isset($openai_response['choices'])) {
             return $this->normalize_openai_streaming($openai_response);
         }
@@ -382,10 +334,8 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Validate unified request format
-     *
-     * @param array $request Request to validate
-     * @throws Exception If invalid
+     * @param array $request
+     * @throws Exception
      */
     private function validate_unified_request($request) {
         if (!is_array($request)) {
@@ -402,13 +352,10 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Sanitize common fields
-     *
-     * @param array $request Request to sanitize
-     * @return array Sanitized request
+     * @param array $request
+     * @return array
      */
     private function sanitize_common_fields($request) {
-        // Sanitize messages
         if (isset($request['messages'])) {
             foreach ($request['messages'] as &$message) {
                 if (isset($message['role'])) {
@@ -420,7 +367,6 @@ class AI_HTTP_OpenAI_Provider {
             }
         }
 
-        // Sanitize other common fields
         if (isset($request['model'])) {
             $request['model'] = sanitize_text_field($request['model']);
         }
@@ -429,10 +375,10 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Normalize OpenAI messages for Responses API format
+     * Normalize messages for Responses API format
      *
-     * @param array $messages Array of messages
-     * @return array OpenAI-formatted messages
+     * @param array $messages
+     * @return array
      */
     private function normalize_openai_messages($messages) {
         $normalized = [];
@@ -446,14 +392,13 @@ class AI_HTTP_OpenAI_Provider {
 
             $normalized_message = array('role' => $message['role']);
 
-            // Handle multi-modal content (images, files) or content arrays
             if (isset($message['images']) || isset($message['image_urls']) || isset($message['files']) || is_array($message['content'])) {
                 $normalized_message['content'] = $this->build_openai_multimodal_content($message);
             } else {
                 $normalized_message['content'] = $message['content'];
             }
 
-            // Preserve other fields (excluding tool_calls for Responses API compatibility)
+            // Preserve other fields excluding tool_calls for Responses API
             foreach ($message as $key => $value) {
                 if (!in_array($key, array('role', 'content', 'images', 'image_urls', 'files', 'tool_calls'))) {
                     $normalized_message[$key] = $value;
@@ -467,15 +412,14 @@ class AI_HTTP_OpenAI_Provider {
     }
     
     /**
-     * Build OpenAI multi-modal content with direct file upload
+     * Build OpenAI multi-modal content with file upload
      *
-     * @param array $message Message with multi-modal content
-     * @return array OpenAI multi-modal content format
+     * @param array $message
+     * @return array
      */
     private function build_openai_multimodal_content($message) {
         $content = [];
 
-        // Handle content array format (from AIStep)
         if (is_array($message['content'])) {
             foreach ($message['content'] as $content_item) {
                 if (isset($content_item['type'])) {
@@ -487,7 +431,6 @@ class AI_HTTP_OpenAI_Provider {
                             );
                             break;
                         case 'file':
-                            // FILES API INTEGRATION
                             try {
                                 $file_path = $content_item['file_path'];
                                 $file_id = $this->upload_file_via_files_api($file_path);
@@ -506,8 +449,6 @@ class AI_HTTP_OpenAI_Provider {
                                     );
                                 }
                             } catch (Exception $e) {
-                                if (defined('WP_DEBUG') && WP_DEBUG) {
-                                }
                             }
                             break;
                         default:
@@ -517,7 +458,6 @@ class AI_HTTP_OpenAI_Provider {
                 }
             }
         } else {
-            // Add text content for string format
             if (!empty($message['content'])) {
                 $content[] = array(
                     'type' => 'input_text',
