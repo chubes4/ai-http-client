@@ -99,6 +99,9 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok');
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('grok', '/chat/completions', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('Grok API request failed: ' . esc_html($result['error']));
         }
         
@@ -174,6 +177,9 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok');
 
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('grok', '/chat/completions', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('Grok API request failed: ' . esc_html($result['error']));
         }
 

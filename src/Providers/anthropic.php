@@ -93,6 +93,9 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic');
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('anthropic', '/messages', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('Anthropic API request failed: ' . esc_html($result['error']));
         }
         
@@ -131,6 +134,10 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic Streaming', true, $callback);
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('anthropic', '/messages', $result, [
+                'request' => $provider_request,
+                'streaming' => true
+            ]);
             throw new Exception('Anthropic streaming request failed: ' . esc_html($result['error']));
         }
 

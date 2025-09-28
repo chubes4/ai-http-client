@@ -93,6 +93,9 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI');
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('openai', '/responses', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
         }
         
@@ -160,6 +163,9 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI');
 
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('openai', '/responses', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
         }
 
@@ -449,6 +455,10 @@ class AI_HTTP_OpenAI_Provider {
                                     );
                                 }
                             } catch (Exception $e) {
+                                AIHttpError::trigger_library_error('file_upload', $e->getMessage(), [
+                                    'file_path' => $file_path ?? 'unknown',
+                                    'provider' => 'openai'
+                                ]);
                             }
                             break;
                         default:

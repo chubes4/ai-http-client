@@ -109,6 +109,9 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter');
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('openrouter', '/chat/completions', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
         }
         
@@ -184,6 +187,9 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter');
 
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('openrouter', '/chat/completions', $result, [
+                'request' => $provider_request
+            ]);
             throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
         }
 

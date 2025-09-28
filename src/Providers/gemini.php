@@ -111,6 +111,9 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini');
         
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('gemini', ':generateContent', $result, [
+                'request' => $modified_request
+            ]);
             throw new Exception('Gemini API request failed: ' . esc_html($result['error']));
         }
         
@@ -186,6 +189,9 @@ class AI_HTTP_Gemini_Provider {
         ], 'Gemini');
 
         if (!$result['success']) {
+            AIHttpError::trigger_api_error('gemini', ':generateContent', $result, [
+                'request' => $modified_request
+            ]);
             throw new Exception('Gemini API request failed: ' . esc_html($result['error']));
         }
 
