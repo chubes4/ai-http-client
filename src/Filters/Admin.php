@@ -18,11 +18,11 @@ defined('ABSPATH') || exit;
 add_filter('ai_provider_api_keys', function($keys = null) {
     $option_name = 'ai_http_shared_api_keys';
     if (is_null($keys)) {
-        // Get all keys
-        return get_option($option_name, []);
+        // Get all keys (network-wide in multisite, per-site in single-site)
+        return get_site_option($option_name, []);
     } else {
-        // Set all keys
-        update_option($option_name, $keys);
+        // Set all keys (network-wide in multisite, per-site in single-site)
+        update_site_option($option_name, $keys);
         return $keys;
     }
 });

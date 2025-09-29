@@ -7,7 +7,7 @@
  * standardized request/response formats.
  *
  * @package AIHttpClient
- * @version 1.0.0
+ * @version 1.1.3
  * @author Chris Huber <https://chubes.net>
  * @link https://github.com/chubes/ai-http-client
  */
