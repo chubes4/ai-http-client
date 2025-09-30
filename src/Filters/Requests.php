@@ -286,7 +286,7 @@ function ai_http_client_register_provider_filters() {
         } catch (Exception $e) {
             return ai_http_create_error_response($e->getMessage(), $provider_name);
         }
-    }, 50, 6); // Priority 50: Execute after all directive filters (10-40) complete
+    }, 99, 6); // Priority 99: Execute after directive filters complete
 }
 
 /**
