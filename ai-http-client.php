@@ -39,6 +39,7 @@ function ai_http_client_init() {
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Models.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Tools.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Admin.php';
+    require_once AI_HTTP_CLIENT_PATH . '/src/Filters/RestApi.php';
 
     if (function_exists('add_action')) {
         add_action('init', 'ai_http_client_wordpress_init', 1);
