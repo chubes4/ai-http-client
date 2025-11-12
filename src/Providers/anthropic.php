@@ -30,9 +30,6 @@ class AI_HTTP_Anthropic_Provider {
     private $base_url;
     private $files_api_callback = null;
 
-    /**
-     * @param array $config
-     */
     public function __construct($config = []) {
         $this->api_key = $config['api_key'] ?? '';
         
@@ -43,20 +40,10 @@ class AI_HTTP_Anthropic_Provider {
         }
     }
 
-    /**
-     * Check if provider is configured
-     *
-     * @return bool True if configured
-     */
     public function is_configured() {
         return !empty($this->api_key);
     }
 
-    /**
-     * Get authentication headers for Anthropic API
-     *
-     * @return array Headers array
-     */
     private function get_auth_headers() {
         return array(
             'x-api-key' => $this->api_key,
@@ -66,12 +53,8 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Send request to Anthropic API
-     * Handles all format conversion internally - receives and returns standard format
-     *
-     * @param array $standard_request Standard request format
-     * @return array Standard response format
-     * @throws Exception If request fails
+     * Converts standard format to Anthropic format, calls API, returns standard format
+     * Triggers ai_api_error action on failure
      */
     public function request($standard_request) {
         if (!$this->is_configured()) {
@@ -106,13 +89,8 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Send streaming request to Anthropic API
-     * Handles all format conversion internally - receives and returns standard format
-     *
-     * @param array $standard_request Standard request format
-     * @param callable $callback Optional callback for each chunk
-     * @return array Standard response format
-     * @throws Exception If request fails
+     * Streaming version with format conversion
+     * Triggers ai_api_error action on failure
      */
     public function streaming_request($standard_request, $callback = null) {
         if (!$this->is_configured()) {
@@ -157,9 +135,7 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Get available models (Anthropic doesn't have models endpoint)
-     *
-     * @return array
+     * Anthropic doesn't expose a models endpoint - hardcoded model names required
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
@@ -171,14 +147,6 @@ class AI_HTTP_Anthropic_Provider {
         return [];
     }
 
-    /**
-     * Upload file to Anthropic API
-     * 
-     * @param string $file_path Path to file to upload
-     * @param string $purpose Purpose for upload (default: 'user_data')
-     * @return string File ID from Anthropic
-     * @throws Exception If upload fails
-     */
     public function upload_file($file_path, $purpose = 'user_data') {
         if (!$this->is_configured()) {
             throw new Exception('Anthropic provider not configured');
@@ -253,13 +221,6 @@ class AI_HTTP_Anthropic_Provider {
         return $data['id'];
     }
 
-    /**
-     * Delete file from Anthropic API
-     * 
-     * @param string $file_id Anthropic file ID to delete
-     * @return bool Success status
-     * @throws Exception If delete fails
-     */
     public function delete_file($file_id) {
         if (!$this->is_configured()) {
             throw new Exception('Anthropic provider not configured');
@@ -279,23 +240,11 @@ class AI_HTTP_Anthropic_Provider {
         return $result['status_code'] === 200;
     }
 
-    /**
-     * Get normalized models for UI components
-     * 
-     * @return array Key-value array of model_id => display_name
-     * @throws Exception If API call fails
-     */
     public function get_normalized_models() {
         $raw_models = $this->get_raw_models();
         return $this->normalize_models_response($raw_models);
     }
     
-    /**
-     * Normalize Anthropic models API response
-     * 
-     * @param array $raw_models Raw API response
-     * @return array Normalized models array
-     */
     private function normalize_models_response($raw_models) {
         $models = [];
         
@@ -313,21 +262,12 @@ class AI_HTTP_Anthropic_Provider {
         return $models;
     }
 
-    /**
-     * Set files API callback
-     *
-     * @param callable $callback Callback function for file uploads
-     */
     public function set_files_api_callback($callback) {
         $this->files_api_callback = $callback;
     }
 
     /**
-     * Format unified request to Anthropic API format
-     *
-     * @param array $unified_request Standard request format
-     * @return array Anthropic-formatted request
-     * @throws Exception If validation fails
+     * Converts standard request format to Anthropic-specific format including tools, temperature, max_tokens
      */
     private function format_request($unified_request) {
         $this->validate_unified_request($unified_request);
@@ -368,12 +308,6 @@ class AI_HTTP_Anthropic_Provider {
         return $request;
     }
     
-    /**
-     * Format Anthropic response to unified standard format
-     *
-     * @param array $anthropic_response Raw Anthropic response
-     * @return array Standard response format
-     */
     private function format_response($anthropic_response) {
         $content = '';
         $tool_calls = [];
@@ -421,12 +355,6 @@ class AI_HTTP_Anthropic_Provider {
         );
     }
     
-    /**
-     * Validate unified request format
-     *
-     * @param array $request Request to validate
-     * @throws Exception If invalid
-     */
     private function validate_unified_request($request) {
         if (!is_array($request)) {
             throw new Exception('Request must be an array');
@@ -441,12 +369,6 @@ class AI_HTTP_Anthropic_Provider {
         }
     }
     
-    /**
-     * Sanitize common fields
-     *
-     * @param array $request Request to sanitize
-     * @return array Sanitized request
-     */
     private function sanitize_common_fields($request) {
         // Sanitize messages
         if (isset($request['messages'])) {
@@ -469,10 +391,7 @@ class AI_HTTP_Anthropic_Provider {
     }
     
     /**
-     * Extract system message for Anthropic
-     *
-     * @param array $request Request with messages
-     * @return array Request with system extracted
+     * Anthropic requires system messages in separate 'system' field, not in messages array
      */
     private function extract_anthropic_system_message($request) {
         $messages = $request['messages'];
@@ -496,12 +415,6 @@ class AI_HTTP_Anthropic_Provider {
         return $request;
     }
 
-    /**
-     * Convert standard tools format to Anthropic tools format
-     *
-     * @param array $standard_tools Standard tools array
-     * @return array Anthropic-formatted tools
-     */
     private function normalize_anthropic_tools($standard_tools) {
         $anthropic_tools = array();
         
@@ -548,12 +461,6 @@ class AI_HTTP_Anthropic_Provider {
         return $anthropic_tools;
     }
 
-    /**
-     * Process messages for multimodal content (files/images)
-     *
-     * @param array $messages Array of messages
-     * @return array Processed messages with file uploads
-     */
     private function process_anthropic_multimodal_messages($messages) {
         $processed_messages = [];
 
@@ -586,10 +493,7 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Build Anthropic multimodal content with Files API integration
-     *
-     * @param array $content_items Array of content items
-     * @return array Anthropic multimodal content format
+     * Handles file uploads via Files API and converts to Anthropic multimodal format
      */
     private function build_anthropic_multimodal_content($content_items) {
         $content = [];
@@ -674,13 +578,6 @@ class AI_HTTP_Anthropic_Provider {
         return $content;
     }
 
-    /**
-     * Upload file via Files API callback
-     *
-     * @param string $file_path Path to file to upload
-     * @return string File ID from Files API
-     * @throws Exception If upload fails
-     */
     private function upload_file_via_files_api($file_path) {
         if (!$this->files_api_callback) {
             throw new Exception('Files API callback not set - cannot upload files');
@@ -693,12 +590,6 @@ class AI_HTTP_Anthropic_Provider {
         return call_user_func($this->files_api_callback, $file_path, 'user_data', 'anthropic');
     }
 
-    /**
-     * Check if file type is supported by Anthropic Files API
-     *
-     * @param string $mime_type MIME type of the file
-     * @return bool True if supported
-     */
     private function is_supported_file_type($mime_type) {
         $supported_types = [
             // Images for vision

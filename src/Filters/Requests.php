@@ -363,5 +363,5 @@ function ai_http_upload_file_to_provider($file_path, $purpose = 'user_data', $pr
     return $provider->upload_file($file_path, $purpose);
 }
 
-// Initialize provider filters and AJAX actions on WordPress init
+// Initialize provider filters on WordPress init
 add_action('init', 'ai_http_client_register_provider_filters');

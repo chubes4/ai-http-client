@@ -6,9 +6,11 @@ A professional WordPress library for unified AI provider communication. Supports
 - WordPress filter-based architecture with self-contained provider classes
 - Unified request/response format across all AI providers
 - Comprehensive caching system with 24-hour model cache TTL
-- Multi-modal support (text, images, files) via Files API integration
+- Multi-modal support (text, images, files) via native Files API integration
 - Streaming and standard request modes with proper error handling
-- Template-based admin UI components with WordPress-native patterns
+- REST API endpoints for configuration and management
+- Multisite network-wide API key storage support
+- Comprehensive error handling with WordPress action hooks
 
 ## Installation
 
@@ -62,9 +64,9 @@ $response = apply_filters('ai_request', $request, 'openai', null, $tools, $conve
 
 Comprehensive AI provider support with dynamic model discovery:
 
-- **OpenAI** - GPT models, OpenAI Responses API, streaming, function calling, Files API upload/delete
-- **Anthropic** - Claude models, streaming, function calling, multi-modal content
-- **Google Gemini** - Gemini models, streaming, function calling, image processing
+- **OpenAI** - GPT models, OpenAI Responses API, streaming, function calling, native Files API integration
+- **Anthropic** - Claude models, streaming, function calling, native Files API integration with vision support
+- **Google Gemini** - Gemini models, streaming, function calling, native Files API integration with vision support
 - **Grok/X.AI** - Grok models, streaming support
 - **OpenRouter** - 200+ models via unified API gateway
 
@@ -82,6 +84,7 @@ Comprehensive AI provider support with dynamic model discovery:
 
 - Plugin-isolated configurations via filter-based settings
 - Centralized API key storage in `ai_http_shared_api_keys` option
+- Multisite network-wide API key storage support
 - No provider conflicts through self-contained architecture
 - Independent AI settings per consuming plugin
 
@@ -91,7 +94,7 @@ Comprehensive AI provider support with dynamic model discovery:
 - **Request Processing**: Complete pipeline via `ai_request` filter with error handling
 - **HTTP Layer**: Centralized `ai_http` filter supporting streaming and standard requests
 - **Caching System**: Model caching via `AIHttpCache` class with WordPress transients
-- **Admin Interface**: Template-based UI via `ai_render_component` filter
+- **REST API**: Configuration and management endpoints via `ai_http_client` namespace
 - **Error Management**: Centralized logging via `AIHttpError` class
 
 ## Core Filters
@@ -110,15 +113,53 @@ $models = apply_filters('ai_models', $provider_name, $config);
 // AI Tools Registration
 $tools = apply_filters('ai_tools', []);
 
-// Template Rendering
-echo apply_filters('ai_render_component', '', $config);
-
 // File Operations
 $base64 = apply_filters('ai_file_to_base64', '', $file_path, $options);
 
 // HTTP Requests (internal use)
 $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Context');
 ```
+
+## REST API Endpoints
+
+The library provides REST API endpoints for configuration and management:
+
+```php
+// Configure API keys via REST API
+wp_remote_post('/wp-json/ai-http-client/v1/config', [
+    'body' => wp_json_encode([
+        'provider' => 'openai',
+        'api_key' => 'your-api-key'
+    ]),
+    'headers' => [
+        'Content-Type' => 'application/json',
+        'X-WP-Nonce' => wp_create_nonce('wp_rest')
+    ]
+]);
+
+// Get provider configuration
+$config = wp_remote_get('/wp-json/ai-http-client/v1/config/openai', [
+    'headers' => [
+        'X-WP-Nonce' => wp_create_nonce('wp_rest')
+    ]
+]);
+
+// Test provider connectivity
+$test = wp_remote_post('/wp-json/ai-http-client/v1/test/openai', [
+    'headers' => [
+        'X-WP-Nonce' => wp_create_nonce('wp_rest')
+    ]
+]);
+```
+
+**Available Endpoints:**
+- **GET/POST** `/wp-json/ai-http-client/v1/config` - Get/set provider configurations
+- **GET/POST** `/wp-json/ai-http-client/v1/config/{provider}` - Get/set specific provider config
+- **DELETE** `/wp-json/ai-http-client/v1/config/{provider}` - Remove provider configuration
+- **POST** `/wp-json/ai-http-client/v1/test/{provider}` - Test provider connectivity
+- **GET** `/wp-json/ai-http-client/v1/providers` - List all available providers with status
+- **POST** `/wp-json/ai-http-client/v1/cache/clear` - Clear all model caches
+- **POST** `/wp-json/ai-http-client/v1/cache/clear/{provider}` - Clear specific provider cache
 
 ## Multi-Plugin Configuration
 
@@ -174,7 +215,7 @@ $response = apply_filters('ai_request', $request, 'openai', null, $tools);
 
 - **Packagist**: Available via `composer require chubes4/ai-http-client`
 - **GitHub**: https://github.com/chubes4/ai-http-client
-- **Version**: 1.0.0 - Professional WordPress library architecture
+- **Version**: 1.2.0 - Professional WordPress library with REST API configuration
 - **License**: GNU GPL v3
 - **Dependencies**: None (pure WordPress integration)
 - **Multi-plugin**: Safe for concurrent use by multiple WordPress plugins
@@ -202,28 +243,29 @@ add_filter('ai_providers', function($providers) {
 });
 ```
 
-## Version 1.0.0 Features
+## Version 1.2.0 Features
 
 **Core Architecture**:
 - WordPress filter-based provider registration with self-contained classes
 - Unified request/response format across all providers
-- Comprehensive caching system with 24-hour model cache
-- Multi-modal content support (text, images, files)
-- Streaming and standard request modes
-- Template-based admin UI components
+- Comprehensive caching system with 24-hour model cache TTL
+- Native Files API integration for multi-modal content (text, images, files)
+- Streaming and standard request modes with proper error handling
+- REST API endpoints for configuration and management
+- Multisite network-wide API key storage support
 
 **AI Provider Support**:
-- OpenAI Responses API integration with Files API support
-- Anthropic Claude models with streaming
-- Google Gemini with multi-modal capabilities
-- Grok/X.AI integration
+- OpenAI Responses API integration with native Files API support
+- Anthropic Claude models with native Files API and vision capabilities
+- Google Gemini with native Files API and multi-modal support
+- Grok/X.AI integration with streaming support
 - OpenRouter gateway access to 200+ models
 
 **WordPress Integration**:
-- Native WordPress HTTP API usage
-- WordPress transients for model caching
-- WordPress options API for settings
-- Action hooks for error handling and cache management
+- Native WordPress HTTP API usage with centralized ai_http filter
+- WordPress transients for model caching with granular cache clearing
+- WordPress options API for settings with multisite support
+- Comprehensive error handling via ai_api_error and ai_library_error action hooks
 
 ## Production Usage
 

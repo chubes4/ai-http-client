@@ -31,11 +31,6 @@ class AI_HTTP_Gemini_Provider {
     private $base_url;
     private $files_api_callback = null;
 
-    /**
-     * Constructor
-     *
-     * @param array $config Provider configuration
-     */
     public function __construct($config = []) {
         $this->api_key = isset($config['api_key']) ? $config['api_key'] : '';
         
@@ -46,20 +41,10 @@ class AI_HTTP_Gemini_Provider {
         }
     }
 
-    /**
-     * Check if provider is configured
-     *
-     * @return bool True if configured
-     */
     public function is_configured() {
         return !empty($this->api_key);
     }
 
-    /**
-     * Get authentication headers for Gemini API
-     *
-     * @return array Headers array
-     */
     private function get_auth_headers() {
         return array(
             'x-goog-api-key' => $this->api_key
@@ -67,11 +52,7 @@ class AI_HTTP_Gemini_Provider {
     }
 
     /**
-     * Build Gemini URL with model in path and prepare request data
-     *
-     * @param array $provider_request Request data
-     * @param string $endpoint_suffix Endpoint suffix (e.g., ':generateContent')
-     * @return array [url, modified_request]
+     * Gemini requires model in URL path, not request body
      */
     private function build_gemini_url_and_request($provider_request, $endpoint_suffix) {
         $model = isset($provider_request['model']) ? $provider_request['model'] : 'gemini-pro';
