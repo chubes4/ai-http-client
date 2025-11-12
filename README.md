@@ -217,7 +217,7 @@ $response = apply_filters('ai_request', $request, 'openai', null, $tools);
 
 - **Packagist**: Available via `composer require chubes4/ai-http-client`
 - **GitHub**: https://github.com/chubes4/ai-http-client
-- **Version**: 2.0.0 - Professional WordPress library with unified error handling
+- **Version**: 1.2.1 - Professional WordPress library with unified error handling
 - **License**: GNU GPL v3
 - **Dependencies**: None (pure WordPress integration)
 - **Multi-plugin**: Safe for concurrent use by multiple WordPress plugins
@@ -245,7 +245,7 @@ add_filter('ai_providers', function($providers) {
 });
 ```
 
-## Version 2.0.0 Features
+## Version 1.2.1 Features
 
 **Core Architecture**:
 - WordPress filter-based provider registration with self-contained classes

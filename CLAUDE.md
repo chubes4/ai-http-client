@@ -100,8 +100,7 @@ add_filter('ai_providers', function($providers) {
 ```
 
 ### Error Handling Requirements
-- All providers trigger error events via `AIHttpError::trigger_api_error()` on API failures
-- Library components trigger error events via `AIHttpError::trigger_library_error()` for internal errors
+- All components trigger error events via `AIHttpError::trigger_error()` on failures
 - WordPress action hook `ai_library_error` enables plugins to monitor all failures
 - Validate all input parameters before API calls
 - Sanitize all user input using WordPress functions
@@ -292,15 +291,12 @@ All implementations must maintain backward compatibility and follow the establis
 **New Features:**
 - Auto-initialization when WordPress is ready - no manual `ai_http_client_init()` calls required in plugins
 - Improved plugin integration with seamless loading on `plugins_loaded` action
-
-## Version 2.0.0 Updates
-
-**New Features:**
 - Native Files API integration for OpenAI, Anthropic, and Gemini providers
 - Multisite network-wide API key storage support
-- Enhanced error handling with comprehensive action hooks
-- Improved model caching system with granular cache management
 - REST API endpoints replacing admin components for configuration and management
+- Consolidated error handling: single `ai_library_error` hook for all errors (API + library)
+- Enhanced error monitoring with unified data format across all components
+- Improved model caching system with granular cache management
 
 **Breaking Changes:**
 - Removed admin components, jQuery, AJAX, and provider manager UI
@@ -313,3 +309,4 @@ All implementations must maintain backward compatibility and follow the establis
 - Multi-modal content support (images, documents, files)
 - Seamless integration with existing request/response formats
 - File lifecycle management with upload/delete operations
+

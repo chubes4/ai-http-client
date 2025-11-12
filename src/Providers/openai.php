@@ -460,7 +460,7 @@ class AI_HTTP_OpenAI_Provider {
                                     );
                                 }
                             } catch (Exception $e) {
-                                AIHttpError::trigger_library_error('file_upload', $e->getMessage(), [
+                                AIHttpError::trigger_error('OpenAI', 'File upload failed: ' . $e->getMessage(), [
                                     'file_path' => $file_path ?? 'unknown',
                                     'provider' => 'openai'
                                 ]);
