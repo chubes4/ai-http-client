@@ -126,9 +126,8 @@ The library provides REST API endpoints for configuration and management:
 
 ```php
 // Configure API keys via REST API
-wp_remote_post('/wp-json/ai-http-client/v1/config', [
+wp_remote_post('/wp-json/ai-http-client/v1/api-keys/openai', [
     'body' => wp_json_encode([
-        'provider' => 'openai',
         'api_key' => 'your-api-key'
     ]),
     'headers' => [
@@ -138,14 +137,21 @@ wp_remote_post('/wp-json/ai-http-client/v1/config', [
 ]);
 
 // Get provider configuration
-$config = wp_remote_get('/wp-json/ai-http-client/v1/config/openai', [
+$config = wp_remote_get('/wp-json/ai-http-client/v1/api-keys/openai', [
     'headers' => [
         'X-WP-Nonce' => wp_create_nonce('wp_rest')
     ]
 ]);
 
-// Test provider connectivity
-$test = wp_remote_post('/wp-json/ai-http-client/v1/test/openai', [
+// Get available models for a provider
+$models = wp_remote_get('/wp-json/ai-http-client/v1/models/openai', [
+    'headers' => [
+        'X-WP-Nonce' => wp_create_nonce('wp_rest')
+    ]
+]);
+
+// Get all available providers
+$providers = wp_remote_get('/wp-json/ai-http-client/v1/providers', [
     'headers' => [
         'X-WP-Nonce' => wp_create_nonce('wp_rest')
     ]
@@ -153,13 +159,9 @@ $test = wp_remote_post('/wp-json/ai-http-client/v1/test/openai', [
 ```
 
 **Available Endpoints:**
-- **GET/POST** `/wp-json/ai-http-client/v1/config` - Get/set provider configurations
-- **GET/POST** `/wp-json/ai-http-client/v1/config/{provider}` - Get/set specific provider config
-- **DELETE** `/wp-json/ai-http-client/v1/config/{provider}` - Remove provider configuration
-- **POST** `/wp-json/ai-http-client/v1/test/{provider}` - Test provider connectivity
-- **GET** `/wp-json/ai-http-client/v1/providers` - List all available providers with status
-- **POST** `/wp-json/ai-http-client/v1/cache/clear` - Clear all model caches
-- **POST** `/wp-json/ai-http-client/v1/cache/clear/{provider}` - Clear specific provider cache
+- **GET/POST** `/wp-json/ai-http-client/v1/api-keys/{provider}` - Get/set API key for specific provider
+- **GET** `/wp-json/ai-http-client/v1/models/{provider}` - Get available models for a provider
+- **GET** `/wp-json/ai-http-client/v1/providers` - List all available providers
 
 ## Multi-Plugin Configuration
 
