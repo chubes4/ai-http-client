@@ -22,33 +22,13 @@ class AIHttpError {
     }
 
     /**
-     * Trigger API error event with context data.
+     * Trigger unified error event for all library errors.
      *
-     * @param string $provider Provider name (openai, anthropic, etc.)
-     * @param string $endpoint API endpoint that failed
-     * @param array $response Error response data
-     * @param array $context Additional context (request data, etc.)
-     */
-    public static function trigger_api_error($provider, $endpoint, $response, $context = []) {
-        $error_data = [
-            'provider' => $provider,
-            'endpoint' => $endpoint,
-            'response' => $response,
-            'context' => $context,
-            'timestamp' => time()
-        ];
-
-        do_action('ai_api_error', $error_data);
-    }
-
-    /**
-     * Trigger general library error event.
-     *
-     * @param string $component Component that errored (cache, models, etc.)
+     * @param string $component Component that errored (Requests, RestApi, OpenAI, etc.)
      * @param string $message Error message
-     * @param array $context Additional context data
+     * @param array $context Additional context data (provider, endpoint, http_code, etc.)
      */
-    public static function trigger_library_error($component, $message, $context = []) {
+    public static function trigger_error($component, $message, $context = []) {
         $error_data = [
             'component' => $component,
             'message' => $message,

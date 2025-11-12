@@ -77,7 +77,7 @@ Comprehensive AI provider support with dynamic model discovery:
 - **Unified Interface**: All providers accept standard format, return normalized responses
 - **WordPress-Native**: Uses wp_remote_* for HTTP, WordPress transients for caching
 - **Modular Design**: Provider files self-register, no central coordination needed
-- **Error Handling**: Comprehensive error hooks via `ai_api_error` action
+- **Error Handling**: Comprehensive error hook via `ai_library_error` action
 - **Performance**: 24-hour model caching with granular cache clearing
 
 ### Multi-Plugin Support
@@ -217,7 +217,7 @@ $response = apply_filters('ai_request', $request, 'openai', null, $tools);
 
 - **Packagist**: Available via `composer require chubes4/ai-http-client`
 - **GitHub**: https://github.com/chubes4/ai-http-client
-- **Version**: 1.2.0 - Professional WordPress library with REST API configuration
+- **Version**: 2.0.0 - Professional WordPress library with unified error handling
 - **License**: GNU GPL v3
 - **Dependencies**: None (pure WordPress integration)
 - **Multi-plugin**: Safe for concurrent use by multiple WordPress plugins
@@ -245,7 +245,7 @@ add_filter('ai_providers', function($providers) {
 });
 ```
 
-## Version 1.2.0 Features
+## Version 2.0.0 Features
 
 **Core Architecture**:
 - WordPress filter-based provider registration with self-contained classes
@@ -267,7 +267,7 @@ add_filter('ai_providers', function($providers) {
 - Native WordPress HTTP API usage with centralized ai_http filter
 - WordPress transients for model caching with granular cache clearing
 - WordPress options API for settings with multisite support
-- Comprehensive error handling via ai_api_error and ai_library_error action hooks
+- Comprehensive error handling via ai_library_error action hook
 
 ## Production Usage
 
@@ -289,7 +289,7 @@ define('WP_DEBUG_LOG', true);
 - Provider-specific API interactions
 - Model caching operations and cache hits/misses
 - Streaming request handling
-- Error conditions via `ai_api_error` action hook
+- Error conditions via `ai_library_error` action hook
 - File upload operations to provider APIs
 
 ## Contributing

@@ -52,10 +52,10 @@ class AI_HTTP_Anthropic_Provider {
         );
     }
 
-    /**
-     * Converts standard format to Anthropic format, calls API, returns standard format
-     * Triggers ai_api_error action on failure
-     */
+     /**
+      * Converts standard format to Anthropic format, calls API, returns standard format
+      * Triggers ai_library_error action on failure
+      */
     public function request($standard_request) {
         if (!$this->is_configured()) {
             throw new Exception('Anthropic provider not configured - missing API key');
@@ -76,7 +76,10 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic');
         
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('anthropic', '/messages', $result, [
+            AIHttpError::trigger_error('Anthropic', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'anthropic',
+                'endpoint' => '/messages',
+                'response' => $result,
                 'request' => $provider_request
             ]);
             throw new Exception('Anthropic API request failed: ' . esc_html($result['error']));
@@ -90,7 +93,7 @@ class AI_HTTP_Anthropic_Provider {
 
     /**
      * Streaming version with format conversion
-     * Triggers ai_api_error action on failure
+     * Triggers ai_library_error action on failure
      */
     public function streaming_request($standard_request, $callback = null) {
         if (!$this->is_configured()) {
@@ -112,7 +115,10 @@ class AI_HTTP_Anthropic_Provider {
         ], 'Anthropic Streaming', true, $callback);
         
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('anthropic', '/messages', $result, [
+            AIHttpError::trigger_error('Anthropic', 'Streaming request failed: ' . esc_html($result['error']), [
+                'provider' => 'anthropic',
+                'endpoint' => '/messages',
+                'response' => $result,
                 'request' => $provider_request,
                 'streaming' => true
             ]);

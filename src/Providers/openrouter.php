@@ -107,9 +107,12 @@ class AI_HTTP_OpenRouter_Provider {
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenRouter');
-        
+
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('openrouter', '/chat/completions', $result, [
+            AIHttpError::trigger_error('OpenRouter', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'openrouter',
+                'endpoint' => '/chat/completions',
+                'response' => $result,
                 'request' => $provider_request
             ]);
             throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
@@ -187,8 +190,10 @@ class AI_HTTP_OpenRouter_Provider {
         ], 'OpenRouter');
 
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('openrouter', '/chat/completions', $result, [
-                'request' => $provider_request
+            AIHttpError::trigger_error('OpenRouter', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'openrouter',
+                'endpoint' => '/models',
+                'response' => $result
             ]);
             throw new Exception('OpenRouter API request failed: ' . esc_html($result['error']));
         }

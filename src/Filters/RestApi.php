@@ -130,7 +130,7 @@ function ai_http_rest_get_api_key($request) {
         ], 200);
 
     } catch (Exception $e) {
-        AIHttpError::trigger_library_error('RestApi', 'Failed to get API key: ' . $e->getMessage(), [
+        AIHttpError::trigger_error('RestApi', 'Failed to get API key: ' . $e->getMessage(), [
             'provider' => $provider,
             'exception' => $e
         ]);
@@ -176,7 +176,7 @@ function ai_http_rest_save_api_key($request) {
         ], 200);
 
     } catch (Exception $e) {
-        AIHttpError::trigger_library_error('RestApi', 'Failed to save API key: ' . $e->getMessage(), [
+        AIHttpError::trigger_error('RestApi', 'Failed to save API key: ' . $e->getMessage(), [
             'provider' => $provider,
             'exception' => $e
         ]);
@@ -220,7 +220,7 @@ function ai_http_rest_get_models($request) {
         ], 200);
 
     } catch (Exception $e) {
-        AIHttpError::trigger_library_error('RestApi', 'Failed to get models: ' . $e->getMessage(), [
+        AIHttpError::trigger_error('RestApi', 'Failed to get models: ' . $e->getMessage(), [
             'provider' => $provider,
             'exception' => $e
         ]);
@@ -250,7 +250,7 @@ function ai_http_rest_get_providers($request) {
         ], 200);
 
     } catch (Exception $e) {
-        AIHttpError::trigger_library_error('RestApi', 'Failed to get providers: ' . $e->getMessage(), [
+        AIHttpError::trigger_error('RestApi', 'Failed to get providers: ' . $e->getMessage(), [
             'exception' => $e
         ]);
 

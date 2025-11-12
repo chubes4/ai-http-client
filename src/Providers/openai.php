@@ -91,9 +91,12 @@ class AI_HTTP_OpenAI_Provider {
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenAI');
-        
+
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('openai', '/responses', $result, [
+            AIHttpError::trigger_error('OpenAI', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'openai',
+                'endpoint' => '/responses',
+                'response' => $result,
                 'request' => $provider_request
             ]);
             throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
@@ -163,8 +166,10 @@ class AI_HTTP_OpenAI_Provider {
         ], 'OpenAI');
 
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('openai', '/responses', $result, [
-                'request' => $provider_request
+            AIHttpError::trigger_error('OpenAI', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'openai',
+                'endpoint' => '/models',
+                'response' => $result
             ]);
             throw new Exception('OpenAI API request failed: ' . esc_html($result['error']));
         }

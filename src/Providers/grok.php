@@ -97,9 +97,12 @@ class AI_HTTP_Grok_Provider {
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'Grok');
-        
+
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('grok', '/chat/completions', $result, [
+            AIHttpError::trigger_error('Grok', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'grok',
+                'endpoint' => '/chat/completions',
+                'response' => $result,
                 'request' => $provider_request
             ]);
             throw new Exception('Grok API request failed: ' . esc_html($result['error']));
@@ -177,8 +180,10 @@ class AI_HTTP_Grok_Provider {
         ], 'Grok');
 
         if (!$result['success']) {
-            AIHttpError::trigger_api_error('grok', '/chat/completions', $result, [
-                'request' => $provider_request
+            AIHttpError::trigger_error('Grok', 'API request failed: ' . esc_html($result['error']), [
+                'provider' => 'grok',
+                'endpoint' => '/models',
+                'response' => $result
             ]);
             throw new Exception('Grok API request failed: ' . esc_html($result['error']));
         }

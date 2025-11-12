@@ -52,7 +52,7 @@ The AI HTTP Client is a WordPress library providing unified AI provider communic
 
 ### Actions System (src/Actions/)
 - **Cache.php**: Model cache management with WordPress transients
-- **Error.php**: Centralized error logging using WordPress action hooks (`ai_api_error`, `ai_library_error`)
+- **Error.php**: Centralized error logging using WordPress action hook (`ai_library_error`)
 
 ## Development Standards
 
@@ -102,28 +102,36 @@ add_filter('ai_providers', function($providers) {
 ### Error Handling Requirements
 - All providers trigger error events via `AIHttpError::trigger_api_error()` on API failures
 - Library components trigger error events via `AIHttpError::trigger_library_error()` for internal errors
-- WordPress action hooks `ai_api_error` and `ai_library_error` enable plugins to monitor failures
+- WordPress action hook `ai_library_error` enables plugins to monitor all failures
 - Validate all input parameters before API calls
 - Sanitize all user input using WordPress functions
 
 **Error Action Hook Usage:**
 ```php
-// Plugins can hook into error events
-add_action('ai_api_error', function($error_data) {
-    error_log(sprintf(
-        'AI API Error: %s failed at %s - %s',
-        $error_data['provider'],
-        $error_data['endpoint'],
-        wp_json_encode($error_data['response'])
-    ));
-});
-
+// Plugins can hook into all error events
 add_action('ai_library_error', function($error_data) {
-    error_log(sprintf(
-        'AI Library Error in %s: %s',
-        $error_data['component'],
-        $error_data['message']
-    ));
+    // All errors (API + library) come through this single hook
+    $component = $error_data['component'];
+    $message = $error_data['message'];
+    $context = $error_data['context'];
+
+    // Handle API errors (from providers)
+    if (isset($context['provider'])) {
+        error_log(sprintf(
+            'AI API Error [%s]: %s failed at %s',
+            $component,
+            $context['provider'],
+            $context['endpoint'] ?? 'unknown'
+        ));
+    }
+    // Handle library errors (REST API, cache, etc.)
+    else {
+        error_log(sprintf(
+            'AI Library Error [%s]: %s',
+            $component,
+            $message
+        ));
+    }
 });
 ```
 
@@ -194,16 +202,11 @@ $providers = wp_remote_get('/wp-json/ai-http-client/v1/providers', [
 
 ### Action Hook Patterns
 ```php
-// Monitor API failures across all providers
-add_action('ai_api_error', function($error_data) {
-    // $error_data: ['provider', 'endpoint', 'response', 'context', 'timestamp']
-    // Implement custom error handling, logging, or notifications
-});
-
-// Monitor library-level errors
+// Monitor all library errors (API + internal)
 add_action('ai_library_error', function($error_data) {
     // $error_data: ['component', 'message', 'context', 'timestamp']
-    // Implement custom error handling for cache, file operations, etc.
+    // context contains provider/endpoint for API errors, or other details for library errors
+    // Implement custom error handling, logging, or notifications
 });
 
 // Clear model cache for specific provider
@@ -284,7 +287,13 @@ This library is the foundation for AI functionality across multiple WordPress pl
 
 All implementations must maintain backward compatibility and follow the established patterns to ensure seamless integration across the plugin ecosystem.
 
-## Version 1.2.0 Updates
+## Version 1.2.1 Updates
+
+**New Features:**
+- Auto-initialization when WordPress is ready - no manual `ai_http_client_init()` calls required in plugins
+- Improved plugin integration with seamless loading on `plugins_loaded` action
+
+## Version 2.0.0 Updates
 
 **New Features:**
 - Native Files API integration for OpenAI, Anthropic, and Gemini providers
@@ -297,6 +306,7 @@ All implementations must maintain backward compatibility and follow the establis
 - Removed admin components, jQuery, AJAX, and provider manager UI
 - All configuration now handled via REST API endpoints
 - Admin.php filter replaced with RestApi.php for endpoint registration
+- Consolidated error hooks: `ai_api_error` removed, all errors now use `ai_library_error`
 
 **Files API Integration:**
 - Automatic file upload and management via provider-specific Files APIs

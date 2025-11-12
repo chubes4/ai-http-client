@@ -61,10 +61,10 @@ add_filter('ai_models', function($provider_name = null) {
         return $models;
     } catch (Exception $e) {
         // Trigger error event for debugging
-        AIHttpError::trigger_api_error($provider_name, 'get_models', [
-            'error' => $e->getMessage(),
-            'code' => $e->getCode()
-        ], [
+        AIHttpError::trigger_error('Models', 'Failed to get models: ' . $e->getMessage(), [
+            'provider' => $provider_name,
+            'endpoint' => 'get_models',
+            'error_code' => $e->getCode(),
             'provider_config' => $provider_config,
             'cache_key' => $cache_key
         ]);

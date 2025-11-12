@@ -124,15 +124,13 @@ function ai_http_client_register_provider_filters() {
             curl_close($ch);
 
             if (!empty($error)) {
-                do_action('ai_api_error', [
-                    'message' => "Connection error to {$context}: {$error}",
+                AIHttpError::trigger_error('Requests', "Connection error to {$context}: {$error}", [
                     'provider' => $context,
                     'error_type' => 'curl_error',
                     'details' => $error
                 ]);
             } elseif ($http_code >= 400) {
-                do_action('ai_api_error', [
-                    'message' => "HTTP {$http_code} error from {$context}",
+                AIHttpError::trigger_error('Requests', "HTTP {$http_code} error from {$context}", [
                     'provider' => $context,
                     'http_code' => $http_code,
                     'error_type' => 'http_error'
@@ -161,8 +159,7 @@ function ai_http_client_register_provider_filters() {
         if (is_wp_error($response)) {
             $error_message = "Failed to connect to {$context}: " . $response->get_error_message();
 
-            do_action('ai_api_error', [
-                'message' => $error_message,
+            AIHttpError::trigger_error('Requests', $error_message, [
                 'provider' => $context,
                 'error_type' => 'connection_error',
                 'wp_error' => $response->get_error_message()
@@ -176,8 +173,7 @@ function ai_http_client_register_provider_filters() {
         $headers = wp_remote_retrieve_headers($response);
 
         if ($status_code >= 400) {
-            do_action('ai_api_error', [
-                'message' => "HTTP {$status_code} error from {$context}",
+            AIHttpError::trigger_error('Requests', "HTTP {$status_code} error from {$context}", [
                 'provider' => $context,
                 'http_code' => $status_code,
                 'response_body' => $body,
