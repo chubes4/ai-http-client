@@ -7,7 +7,7 @@
  * standardized request/response formats.
  *
  * @package AIHttpClient
- * @version 1.2.1
+ * @version 1.2.2
  * @author Chris Huber <https://chubes.net>
  * @link https://github.com/chubes/ai-http-client
  */
@@ -55,6 +55,4 @@ function ai_http_client_wordpress_init() {
     }
 }
 
-if (function_exists('add_action') && did_action('plugins_loaded')) {
-    ai_http_client_init();  // Auto-init if WordPress ready
-}
+add_action('plugins_loaded', 'ai_http_client_init', 1);

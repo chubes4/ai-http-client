@@ -138,7 +138,6 @@ add_action('ai_library_error', function($error_data) {
 - One provider per file in src/Providers/
 - Filter registration grouped by functionality in src/Filters/
 - WordPress action hooks in src/Actions/
-- Template files in src/templates/
 - No external composer dependencies - WordPress-native only
 
 ## Integration Patterns
@@ -286,11 +285,27 @@ This library is the foundation for AI functionality across multiple WordPress pl
 
 All implementations must maintain backward compatibility and follow the established patterns to ensure seamless integration across the plugin ecosystem.
 
+## Version 1.2.2 Updates
+
+**Bug Fixes:**
+- Fixed initialization timing issue that prevented providers from registering
+- Changed from conditional check to reliable hook-based initialization using `plugins_loaded` action
+- Ensures provider files load and register properly regardless of plugin load order
+
+**Technical Details:**
+- Replaced `did_action('plugins_loaded')` conditional with `add_action('plugins_loaded', 'ai_http_client_init', 1)`
+- Eliminates race condition between library loading and WordPress initialization
+- All AI providers now register correctly and are available through REST API endpoints
+
 ## Version 1.2.1 Updates
 
 **New Features:**
 - Auto-initialization when WordPress is ready - no manual `ai_http_client_init()` calls required in plugins
 - Improved plugin integration with seamless loading on `plugins_loaded` action
+
+## Version 1.2.0 Updates
+
+**New Features:**
 - Native Files API integration for OpenAI, Anthropic, and Gemini providers
 - Multisite network-wide API key storage support
 - REST API endpoints replacing admin components for configuration and management
