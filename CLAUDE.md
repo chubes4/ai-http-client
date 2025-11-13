@@ -285,6 +285,18 @@ This library is the foundation for AI functionality across multiple WordPress pl
 
 All implementations must maintain backward compatibility and follow the established patterns to ensure seamless integration across the plugin ecosystem.
 
+## Version 1.2.3 Updates
+
+**New Features:**
+- Dynamic model fetching for Anthropic provider
+- Models now discovered from Anthropic's /v1/models API endpoint instead of hardcoded values
+- Improved model availability with automatic updates as Anthropic releases new models
+
+**Technical Details:**
+- Updated `get_raw_models()` method to call Anthropic's models API
+- Added proper error handling for API failures during model discovery
+- Maintains backward compatibility with existing model caching system
+
 ## Version 1.2.2 Updates
 
 **Bug Fixes:**
@@ -316,7 +328,7 @@ All implementations must maintain backward compatibility and follow the establis
 **Breaking Changes:**
 - Removed admin components, jQuery, AJAX, and provider manager UI
 - All configuration now handled via REST API endpoints
-- Admin.php filter replaced with RestApi.php for endpoint registration
+- REST API endpoints added via RestApi.php for configuration and management
 - Consolidated error hooks: `ai_api_error` removed, all errors now use `ai_library_error`
 
 **Files API Integration:**
