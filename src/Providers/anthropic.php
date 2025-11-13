@@ -141,16 +141,29 @@ class AI_HTTP_Anthropic_Provider {
     }
 
     /**
-     * Anthropic doesn't expose a models endpoint - hardcoded model names required
+     * Fetch available models from Anthropic's /v1/models API endpoint
      */
     public function get_raw_models() {
         if (!$this->is_configured()) {
             return [];
         }
 
-        // Anthropic doesn't have a models endpoint
-        // Model names are hardcoded: claude-3-5-sonnet-20241022, claude-3-haiku-20240307, etc.
-        return [];
+        $url = $this->base_url . '/models';
+
+        $result = apply_filters('ai_http', [], 'GET', $url, [
+            'headers' => $this->get_auth_headers()
+        ], 'Anthropic Models');
+
+        if (!$result['success']) {
+            AIHttpError::trigger_error('Anthropic', 'Models API request failed: ' . esc_html($result['error']), [
+                'provider' => 'anthropic',
+                'endpoint' => '/models',
+                'response' => $result
+            ]);
+            throw new Exception('Anthropic models API request failed: ' . esc_html($result['error']));
+        }
+
+        return json_decode($result['data'], true);
     }
 
     public function upload_file($file_path, $purpose = 'user_data') {
