@@ -106,6 +106,58 @@ If you need to rollback to v1.x within 30 days:
 
 ---
 
-## [1.2.3] - Previous Release
+## [1.2.3] - 2025-01-14
 
-_(Previous changelog entries would go here)_
+### Added
+- Dynamic model fetching for Anthropic provider
+- Models now discovered from Anthropic's /v1/models API endpoint instead of hardcoded values
+- Improved model availability with automatic updates as Anthropic releases new models
+
+### Changed
+- Updated `get_raw_models()` method to call Anthropic's models API
+- Added proper error handling for API failures during model discovery
+- Maintains backward compatibility with existing model caching system
+
+---
+
+## [1.2.2] - 2025-01-13
+
+### Fixed
+- Fixed initialization timing issue that prevented providers from registering
+- Changed from conditional check to reliable hook-based initialization using `plugins_loaded` action
+- Ensures provider files load and register properly regardless of plugin load order
+
+### Changed
+- Replaced `did_action('plugins_loaded')` conditional with `add_action('plugins_loaded', 'ai_http_client_init', 1)`
+- Eliminates race condition between library loading and WordPress initialization
+- All AI providers now register correctly and are available through REST API endpoints
+
+---
+
+## [1.2.1] - 2025-01-12
+
+### Added
+- Auto-initialization when WordPress is ready - no manual `ai_http_client_init()` calls required in plugins
+- Improved plugin integration with seamless loading on `plugins_loaded` action
+
+---
+
+## [1.2.0] - 2025-01-11
+
+### Added
+- Native Files API integration for OpenAI, Anthropic, and Gemini providers
+- Multisite network-wide API key storage support
+- REST API endpoints replacing admin components for configuration and management
+- Consolidated error handling: single `ai_library_error` hook for all errors (API + library)
+- Enhanced error monitoring with unified data format across all components
+- Improved model caching system with granular cache management
+- Automatic file upload and management via provider-specific Files APIs
+- Multi-modal content support (images, documents, files)
+- Seamless integration with existing request/response formats
+- File lifecycle management with upload/delete operations
+
+### Changed
+- Removed admin components, jQuery, AJAX, and provider manager UI
+- All configuration now handled via REST API endpoints
+- REST API endpoints added via RestApi.php for configuration and management
+- Consolidated error hooks: `ai_api_error` removed, all errors now use `ai_library_error`

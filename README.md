@@ -35,7 +35,7 @@ git subtree add --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-c
 ### Automatic Migration
 
 API keys are automatically migrated on first admin page load:
-- Old option: `chubes_ai_http_shared_api_keys`
+- Old option: `ai_http_shared_api_keys`
 - New option: `chubes_ai_http_shared_api_keys`
 - Old option deleted after 30 days
 
@@ -45,11 +45,11 @@ Update all references in your code:
 
 ```php
 // OLD (v1.x)
-apply_filters('chubes_ai_providers', [])
+apply_filters('ai_providers', [])
 apply_filters('ai_provider_api_keys', null)
-apply_filters('chubes_ai_models', $provider)
-apply_filters('chubes_ai_tools', [])
-apply_filters('chubes_ai_request', $request)
+apply_filters('ai_models', $provider)
+apply_filters('ai_tools', [])
+apply_filters('ai_request', $request)
 apply_filters('ai_file_to_base64', '', $path)
 apply_filters('ai_http', [], $method, $url, $args)
 
@@ -141,8 +141,8 @@ Comprehensive AI provider support with dynamic model discovery:
 $providers = apply_filters('chubes_ai_providers', []);
 
 // API Keys Management
-$keys = apply_filters('ai_provider_api_keys', null); // Get all keys
-apply_filters('ai_provider_api_keys', $new_keys);     // Update all keys
+$keys = apply_filters('chubes_ai_provider_api_keys', null); // Get all keys
+apply_filters('chubes_ai_provider_api_keys', $new_keys);     // Update all keys
 
 // Dynamic Model Fetching (with 24-hour cache)
 $models = apply_filters('chubes_ai_models', $provider_name, $config);
@@ -151,10 +151,10 @@ $models = apply_filters('chubes_ai_models', $provider_name, $config);
 $tools = apply_filters('chubes_ai_tools', []);
 
 // File Operations
-$base64 = apply_filters('ai_file_to_base64', '', $file_path, $options);
+$base64 = apply_filters('chubes_ai_file_to_base64', '', $file_path, $options);
 
 // HTTP Requests (internal use)
-$result = apply_filters('ai_http', [], 'POST', $url, $args, 'Context');
+$result = apply_filters('chubes_ai_http', [], 'POST', $url, $args, 'Context');
 ```
 
 ## REST API Endpoints
@@ -204,8 +204,8 @@ $providers = wp_remote_get('/wp-json/ai-http-client/v1/providers', [
 
 **Shared API Keys Storage**:
 ```php
-// WordPress option: 'ai_http_shared_api_keys'
-$shared_keys = apply_filters('ai_provider_api_keys', null);
+// WordPress option: 'chubes_ai_http_shared_api_keys'
+$shared_keys = apply_filters('chubes_ai_provider_api_keys', null);
 // Returns: ['openai' => 'sk-...', 'anthropic' => 'sk-ant-...', ...]
 ```
 
@@ -254,7 +254,7 @@ $response = apply_filters('chubes_ai_request', $request, 'openai', null, $tools)
 
 - **Packagist**: Available via `composer require chubes4/ai-http-client`
 - **GitHub**: https://github.com/chubes4/ai-http-client
-- **Version**: 1.2.3 - Professional WordPress library with dynamic model fetching
+- **Version**: 2.0.0 - Professional WordPress library with WordPress.org compliance
 - **License**: GNU GPL v3
 - **Dependencies**: None (pure WordPress integration)
 - **Multi-plugin**: Safe for concurrent use by multiple WordPress plugins
@@ -282,7 +282,12 @@ add_filter('chubes_ai_providers', function($providers) {
 });
 ```
 
-## Version 1.2.3 Features
+## Version 2.0.0 Features
+
+**WordPress.org Compliance**:
+- All filter/action hooks renamed from `ai_*` to `chubes_ai_*` prefix
+- Automatic migration system for API keys and settings
+- Backward compatibility migration for 30-day rollback window
 
 **Core Architecture**:
 - WordPress filter-based provider registration with self-contained classes
@@ -295,16 +300,16 @@ add_filter('chubes_ai_providers', function($providers) {
 
 **AI Provider Support**:
 - OpenAI Responses API integration with native Files API support
-- Anthropic Claude models with native Files API and vision capabilities
+- Anthropic Claude models with dynamic model discovery and native Files API
 - Google Gemini with native Files API and multi-modal support
 - Grok/X.AI integration with streaming support
 - OpenRouter gateway access to 200+ models
 
 **WordPress Integration**:
-- Native WordPress HTTP API usage with centralized ai_http filter
+- Native WordPress HTTP API usage with centralized `chubes_ai_http` filter
 - WordPress transients for model caching with granular cache clearing
 - WordPress options API for settings with multisite support
-- Comprehensive error handling via ai_library_error action hook
+- Comprehensive error handling via `chubes_ai_library_error` action hook
 
 ## Production Usage
 
