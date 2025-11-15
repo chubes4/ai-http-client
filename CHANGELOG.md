@@ -43,7 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic Migration System**: API keys are automatically migrated on first admin page load after upgrading to v2.0
 - **Migration Tracking**: `chubes_ai_http_v2_migrated` option tracks migration completion
 - **Scheduled Cleanup**: Old API keys option automatically deleted 30 days after migration
-- **Migration Logging**: All migration events logged via `error_log()` for debugging
 
 ### Changed
 

@@ -46,14 +46,6 @@ class AIHttpMigration {
             // Copy to new option
             update_site_option('chubes_ai_http_shared_api_keys', $old_keys);
 
-            // Log migration
-            if (function_exists('error_log')) {
-                error_log(sprintf(
-                    '[AI HTTP Client] v2.0 Migration: Migrated %d API keys from v1.x to v2.0 format',
-                    count($old_keys)
-                ));
-            }
-
             // Schedule cleanup of old option after 30 days
             if (function_exists('wp_schedule_single_event')) {
                 wp_schedule_single_event(
@@ -74,10 +66,6 @@ class AIHttpMigration {
      */
     public static function cleanup_old_keys() {
         delete_site_option('ai_http_shared_api_keys');
-
-        if (function_exists('error_log')) {
-            error_log('[AI HTTP Client] v2.0 Migration: Cleaned up old v1.x API keys option');
-        }
     }
 }
 
