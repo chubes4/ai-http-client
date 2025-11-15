@@ -118,7 +118,7 @@ function ai_http_rest_get_api_key($request) {
 
     try {
         // Get API key using ai_provider_api_keys filter
-        $all_keys = apply_filters('ai_provider_api_keys', null);
+        $all_keys = apply_filters('chubes_ai_provider_api_keys', null);
         $api_key = $all_keys[$provider] ?? '';
 
         return new WP_REST_Response([
@@ -163,9 +163,9 @@ function ai_http_rest_save_api_key($request) {
 
     try {
         // Save API key using ai_provider_api_keys filter
-        $all_keys = apply_filters('ai_provider_api_keys', null);
+        $all_keys = apply_filters('chubes_ai_provider_api_keys', null);
         $all_keys[$provider] = $api_key;
-        apply_filters('ai_provider_api_keys', $all_keys);
+        apply_filters('chubes_ai_provider_api_keys', $all_keys);
 
         return new WP_REST_Response([
             'success' => true,
@@ -208,11 +208,11 @@ function ai_http_rest_get_models($request) {
 
     try {
         // Get API key using ai_provider_api_keys filter
-        $all_keys = apply_filters('ai_provider_api_keys', null);
+        $all_keys = apply_filters('chubes_ai_provider_api_keys', null);
         $api_key = $all_keys[$provider] ?? '';
 
-        // Get models using ai_models filter
-        $models = apply_filters('ai_models', $provider, ['api_key' => $api_key]);
+        // Get models using chubes_ai_models filter
+        $models = apply_filters('chubes_ai_models', $provider, ['api_key' => $api_key]);
 
         return new WP_REST_Response([
             'success' => true,
@@ -241,8 +241,8 @@ function ai_http_rest_get_models($request) {
  */
 function ai_http_rest_get_providers($request) {
     try {
-        // Get providers using ai_providers filter
-        $providers = apply_filters('ai_providers', []);
+        // Get providers using chubes_ai_providers filter
+        $providers = apply_filters('chubes_ai_providers', []);
 
         return new WP_REST_Response([
             'success' => true,

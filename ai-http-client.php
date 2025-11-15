@@ -7,9 +7,9 @@
  * standardized request/response formats.
  *
  * @package AIHttpClient
- * @version 1.2.3
+ * @version 2.0.0
  * @author Chris Huber <https://chubes.net>
- * @link https://github.com/chubes/ai-http-client
+ * @link https://github.com/chubes4/ai-http-client
  */
 
 defined('ABSPATH') || exit;
@@ -35,6 +35,7 @@ function ai_http_client_init() {
 
     require_once AI_HTTP_CLIENT_PATH . '/src/Actions/Cache.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Actions/Error.php';
+    require_once AI_HTTP_CLIENT_PATH . '/src/Actions/Migration.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Requests.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Models.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Filters/Tools.php';
@@ -51,7 +52,7 @@ function ai_http_client_wordpress_init() {
     AIHttpError::register();
 
     if (function_exists('do_action')) {
-        do_action('ai_http_client_loaded');
+        do_action('chubes_ai_http_client_loaded');
     }
 }
 

@@ -18,9 +18,9 @@ defined('ABSPATH') || exit;
 function ai_http_client_register_provider_filters() {
 
     // Universal file-to-base64 conversion filter
-    // Usage: $base64_data_url = apply_filters('ai_file_to_base64', '', $file_path, $options);
+    // Usage: $base64_data_url = apply_filters('chubes_ai_file_to_base64', '', $file_path, $options);
     // Returns: "data:image/jpeg;base64,/9j/4AAQ..." format or empty string on failure
-    add_filter('ai_file_to_base64', function($default, $file_path, $options = []) {
+    add_filter('chubes_ai_file_to_base64', function($default, $file_path, $options = []) {
         if (empty($file_path) || !is_string($file_path)) {
             return '';
         }
@@ -59,9 +59,9 @@ function ai_http_client_register_provider_filters() {
     }, 10, 3);
     
     // Internal HTTP request handling for AI API calls
-    // Usage: $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Provider Context', false, $callback);
-    // Streaming: $result = apply_filters('ai_http', [], 'POST', $url, $args, 'Provider Context', true, $callback);
-    add_filter('ai_http', function($default, $method, $url, $args, $context, $streaming = false, $callback = null) {
+    // Usage: $result = apply_filters('chubes_ai_http', [], 'POST', $url, $args, 'Provider Context', false, $callback);
+    // Streaming: $result = apply_filters('chubes_ai_http', [], 'POST', $url, $args, 'Provider Context', true, $callback);
+    add_filter('chubes_ai_http', function($default, $method, $url, $args, $context, $streaming = false, $callback = null) {
         $valid_methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
         $method = strtoupper($method);
         if (!in_array($method, $valid_methods)) {
@@ -194,8 +194,8 @@ function ai_http_client_register_provider_filters() {
     
 
     // Public AI Request filter - high-level plugin interface
-    // Usage: $response = apply_filters('ai_request', $request, $provider_name, $streaming_callback, $tools, $conversation_data);
-    add_filter('ai_request', function($request, $provider_name = null, $streaming_callback = null, $tools = null, $conversation_data = null) {
+    // Usage: $response = apply_filters('chubes_ai_request', $request, $provider_name, $streaming_callback, $tools, $conversation_data);
+    add_filter('chubes_ai_request', function($request, $provider_name = null, $streaming_callback = null, $tools = null, $conversation_data = null) {
         
 
         if (!is_array($request)) {
@@ -218,7 +218,7 @@ function ai_http_client_register_provider_filters() {
         }
         
         if ($conversation_data && is_array($conversation_data)) {
-            $shared_api_keys = apply_filters('ai_provider_api_keys', null);
+            $shared_api_keys = apply_filters('chubes_ai_provider_api_keys', null);
             $api_key = $shared_api_keys[$provider_name] ?? '';
             if (!empty($api_key)) {
                 $provider_config = ['api_key' => $api_key];
@@ -253,7 +253,7 @@ function ai_http_client_register_provider_filters() {
             }
             
             // Build provider config from shared API keys
-            $shared_api_keys = apply_filters('ai_provider_api_keys', null);
+            $shared_api_keys = apply_filters('chubes_ai_provider_api_keys', null);
             $api_key = $shared_api_keys[$provider_name] ?? '';
             
             if (empty($api_key)) {
@@ -313,7 +313,7 @@ function ai_http_create_error_response($error_message, $provider_name = 'unknown
  */
 function ai_http_create_provider($provider_name, $provider_config = null) {
     // Use filter-based provider discovery
-    $all_providers = apply_filters('ai_providers', []);
+    $all_providers = apply_filters('chubes_ai_providers', []);
     $provider_info = $all_providers[strtolower($provider_name)] ?? null;
     if (!$provider_info) {
         return false;

@@ -16,7 +16,7 @@ class AIHttpCache {
     /**
      * Cache key constants
      */
-    const MODEL_CACHE_PREFIX = 'ai_models_';
+    const MODEL_CACHE_PREFIX = 'chubes_ai_models_';
     const CACHE_TTL = 24 * HOUR_IN_SECONDS; // 24 hours
 
     /**
@@ -30,8 +30,8 @@ class AIHttpCache {
     public static function register() {
         $instance = new self();
 
-        add_action('ai_clear_model_cache', [$instance, 'handle_clear_model_cache'], 10, 1);
-        add_action('ai_clear_all_cache', [$instance, 'handle_clear_all_cache'], 10, 0);
+        add_action('chubes_ai_clear_model_cache', [$instance, 'handle_clear_model_cache'], 10, 1);
+        add_action('chubes_ai_clear_all_cache', [$instance, 'handle_clear_all_cache'], 10, 0);
     }
 
     /**
@@ -44,7 +44,7 @@ class AIHttpCache {
 
         $this->clear_model_cache($provider);
 
-        do_action('ai_model_cache_cleared', $provider);
+        do_action('chubes_ai_model_cache_cleared', $provider);
     }
 
     /**
@@ -55,7 +55,7 @@ class AIHttpCache {
             $this->clear_model_cache($provider);
         }
 
-        do_action('ai_all_model_cache_cleared');
+        do_action('chubes_ai_all_model_cache_cleared');
     }
 
     /**
@@ -64,7 +64,7 @@ class AIHttpCache {
     private function clear_model_cache($provider) {
         global $wpdb;
 
-        // Clear all cache keys matching pattern: ai_models_{provider}_*
+        // Clear all cache keys matching pattern: chubes_ai_models_{provider}_*
         $cache_pattern = self::MODEL_CACHE_PREFIX . $provider . '_';
         $sql_pattern = str_replace('*', '%', $cache_pattern . '*');
         $transient_keys = $wpdb->get_col($wpdb->prepare(

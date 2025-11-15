@@ -36,6 +36,6 @@ class AIHttpError {
             'timestamp' => time()
         ];
 
-        do_action('ai_library_error', $error_data);
+        do_action('chubes_ai_library_error', $error_data);
     }
 }

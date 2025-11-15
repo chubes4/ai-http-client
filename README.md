@@ -28,6 +28,43 @@ git subtree add --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-c
 
 **Requirements**: PHP 7.4+, WordPress environment
 
+## Upgrading from v1.x to v2.0
+
+**Breaking Changes**: All filter/action hooks renamed from `ai_*` to `chubes_ai_*` for WordPress.org compliance.
+
+### Automatic Migration
+
+API keys are automatically migrated on first admin page load:
+- Old option: `chubes_ai_http_shared_api_keys`
+- New option: `chubes_ai_http_shared_api_keys`
+- Old option deleted after 30 days
+
+### Hook Migration
+
+Update all references in your code:
+
+```php
+// OLD (v1.x)
+apply_filters('chubes_ai_providers', [])
+apply_filters('ai_provider_api_keys', null)
+apply_filters('chubes_ai_models', $provider)
+apply_filters('chubes_ai_tools', [])
+apply_filters('chubes_ai_request', $request)
+apply_filters('ai_file_to_base64', '', $path)
+apply_filters('ai_http', [], $method, $url, $args)
+
+// NEW (v2.0)
+apply_filters('chubes_ai_providers', [])
+apply_filters('chubes_ai_provider_api_keys', null)
+apply_filters('chubes_ai_models', $provider)
+apply_filters('chubes_ai_tools', [])
+apply_filters('chubes_ai_request', $request)
+apply_filters('chubes_ai_file_to_base64', '', $path)
+apply_filters('chubes_ai_http', [], $method, $url, $args)
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for complete migration details.
+
 ## Usage
 
 **Include Library**:
@@ -40,7 +77,7 @@ require_once plugin_dir_path(__FILE__) . 'lib/ai-http-client/ai-http-client.php'
 
 **Basic Request**:
 ```php
-$response = apply_filters('ai_request', [
+$response = apply_filters('chubes_ai_request', [
     'messages' => [['role' => 'user', 'content' => 'Hello AI!']]
 ], 'openai'); // Provider name is now required
 ```
@@ -48,16 +85,16 @@ $response = apply_filters('ai_request', [
 **Advanced Options**:
 ```php
 // Specific provider (required parameter)
-$response = apply_filters('ai_request', $request, 'anthropic');
+$response = apply_filters('chubes_ai_request', $request, 'anthropic');
 
 // With streaming callback
-$response = apply_filters('ai_request', $request, 'openai', $streaming_callback);
+$response = apply_filters('chubes_ai_request', $request, 'openai', $streaming_callback);
 
 // With function calling tools
-$response = apply_filters('ai_request', $request, 'openai', null, $tools);
+$response = apply_filters('chubes_ai_request', $request, 'openai', null, $tools);
 
 // With conversation continuation
-$response = apply_filters('ai_request', $request, 'openai', null, $tools, $conversation_data);
+$response = apply_filters('chubes_ai_request', $request, 'openai', null, $tools, $conversation_data);
 ```
 
 ## Providers
@@ -72,18 +109,18 @@ Comprehensive AI provider support with dynamic model discovery:
 
 ## Architecture
 
-- **Filter-Based**: WordPress-native provider registration via `ai_providers` filter
+- **Filter-Based**: WordPress-native provider registration via `chubes_ai_providers` filter
 - **Self-Contained**: Each provider handles format conversion internally (standard ↔ provider format)
 - **Unified Interface**: All providers accept standard format, return normalized responses
 - **WordPress-Native**: Uses wp_remote_* for HTTP, WordPress transients for caching
 - **Modular Design**: Provider files self-register, no central coordination needed
-- **Error Handling**: Comprehensive error hook via `ai_library_error` action
+- **Error Handling**: Comprehensive error hook via `chubes_ai_library_error` action
 - **Performance**: 24-hour model caching with granular cache clearing
 
 ### Multi-Plugin Support
 
 - Plugin-isolated configurations via filter-based settings
-- Centralized API key storage in `ai_http_shared_api_keys` option
+- Centralized API key storage in `chubes_ai_http_shared_api_keys` option
 - Multisite network-wide API key storage support
 - No provider conflicts through self-contained architecture
 - Independent AI settings per consuming plugin
@@ -91,8 +128,8 @@ Comprehensive AI provider support with dynamic model discovery:
 ### Core Components
 
 - **Providers**: Self-contained classes with unified interface (OpenAI, Anthropic, Gemini, Grok, OpenRouter)
-- **Request Processing**: Complete pipeline via `ai_request` filter with error handling
-- **HTTP Layer**: Centralized `ai_http` filter supporting streaming and standard requests
+- **Request Processing**: Complete pipeline via `chubes_ai_request` filter with error handling
+- **HTTP Layer**: Centralized `chubes_ai_http` filter supporting streaming and standard requests
 - **Caching System**: Model caching via `AIHttpCache` class with WordPress transients
 - **REST API**: Configuration and management endpoints via `ai_http_client` namespace
 - **Error Management**: Centralized logging via `AIHttpError` class
@@ -101,17 +138,17 @@ Comprehensive AI provider support with dynamic model discovery:
 
 ```php
 // Provider Discovery
-$providers = apply_filters('ai_providers', []);
+$providers = apply_filters('chubes_ai_providers', []);
 
 // API Keys Management
 $keys = apply_filters('ai_provider_api_keys', null); // Get all keys
 apply_filters('ai_provider_api_keys', $new_keys);     // Update all keys
 
 // Dynamic Model Fetching (with 24-hour cache)
-$models = apply_filters('ai_models', $provider_name, $config);
+$models = apply_filters('chubes_ai_models', $provider_name, $config);
 
 // AI Tools Registration
-$tools = apply_filters('ai_tools', []);
+$tools = apply_filters('chubes_ai_tools', []);
 
 // File Operations
 $base64 = apply_filters('ai_file_to_base64', '', $file_path, $options);
@@ -186,7 +223,7 @@ $provider = new AI_HTTP_OpenAI_Provider([
 
 **Tool Registration**:
 ```php
-add_filter('ai_tools', function($tools) {
+add_filter('chubes_ai_tools', function($tools) {
     $tools['file_processor'] = [
         'class' => 'FileProcessor_Tool',
         'category' => 'file_handling',
@@ -206,10 +243,10 @@ add_filter('ai_tools', function($tools) {
 **Tool Discovery and Usage**:
 ```php
 // Get all registered tools
-$all_tools = apply_filters('ai_tools', []);
+$all_tools = apply_filters('chubes_ai_tools', []);
 
 // Pass tools to AI request
-$response = apply_filters('ai_request', $request, 'openai', null, $tools);
+$response = apply_filters('chubes_ai_request', $request, 'openai', null, $tools);
 // Note: Tool execution is handled by consuming plugins
 ```
 
@@ -235,7 +272,7 @@ class AI_HTTP_MyProvider {
 }
 
 // Self-register via filter
-add_filter('ai_providers', function($providers) {
+add_filter('chubes_ai_providers', function($providers) {
     $providers['myprovider'] = [
         'class' => 'AI_HTTP_MyProvider',
         'type' => 'llm',
@@ -285,11 +322,11 @@ define('WP_DEBUG_LOG', true);
 ```
 
 **Debug Logging Covers**:
-- HTTP request/response cycles via `ai_http` filter
+- HTTP request/response cycles via `chubes_ai_http` filter
 - Provider-specific API interactions
 - Model caching operations and cache hits/misses
 - Streaming request handling
-- Error conditions via `ai_library_error` action hook
+- Error conditions via `chubes_ai_library_error` action hook
 - File upload operations to provider APIs
 
 ## Contributing

@@ -15,7 +15,7 @@ defined('ABSPATH') || exit;
 /**
  * Self-register OpenAI provider
  */
-add_filter('ai_providers', function($providers) {
+add_filter('chubes_ai_providers', function($providers) {
     $providers['openai'] = [
         'class' => 'AI_HTTP_OpenAI_Provider',
         'type' => 'llm',
@@ -87,7 +87,7 @@ class AI_HTTP_OpenAI_Provider {
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenAI');
@@ -127,7 +127,7 @@ class AI_HTTP_OpenAI_Provider {
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenAI Streaming', true, $callback);
@@ -161,7 +161,7 @@ class AI_HTTP_OpenAI_Provider {
 
         $url = $this->base_url . '/models';
 
-        $result = apply_filters('ai_http', [], 'GET', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'GET', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenAI');
 
@@ -213,7 +213,7 @@ class AI_HTTP_OpenAI_Provider {
         $body .= file_get_contents($file_path) . "\r\n";
         $body .= "--{$boundary}--\r\n";
 
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => $body
         ], 'OpenAI File Upload');
@@ -244,7 +244,7 @@ class AI_HTTP_OpenAI_Provider {
 
         $url = $this->base_url . "/files/{$file_id}";
 
-        $result = apply_filters('ai_http', [], 'DELETE', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'DELETE', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenAI File Delete');
 

@@ -12,8 +12,8 @@
 defined('ABSPATH') || exit;
 
 // Register AI tools filter for plugin-scoped tool registration
-// Usage: $all_tools = apply_filters('ai_tools', []);
-add_filter('ai_tools', function($tools) {
+// Usage: $all_tools = apply_filters('chubes_ai_tools', []);
+add_filter('chubes_ai_tools', function($tools) {
     // Tools self-register in their own files following the same pattern as providers
     // This enables any plugin to register tools that other plugins can discover and use
     return $tools;
@@ -49,7 +49,7 @@ function ai_http_convert_tool_name_to_definition($tool_name) {
  * @since 1.2.0
  */
 function ai_http_get_tools($category = null) {
-    $all_tools = apply_filters('ai_tools', []);
+    $all_tools = apply_filters('chubes_ai_tools', []);
     
     // Filter by category
     if ($category) {

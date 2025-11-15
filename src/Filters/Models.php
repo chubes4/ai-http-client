@@ -21,8 +21,8 @@ function ai_http_generate_cache_key($provider_name, $api_key = '') {
 }
 
 // AI Models filter - with 24-hour caching for performance
-// Usage: $models = apply_filters('ai_models', $provider_name);
-add_filter('ai_models', function($provider_name = null) {
+// Usage: $models = apply_filters('chubes_ai_models', $provider_name);
+add_filter('chubes_ai_models', function($provider_name = null) {
 
     $args = func_get_args();
     $provider_config = $args[1] ?? null;
@@ -38,7 +38,7 @@ add_filter('ai_models', function($provider_name = null) {
     }
 
     // Check cache first (24-hour TTL) with secure key including API key hash
-    $cache_key = ai_http_generate_cache_key($provider_name, $api_key);
+    $cache_key = chubes_ai_http_generate_cache_key($provider_name, $api_key);
     $cached_models = get_transient($cache_key);
 
     if ($cached_models !== false) {

@@ -12,10 +12,10 @@
 defined('ABSPATH') || exit;
 
 // Filter to get/set all provider API keys.
-// Usage: apply_filters('ai_provider_api_keys', null) to get all keys.
-//        apply_filters('ai_provider_api_keys', $keys) to update all keys.
-add_filter('ai_provider_api_keys', function($keys = null) {
-    $option_name = 'ai_http_shared_api_keys';
+// Usage: apply_filters('chubes_ai_provider_api_keys', null) to get all keys.
+//        apply_filters('chubes_ai_provider_api_keys', $keys) to update all keys.
+add_filter('chubes_ai_provider_api_keys', function($keys = null) {
+    $option_name = 'chubes_ai_http_shared_api_keys';
     if (is_null($keys)) {
         // Get all keys (network-wide in multisite, per-site in single-site)
         return get_site_option($option_name, []);

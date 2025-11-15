@@ -16,7 +16,7 @@ defined('ABSPATH') || exit;
  * Self-register OpenRouter provider with complete configuration
  * Self-contained provider architecture - no external normalizers needed
  */
-add_filter('ai_providers', function($providers) {
+add_filter('chubes_ai_providers', function($providers) {
     $providers['openrouter'] = [
         'class' => 'AI_HTTP_OpenRouter_Provider',
         'type' => 'llm',
@@ -103,7 +103,7 @@ class AI_HTTP_OpenRouter_Provider {
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenRouter');
@@ -147,7 +147,7 @@ class AI_HTTP_OpenRouter_Provider {
         $headers = $this->get_auth_headers();
         $headers['Content-Type'] = 'application/json';
         
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => wp_json_encode($provider_request)
         ], 'OpenRouter Streaming', true, $callback);
@@ -185,7 +185,7 @@ class AI_HTTP_OpenRouter_Provider {
         $url = $this->base_url . '/models';
         
         // Use centralized ai_http filter
-        $result = apply_filters('ai_http', [], 'GET', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'GET', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenRouter');
 
@@ -243,7 +243,7 @@ class AI_HTTP_OpenRouter_Provider {
         $body .= "--{$boundary}--\r\n";
 
         // Send request using centralized ai_http filter
-        $result = apply_filters('ai_http', [], 'POST', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => $body
         ], 'OpenRouter File Upload');
@@ -277,7 +277,7 @@ class AI_HTTP_OpenRouter_Provider {
         $url = $this->base_url . "/files/{$file_id}";
         
         // Send request using centralized ai_http filter
-        $result = apply_filters('ai_http', [], 'DELETE', $url, [
+        $result = apply_filters('chubes_ai_http', [], 'DELETE', $url, [
             'headers' => $this->get_auth_headers()
         ], 'OpenRouter File Delete');
 
@@ -346,7 +346,7 @@ class AI_HTTP_OpenRouter_Provider {
                             $file_path = $content_part['file_path'];
                             
                             // Use universal base64 conversion filter
-                            $base64_data_url = apply_filters('ai_file_to_base64', '', $file_path);
+                            $base64_data_url = apply_filters('chubes_ai_file_to_base64', '', $file_path);
                             
                             if (!empty($base64_data_url)) {
                                 // Convert to OpenAI-compatible image_url format
