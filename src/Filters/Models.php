@@ -38,7 +38,7 @@ add_filter('chubes_ai_models', function($provider_name = null) {
     }
 
     // Check cache first (24-hour TTL) with secure key including API key hash
-    $cache_key = chubes_ai_http_generate_cache_key($provider_name, $api_key);
+    $cache_key = ai_http_generate_cache_key($provider_name, $api_key);
     $cached_models = get_transient($cache_key);
 
     if ($cached_models !== false) {
