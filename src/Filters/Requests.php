@@ -308,32 +308,25 @@ function ai_http_create_error_response($error_message, $provider_name = 'unknown
  * Create provider instance
  *
  * @param string $provider_name Provider name
- * @param array|null $provider_config Optional provider configuration override
+ * @param array $provider_config Provider configuration (required)
  * @return object|false Provider instance or false on failure
  */
-function ai_http_create_provider($provider_name, $provider_config = null) {
+function ai_http_create_provider($provider_name, $provider_config) {
     // Use filter-based provider discovery
     $all_providers = apply_filters('chubes_ai_providers', []);
     $provider_info = $all_providers[strtolower($provider_name)] ?? null;
     if (!$provider_info) {
         return false;
     }
-    // Get provider configuration if not provided
-    if ($provider_config === null) {
-        // Build minimal config from shared API keys
-        $shared_api_keys = apply_filters('ai_provider_api_keys', null);
-        $api_key = $shared_api_keys[$provider_name] ?? '';
-        $provider_config = $api_key ? ['api_key' => $api_key] : [];
-    }
-    
+
     // Get provider class and create instance
     $provider_class = $provider_info['class'];
     $provider = new $provider_class($provider_config);
 
     // Set up Files API callback for file uploads in self-contained providers
     if (method_exists($provider, 'set_files_api_callback')) {
-        $provider->set_files_api_callback(function($file_path, $purpose = 'user_data', $provider_name = 'openai') {
-            return ai_http_upload_file_to_provider($file_path, $purpose, $provider_name);
+        $provider->set_files_api_callback(function($file_path, $purpose = 'user_data') use ($provider_name, $provider_config) {
+            return ai_http_upload_file_to_provider($file_path, $purpose, $provider_name, $provider_config);
         });
     }
 
@@ -346,16 +339,17 @@ function ai_http_create_provider($provider_name, $provider_config = null) {
  * @param string $file_path Path to file to upload
  * @param string $purpose Purpose for upload
  * @param string $provider_name Provider to upload to
+ * @param array $provider_config Provider configuration
  * @return string File ID from provider's Files API
  * @throws Exception If upload fails
  */
-function ai_http_upload_file_to_provider($file_path, $purpose = 'user_data', $provider_name = 'openai') {
-    $provider = ai_http_create_provider($provider_name);
-    
+function ai_http_upload_file_to_provider($file_path, $purpose = 'user_data', $provider_name = 'openai', $provider_config = []) {
+    $provider = ai_http_create_provider($provider_name, $provider_config);
+
     if (!$provider) {
         throw new Exception(esc_html($provider_name) . ' provider not available for Files API upload');
     }
-    
+
     return $provider->upload_file($file_path, $purpose);
 }
 
