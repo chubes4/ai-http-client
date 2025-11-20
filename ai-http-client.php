@@ -7,7 +7,7 @@
  * standardized request/response formats.
  *
  * @package AIHttpClient
- * @version 2.0.2
+ * @version 2.0.3
  * @author Chris Huber <https://chubes.net>
  * @link https://github.com/chubes4/ai-http-client
  */
@@ -26,6 +26,12 @@ if (!defined('AI_HTTP_CLIENT_URL')) {
  * Initialize AI HTTP Client library with WordPress-native loading
  */
 function ai_http_client_init() {
+    // Prevent multiple initializations when library is included by multiple plugins
+    if (defined('AI_HTTP_CLIENT_INITIALIZED')) {
+        return;
+    }
+    define('AI_HTTP_CLIENT_INITIALIZED', true);
+
     // Load providers and filters
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/gemini.php';

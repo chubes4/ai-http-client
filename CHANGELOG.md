@@ -5,6 +5,12 @@ All notable changes to the AI HTTP Client library will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2025-11-20
+
+### Fixed
+
+- **Multi-Plugin Compatibility**: Added initialization guard to prevent conflicts when multiple plugins include the AI HTTP Client library simultaneously. The library now properly handles being loaded by multiple plugins without losing provider registrations.
+
 ## [2.0.1] - 2025-11-16
 
 ### Fixed
