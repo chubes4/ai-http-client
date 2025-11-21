@@ -121,7 +121,6 @@ function ai_http_client_register_provider_filters() {
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
-            curl_close($ch);
 
             if (!empty($error)) {
                 AIHttpError::trigger_error('Requests', "Connection error to {$context}: {$error}", [

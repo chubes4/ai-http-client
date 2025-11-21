@@ -14,6 +14,10 @@
 
 defined('ABSPATH') || exit;
 
+if (!defined('AI_HTTP_CLIENT_VERSION')) {
+    define('AI_HTTP_CLIENT_VERSION', '2.0.4');
+}
+
 if (!defined('AI_HTTP_CLIENT_PATH')) {
     define('AI_HTTP_CLIENT_PATH', __DIR__);
 }
