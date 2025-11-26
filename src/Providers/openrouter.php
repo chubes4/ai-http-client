@@ -457,9 +457,6 @@ class AI_HTTP_OpenRouter_Provider {
                 if (isset($message['role'])) {
                     $message['role'] = sanitize_text_field($message['role']);
                 }
-                if (isset($message['content']) && is_string($message['content'])) {
-                    $message['content'] = sanitize_textarea_field($message['content']);
-                }
             }
         }
 
