@@ -24,7 +24,7 @@ composer require chubes4/ai-http-client
 git subtree add --prefix=lib/ai-http-client https://github.com/chubes4/ai-http-client.git main --squash
 ```
 
-**Manual Installation**: Download and place in your plugin directory
+**Manual Installation**: Download and include in your WordPress plugin or theme
 
 **Requirements**: PHP 7.4+, WordPress environment
 
@@ -254,7 +254,7 @@ $response = apply_filters('chubes_ai_request', $request, 'openai', null, $tools)
 
 - **Packagist**: Available via `composer require chubes4/ai-http-client`
 - **GitHub**: https://github.com/chubes4/ai-http-client
-- **Version**: 2.0.0 - Professional WordPress library with WordPress.org compliance
+- **Version**: 2.0.7 - Professional WordPress library with BaseProvider architecture
 - **License**: GNU GPL v3
 - **Dependencies**: None (pure WordPress integration)
 - **Multi-plugin**: Safe for concurrent use by multiple WordPress plugins

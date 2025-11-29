@@ -16,8 +16,10 @@ The AI HTTP Client is a WordPress library providing unified AI provider communic
 - Library provides 0 admin components - all configuration managed via REST API endpoints
 
 ### Provider Architecture Standards
+- All providers extend `AI_HTTP_BaseProvider` abstract class (introduced v2.0.6)
+- BaseProvider centralizes common functionality: validation, sanitization, HTTP patterns, Files API operations
 - Each provider is a self-contained PHP class with unified interface
-- Providers self-register via `ai_providers` filter in their own files
+- Providers self-register via `chubes_ai_providers` filter in their own files
 - Standard format in → Provider format → API → Provider format → Standard format out
 - All providers support: `request()`, `streaming_request()`, `get_normalized_models()`, `is_configured()`
 - Provider classes handle their own format validation and error handling
@@ -38,6 +40,7 @@ The AI HTTP Client is a WordPress library providing unified AI provider communic
 ## Core Components
 
 ### Providers (src/Providers/)
+- **BaseProvider**: Abstract base class centralizing common functionality (validation, HTTP, Files API)
 - **OpenAI**: Responses API integration, native Files API, function calling, streaming
 - **Anthropic**: Claude models, native Files API with vision, streaming, function calling
 - **Gemini**: Google AI models, native Files API with multi-modal support, streaming, function calling
@@ -58,38 +61,48 @@ The AI HTTP Client is a WordPress library providing unified AI provider communic
 
 ### Provider Implementation Requirements
 ```php
-class AI_HTTP_NewProvider {
-    private $api_key;
-    private $base_url;
+class AI_HTTP_NewProvider extends AI_HTTP_BaseProvider {
 
-    public function __construct($config = []) {
-        // Initialize with configuration
-        $this->api_key = $config['api_key'] ?? '';
-        $this->base_url = $config['base_url'] ?? 'https://api.provider.com';
+    protected function get_default_base_url() {
+        return 'https://api.provider.com';
     }
 
-    public function is_configured() {
-        return !empty($this->api_key);
+    protected function get_auth_headers() {
+        return [
+            'Authorization' => 'Bearer ' . $this->api_key
+        ];
     }
 
-    public function request($standard_request) {
-        // Convert standard → provider format → API → standard format
-        $provider_request = $this->format_request($standard_request);
-        $raw_response = $this->call_api($provider_request);
-        return $this->format_response($raw_response);
+    protected function get_provider_name() {
+        return 'New Provider';
     }
 
-    public function streaming_request($standard_request, $callback = null) {
-        // Similar pattern for streaming requests
+    protected function format_request($unified_request) {
+        // Convert unified format to provider-specific format
+        return $provider_request;
     }
 
-    public function get_normalized_models() {
-        // Return ['model_id' => 'display_name'] array
+    protected function format_response($raw_response) {
+        // Convert provider response to unified format
+        return $unified_response;
+    }
+
+    protected function normalize_models_response($raw_models) {
+        // Convert provider models API to normalized format
+        return $normalized_models;
+    }
+
+    protected function get_chat_endpoint() {
+        return '/chat/completions';
+    }
+
+    protected function get_models_endpoint() {
+        return '/models';
     }
 }
 
 // Self-register the provider
-add_filter('ai_providers', function($providers) {
+add_filter('chubes_ai_providers', function($providers) {
     $providers['newprovider'] = [
         'class' => 'AI_HTTP_NewProvider',
         'type' => 'llm',
@@ -151,16 +164,16 @@ add_action('ai_library_error', function($error_data) {
 ### Filter Usage Patterns
 ```php
 // Get all providers
-$providers = apply_filters('ai_providers', []);
+$providers = apply_filters('chubes_ai_providers', []);
 
 // Make AI request (provider required)
-$response = apply_filters('ai_request', $request, 'openai');
+$response = apply_filters('chubes_ai_request', $request, 'openai');
 
 // Get models with caching
-$models = apply_filters('ai_models', 'openai', $config);
+$models = apply_filters('chubes_ai_models', 'openai', $config);
 
 // Convert file to base64
-$base64 = apply_filters('ai_file_to_base64', '', $file_path, $options);
+$base64 = apply_filters('chubes_ai_file_to_base64', '', $file_path, $options);
 ```
 
 ### REST API Usage Patterns
@@ -201,17 +214,17 @@ $providers = wp_remote_get('/wp-json/ai-http-client/v1/providers', [
 ### Action Hook Patterns
 ```php
 // Monitor all library errors (API + internal)
-add_action('ai_library_error', function($error_data) {
+add_action('chubes_ai_library_error', function($error_data) {
     // $error_data: ['component', 'message', 'context', 'timestamp']
     // context contains provider/endpoint for API errors, or other details for library errors
     // Implement custom error handling, logging, or notifications
 });
 
 // Clear model cache for specific provider
-do_action('ai_clear_model_cache', 'openai');
+do_action('chubes_ai_clear_model_cache', 'openai');
 
 // Clear all provider model caches
-do_action('ai_clear_all_cache');
+do_action('chubes_ai_clear_all_cache');
 ```
 
 ## REST API Endpoints
