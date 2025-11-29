@@ -285,5 +285,5 @@ This library is the foundation for AI functionality across multiple WordPress pl
 
 All implementations must maintain backward compatibility and follow the established patterns to ensure seamless integration across the plugin ecosystem.
 
-For version history and release notes, see CHANGELOG.md.
+For version history and release notes, see docs/CHANGELOG.md.
 

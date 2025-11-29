@@ -63,7 +63,7 @@ apply_filters('chubes_ai_file_to_base64', '', $path)
 apply_filters('chubes_ai_http', [], $method, $url, $args)
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for complete migration details.
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for complete migration details.
 
 ## Usage
 
