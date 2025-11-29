@@ -54,6 +54,15 @@
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
+    "archive": {
+        "exclude": [
+            "/docs",
+            "/.claude",
+            "/CLAUDE.md",
+            "/README.md",
+            "/build.sh"
+        ]
+    },
     "scripts": {
         "test": "phpunit",
         "analyse": "phpstan analyse src --level=5",

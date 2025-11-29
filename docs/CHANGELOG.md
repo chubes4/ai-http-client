@@ -5,6 +5,30 @@ All notable changes to the AI HTTP Client library will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.7] - 2025-11-28
+
+### Removed
+
+- **Inappropriate Build Script**: Removed `build.sh` as this is a Composer library, not a ZIP-distributed WordPress plugin. The script created unused ZIP artifacts that don't align with the library's distribution method.
+
+### Changed
+
+- **Composer Archive Exclusions**: Added `archive.exclude` configuration to `composer.json` to prevent documentation and development files from being included in Composer package installations, while keeping them visible in the GitHub repository.
+
+### Technical Details
+
+**Archive Exclusions Added:**
+- `/docs` - User documentation (keeps GitHub visible, excludes from vendor/)
+- `/.claude` - Development AI context files
+- `/CLAUDE.md` - Development guidelines
+- `/README.md` - Repository documentation
+- `/build.sh` - Removed build script
+
+**Impact:**
+- Composer users get clean vendor directories without documentation bloat
+- GitHub repository maintains full documentation visibility
+- Aligns distribution method with Composer library standards
+
 ## [2.0.6] - 2025-11-28
 
 ### Added
