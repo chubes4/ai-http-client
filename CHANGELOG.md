@@ -5,6 +5,41 @@ All notable changes to the AI HTTP Client library will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.6] - 2025-11-28
+
+### Added
+
+- **BaseProvider Architecture**: Introduced `AI_HTTP_BaseProvider` abstract class centralizing common provider functionality including validation, sanitization, HTTP patterns, and Files API operations
+- **Unified Provider Interface**: All providers now extend BaseProvider, ensuring consistent implementation patterns and reducing code duplication
+- **Enhanced File Management**: Centralized file upload/delete operations with provider-specific implementations
+- **Improved Error Handling**: Standardized error handling across all providers with consistent error triggering and context
+
+### Changed
+
+- **Provider Refactoring**: All provider classes (OpenAI, Anthropic, Gemini, Grok, OpenRouter) refactored to extend BaseProvider
+- **Code Consolidation**: Removed ~1700 lines of duplicated code across providers by leveraging inheritance
+- **Initialization Order**: BaseProvider now loads first in ai-http-client.php to ensure proper class availability
+
+### Technical Details
+
+**New BaseProvider Features**:
+- Abstract methods for provider-specific implementations (endpoints, formatting, authentication)
+- Centralized request/response handling with unified error management
+- Built-in Files API support with multipart upload capabilities
+- Streaming request infrastructure with callback support
+- Model fetching and normalization with caching integration
+
+**Affected Files** (6 total):
+- `/ai-http-client.php` - BaseProvider loading order
+- `/src/Providers/BaseProvider.php` - NEW: Abstract base class
+- `/src/Providers/anthropic.php` - Refactored to extend BaseProvider
+- `/src/Providers/gemini.php` - Refactored to extend BaseProvider
+- `/src/Providers/grok.php` - Refactored to extend BaseProvider
+- `/src/Providers/openai.php` - Refactored to extend BaseProvider
+- `/src/Providers/openrouter.php` - Refactored to extend BaseProvider
+
+**No Functional Changes**: All AI provider functionality remains identical. This is purely an architectural improvement for maintainability and code consistency.
+
 ## [2.0.5] - 2025-11-25
 
 ### Fixed

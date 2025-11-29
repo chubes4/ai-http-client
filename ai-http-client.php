@@ -7,7 +7,7 @@
  * standardized request/response formats.
  *
  * @package AIHttpClient
- * @version 2.0.5
+ * @version 2.0.6
  * @author Chris Huber <https://chubes.net>
  * @link https://github.com/chubes4/ai-http-client
  */
@@ -15,7 +15,7 @@
 defined('ABSPATH') || exit;
 
 if (!defined('AI_HTTP_CLIENT_VERSION')) {
-    define('AI_HTTP_CLIENT_VERSION', '2.0.5');
+    define('AI_HTTP_CLIENT_VERSION', '2.0.6');
 }
 
 if (!defined('AI_HTTP_CLIENT_PATH')) {
@@ -36,7 +36,10 @@ function ai_http_client_init() {
     }
     define('AI_HTTP_CLIENT_INITIALIZED', true);
 
-    // Load providers and filters
+    // Load base provider class first
+    require_once AI_HTTP_CLIENT_PATH . '/src/Providers/BaseProvider.php';
+
+    // Load providers
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/openai.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/gemini.php';
     require_once AI_HTTP_CLIENT_PATH . '/src/Providers/anthropic.php';

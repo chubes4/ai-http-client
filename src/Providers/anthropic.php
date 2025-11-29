@@ -2,9 +2,8 @@
 /**
  * AI HTTP Client - Anthropic Provider
  * 
- * Single Responsibility: Pure Anthropic API communication only
- * No normalization logic - just sends/receives raw data
- * This is a "dumb" API client that the unified normalizers use
+ * Anthropic Claude API implementation extending BaseProvider.
+ * Handles system message extraction and Files API integration.
  *
  * @package AIHttpClient\Providers
  * @author Chris Huber <https://chubes.net>
@@ -12,9 +11,6 @@
 
 defined('ABSPATH') || exit;
 
-/**
- * Self-register Anthropic provider
- */
 add_filter('chubes_ai_providers', function($providers) {
     $providers['anthropic'] = [
         'class' => 'AI_HTTP_Anthropic_Provider', 
@@ -24,191 +20,144 @@ add_filter('chubes_ai_providers', function($providers) {
     return $providers;
 });
 
-class AI_HTTP_Anthropic_Provider {
+class AI_HTTP_Anthropic_Provider extends AI_HTTP_BaseProvider {
 
-    private $api_key;
-    private $base_url;
-    private $files_api_callback = null;
-
-    public function __construct($config = []) {
-        $this->api_key = $config['api_key'] ?? '';
-        
-        if (isset($config['base_url']) && !empty($config['base_url'])) {
-            $this->base_url = rtrim($config['base_url'], '/');
-        } else {
-            $this->base_url = 'https://api.anthropic.com/v1';
-        }
+    protected function get_default_base_url() {
+        return 'https://api.anthropic.com/v1';
     }
 
-    public function is_configured() {
-        return !empty($this->api_key);
-    }
-
-    private function get_auth_headers() {
-        return array(
+    protected function get_auth_headers() {
+        return [
             'x-api-key' => $this->api_key,
             'anthropic-version' => '2023-06-01',
             'anthropic-beta' => 'files-api-2025-04-14'
-        );
-    }
-
-     /**
-      * Converts standard format to Anthropic format, calls API, returns standard format
-      * Triggers ai_library_error action on failure
-      */
-    public function request($standard_request) {
-        if (!$this->is_configured()) {
-            throw new Exception('Anthropic provider not configured - missing API key');
-        }
-
-        // Convert standard format to Anthropic format internally
-        $provider_request = $this->format_request($standard_request);
-        
-        $url = $this->base_url . '/messages';
-        
-        // Use centralized ai_http filter
-        $headers = $this->get_auth_headers();
-        $headers['Content-Type'] = 'application/json';
-        
-        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
-            'headers' => $headers,
-            'body' => wp_json_encode($provider_request)
-        ], 'Anthropic');
-        
-        if (!$result['success']) {
-            AIHttpError::trigger_error('Anthropic', 'API request failed: ' . esc_html($result['error']), [
-                'provider' => 'anthropic',
-                'endpoint' => '/messages',
-                'response' => $result,
-                'request' => $provider_request
-            ]);
-            throw new Exception('Anthropic API request failed: ' . esc_html($result['error']));
-        }
-        
-        $raw_response = json_decode($result['data'], true);
-        
-        // Convert Anthropic format to standard format
-        return $this->format_response($raw_response);
-    }
-
-    /**
-     * Streaming version with format conversion
-     * Triggers ai_library_error action on failure
-     */
-    public function streaming_request($standard_request, $callback = null) {
-        if (!$this->is_configured()) {
-            throw new Exception('Anthropic provider not configured - missing API key');
-        }
-
-        // Convert standard format to Anthropic format internally
-        $provider_request = $this->format_request($standard_request);
-        
-        $url = $this->base_url . '/messages';
-        
-        // Use centralized ai_http filter with streaming=true
-        $headers = $this->get_auth_headers();
-        $headers['Content-Type'] = 'application/json';
-        
-        $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
-            'headers' => $headers,
-            'body' => wp_json_encode($provider_request)
-        ], 'Anthropic Streaming', true, $callback);
-        
-        if (!$result['success']) {
-            AIHttpError::trigger_error('Anthropic', 'Streaming request failed: ' . esc_html($result['error']), [
-                'provider' => 'anthropic',
-                'endpoint' => '/messages',
-                'response' => $result,
-                'request' => $provider_request,
-                'streaming' => true
-            ]);
-            throw new Exception('Anthropic streaming request failed: ' . esc_html($result['error']));
-        }
-
-        // Return standardized streaming response
-        return [
-            'success' => true,
-            'data' => [
-                'content' => '',
-                'usage' => ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0],
-                'model' => $standard_request['model'] ?? '',
-                'finish_reason' => 'stop',
-                'tool_calls' => null
-            ],
-            'error' => null,
-            'provider' => 'anthropic'
         ];
     }
 
-    /**
-     * Fetch available models from Anthropic's /v1/models API endpoint
-     */
-    public function get_raw_models() {
-        if (!$this->is_configured()) {
-            return [];
+    protected function get_provider_name() {
+        return 'Anthropic';
+    }
+
+    protected function get_chat_endpoint() {
+        return '/messages';
+    }
+
+    protected function get_models_endpoint() {
+        return '/models';
+    }
+
+    protected function format_request($unified_request) {
+        $this->validate_unified_request($unified_request);
+        
+        $request = $this->sanitize_common_fields($unified_request);
+        
+        if (isset($request['temperature']) && !empty($request['temperature'])) {
+            $request['temperature'] = max(0, min(1, floatval($request['temperature'])));
         }
 
-        $url = $this->base_url . '/models';
-
-        $result = apply_filters('chubes_ai_http', [], 'GET', $url, [
-            'headers' => $this->get_auth_headers()
-        ], 'Anthropic Models');
-
-        if (!$result['success']) {
-            AIHttpError::trigger_error('Anthropic', 'Models API request failed: ' . esc_html($result['error']), [
-                'provider' => 'anthropic',
-                'endpoint' => '/models',
-                'response' => $result
-            ]);
-            throw new Exception('Anthropic models API request failed: ' . esc_html($result['error']));
+        if (isset($request['max_tokens']) && !empty($request['max_tokens'])) {
+            $request['max_tokens'] = max(1, intval($request['max_tokens']));
         }
 
-        return json_decode($result['data'], true);
+        if (isset($request['tools']) && is_array($request['tools'])) {
+            $request['tools'] = $this->normalize_tools($request['tools']);
+        }
+
+        if (isset($request['tool_choice']) && !empty($request['tool_choice'])) {
+            if ($request['tool_choice'] === 'required') {
+                $request['tool_choice'] = 'any';
+            }
+        }
+
+        if (isset($request['messages'])) {
+            $request['messages'] = $this->process_multimodal_messages($request['messages']);
+            $request = $this->extract_system_message($request);
+        }
+
+        return $request;
+    }
+    
+    protected function format_response($anthropic_response) {
+        $content = '';
+        $tool_calls = [];
+
+        if (isset($anthropic_response['content']) && is_array($anthropic_response['content'])) {
+            foreach ($anthropic_response['content'] as $content_block) {
+                if (isset($content_block['type'])) {
+                    switch ($content_block['type']) {
+                        case 'text':
+                            $content .= $content_block['text'] ?? '';
+                            break;
+                        case 'tool_use':
+                            $tool_calls[] = [
+                                'name' => $content_block['name'] ?? '',
+                                'parameters' => $content_block['input'] ?? []
+                            ];
+                            break;
+                    }
+                }
+            }
+        }
+
+        $usage = [
+            'prompt_tokens' => $anthropic_response['usage']['input_tokens'] ?? 0,
+            'completion_tokens' => $anthropic_response['usage']['output_tokens'] ?? 0,
+            'total_tokens' => 0
+        ];
+        $usage['total_tokens'] = $usage['prompt_tokens'] + $usage['completion_tokens'];
+
+        return [
+            'success' => true,
+            'data' => [
+                'content' => $content,
+                'usage' => $usage,
+                'model' => $anthropic_response['model'] ?? '',
+                'finish_reason' => $anthropic_response['stop_reason'] ?? 'unknown',
+                'tool_calls' => !empty($tool_calls) ? $tool_calls : null
+            ],
+            'error' => null,
+            'provider' => 'anthropic',
+            'raw_response' => $anthropic_response
+        ];
+    }
+
+    protected function normalize_models_response($raw_models) {
+        $models = [];
+        
+        $data = $raw_models['data'] ?? $raw_models;
+        if (is_array($data)) {
+            foreach ($data as $model) {
+                if (isset($model['id'])) {
+                    $display_name = $model['display_name'] ?? $model['id'];
+                    $models[$model['id']] = $display_name;
+                }
+            }
+        }
+        
+        return $models;
     }
 
     public function upload_file($file_path, $purpose = 'user_data') {
-        if (!$this->is_configured()) {
-            throw new Exception('Anthropic provider not configured');
-        }
+        $this->validate_configured();
+        $this->validate_file_exists($file_path);
 
-        if (!file_exists($file_path)) {
-            throw new Exception('File not found: ' . esc_html($file_path));
-        }
-
-        // Anthropic file upload endpoint
-        $url = $this->base_url . '/files';
+        $url = $this->build_file_upload_url();
         
-        // Prepare multipart form data
         $boundary = wp_generate_uuid4();
         $headers = array_merge($this->get_auth_headers(), [
             'Content-Type' => 'multipart/form-data; boundary=' . $boundary
         ]);
 
-        // Build multipart body
-        $body = '';
-        
-        // Purpose field
-        $body .= "--{$boundary}\r\n";
-        $body .= "Content-Disposition: form-data; name=\"purpose\"\r\n\r\n";
-        $body .= $purpose . "\r\n";
-        
-        // File field
-        $body .= "--{$boundary}\r\n";
-        $body .= 'Content-Disposition: form-data; name="file"; filename="' . basename($file_path) . "\"\r\n";
-        $body .= "Content-Type: " . mime_content_type($file_path) . "\r\n\r\n";
-        $body .= file_get_contents($file_path) . "\r\n";
-        $body .= "--{$boundary}--\r\n";
+        $body = $this->build_multipart_body($file_path, $purpose, $boundary);
 
-        // Send request using centralized ai_http filter
         $result = apply_filters('chubes_ai_http', [], 'POST', $url, [
             'headers' => $headers,
             'body' => $body
-        ], 'Anthropic File Upload');
+        ], $this->get_provider_name() . ' File Upload');
 
         if (!$result['success']) {
             $error_message = 'Anthropic file upload failed: ' . esc_html($result['error'] ?? 'Unknown error');
 
-            // Check for specific error types
             if (isset($result['status_code'])) {
                 switch ($result['status_code']) {
                     case 400:
@@ -230,189 +179,13 @@ class AI_HTTP_Anthropic_Provider {
             throw new Exception($error_message);
         }
 
-        $response_body = $result['data'];
-
-        $data = json_decode($response_body, true);
-        if (!isset($data['id'])) {
-            throw new Exception('Anthropic file upload response missing file ID - invalid API response');
-        }
-
-        return $data['id'];
+        return $this->extract_file_id($result['data']);
     }
 
-    public function delete_file($file_id) {
-        if (!$this->is_configured()) {
-            throw new Exception('Anthropic provider not configured');
-        }
-
-        $url = $this->base_url . "/files/{$file_id}";
-        
-        // Send request using centralized ai_http filter
-        $result = apply_filters('chubes_ai_http', [], 'DELETE', $url, [
-            'headers' => $this->get_auth_headers()
-        ], 'Anthropic File Delete');
-
-        if (!$result['success']) {
-            throw new Exception('Anthropic file delete failed: ' . esc_html($result['error']));
-        }
-
-        return $result['status_code'] === 200;
-    }
-
-    public function get_normalized_models() {
-        $raw_models = $this->get_raw_models();
-        return $this->normalize_models_response($raw_models);
-    }
-    
-    private function normalize_models_response($raw_models) {
-        $models = [];
-        
-        // Anthropic returns: { "data": [{"id": "claude-3-5-sonnet-20241022", "display_name": "Claude 3.5 Sonnet", ...}, ...] }
-        $data = $raw_models['data'] ?? $raw_models;
-        if (is_array($data)) {
-            foreach ($data as $model) {
-                if (isset($model['id'])) {
-                    $display_name = $model['display_name'] ?? $model['id'];
-                    $models[$model['id']] = $display_name;
-                }
-            }
-        }
-        
-        return $models;
-    }
-
-    public function set_files_api_callback($callback) {
-        $this->files_api_callback = $callback;
-    }
-
-    /**
-     * Converts standard request format to Anthropic-specific format including tools, temperature, max_tokens
-     */
-    private function format_request($unified_request) {
-        $this->validate_unified_request($unified_request);
-        
-        $request = $this->sanitize_common_fields($unified_request);
-        
-        // Process optional parameters (only if explicitly provided)
-        // Temperature parameter (OPTIONAL - only if explicitly provided)
-        if (isset($request['temperature']) && !empty($request['temperature'])) {
-            $request['temperature'] = max(0, min(1, floatval($request['temperature'])));
-        }
-
-        // Max tokens parameter (OPTIONAL - only if explicitly provided)
-        if (isset($request['max_tokens']) && !empty($request['max_tokens'])) {
-            $request['max_tokens'] = max(1, intval($request['max_tokens']));
-        }
-
-        // Handle tools (OPTIONAL - only if explicitly provided)
-        if (isset($request['tools']) && is_array($request['tools'])) {
-            $request['tools'] = $this->normalize_anthropic_tools($request['tools']);
-        }
-
-        // Handle tool_choice (OPTIONAL - only if explicitly provided)
-        if (isset($request['tool_choice']) && !empty($request['tool_choice'])) {
-            // Anthropic supports "auto", "any", or specific tool selection
-            if ($request['tool_choice'] === 'required') {
-                $request['tool_choice'] = 'any'; // Convert standard "required" to Anthropic "any"
-            }
-        }
-
-        // Handle system message extraction for Anthropic
-        if (isset($request['messages'])) {
-            // Process multimodal content before system message extraction
-            $request['messages'] = $this->process_anthropic_multimodal_messages($request['messages']);
-            $request = $this->extract_anthropic_system_message($request);
-        }
-
-        return $request;
-    }
-    
-    private function format_response($anthropic_response) {
-        $content = '';
-        $tool_calls = [];
-
-        // Extract content
-        if (isset($anthropic_response['content']) && is_array($anthropic_response['content'])) {
-            foreach ($anthropic_response['content'] as $content_block) {
-                if (isset($content_block['type'])) {
-                    switch ($content_block['type']) {
-                        case 'text':
-                            $content .= $content_block['text'] ?? '';
-                            break;
-                        case 'tool_use':
-                            // Convert Anthropic tool_use to standard format
-                            $tool_calls[] = array(
-                                'name' => $content_block['name'] ?? '',
-                                'parameters' => $content_block['input'] ?? []
-                            );
-                            break;
-                    }
-                }
-            }
-        }
-
-        // Extract usage
-        $usage = array(
-            'prompt_tokens' => $anthropic_response['usage']['input_tokens'] ?? 0,
-            'completion_tokens' => $anthropic_response['usage']['output_tokens'] ?? 0,
-            'total_tokens' => 0
-        );
-        $usage['total_tokens'] = $usage['prompt_tokens'] + $usage['completion_tokens'];
-
-        return array(
-            'success' => true,
-            'data' => array(
-                'content' => $content,
-                'usage' => $usage,
-                'model' => $anthropic_response['model'] ?? '',
-                'finish_reason' => $anthropic_response['stop_reason'] ?? 'unknown',
-                'tool_calls' => !empty($tool_calls) ? $tool_calls : null
-            ),
-            'error' => null,
-            'provider' => 'anthropic',
-            'raw_response' => $anthropic_response
-        );
-    }
-    
-    private function validate_unified_request($request) {
-        if (!is_array($request)) {
-            throw new Exception('Request must be an array');
-        }
-
-        if (!isset($request['messages']) || !is_array($request['messages'])) {
-            throw new Exception('Request must include messages array');
-        }
-
-        if (empty($request['messages'])) {
-            throw new Exception('Messages array cannot be empty');
-        }
-    }
-    
-    private function sanitize_common_fields($request) {
-        // Sanitize messages
-        if (isset($request['messages'])) {
-            foreach ($request['messages'] as &$message) {
-                if (isset($message['role'])) {
-                    $message['role'] = sanitize_text_field($message['role']);
-                }
-            }
-        }
-
-        // Sanitize other common fields
-        if (isset($request['model'])) {
-            $request['model'] = sanitize_text_field($request['model']);
-        }
-
-        return $request;
-    }
-    
-    /**
-     * Anthropic requires system messages in separate 'system' field, not in messages array
-     */
-    private function extract_anthropic_system_message($request) {
+    private function extract_system_message($request) {
         $messages = $request['messages'];
         $system_content = '';
-        $filtered_messages = array();
+        $filtered_messages = [];
 
         foreach ($messages as $message) {
             if (isset($message['role']) && $message['role'] === 'system') {
@@ -431,43 +204,18 @@ class AI_HTTP_Anthropic_Provider {
         return $request;
     }
 
-    private function normalize_anthropic_tools($standard_tools) {
-        $anthropic_tools = array();
+    private function normalize_tools($standard_tools) {
+        $anthropic_tools = [];
         
         foreach ($standard_tools as $tool) {
             if (isset($tool['name'], $tool['description'])) {
-                $anthropic_tool = array(
+                $anthropic_tool = [
                     'name' => $tool['name'],
                     'description' => $tool['description']
-                );
+                ];
                 
-                // Convert parameters to Anthropic input_schema format
                 if (isset($tool['parameters']) && is_array($tool['parameters'])) {
-                    $properties = array();
-                    $required = array();
-                    
-                    foreach ($tool['parameters'] as $param_name => $param_config) {
-                        $properties[$param_name] = array();
-                        
-                        if (isset($param_config['type'])) {
-                            $properties[$param_name]['type'] = $param_config['type'];
-                        }
-                        if (isset($param_config['description'])) {
-                            $properties[$param_name]['description'] = $param_config['description'];
-                        }
-                        if (isset($param_config['required']) && $param_config['required']) {
-                            $required[] = $param_name;
-                        }
-                    }
-                    
-                    $anthropic_tool['input_schema'] = array(
-                        'type' => 'object',
-                        'properties' => $properties
-                    );
-                    
-                    if (!empty($required)) {
-                        $anthropic_tool['input_schema']['required'] = $required;
-                    }
+                    $anthropic_tool['input_schema'] = $this->convert_parameters_to_json_schema($tool['parameters']);
                 }
                 
                 $anthropic_tools[] = $anthropic_tool;
@@ -477,7 +225,7 @@ class AI_HTTP_Anthropic_Provider {
         return $anthropic_tools;
     }
 
-    private function process_anthropic_multimodal_messages($messages) {
+    private function process_multimodal_messages($messages) {
         $processed_messages = [];
 
         foreach ($messages as $message) {
@@ -486,18 +234,16 @@ class AI_HTTP_Anthropic_Provider {
                 continue;
             }
 
-            $processed_message = array('role' => $message['role']);
+            $processed_message = ['role' => $message['role']];
 
-            // Handle multimodal content (files/images) or content arrays
             if (is_array($message['content'])) {
-                $processed_message['content'] = $this->build_anthropic_multimodal_content($message['content']);
+                $processed_message['content'] = $this->build_multimodal_content($message['content']);
             } else {
                 $processed_message['content'] = $message['content'];
             }
 
-            // Preserve other message fields
             foreach ($message as $key => $value) {
-                if (!in_array($key, array('role', 'content'))) {
+                if (!in_array($key, ['role', 'content'])) {
                     $processed_message[$key] = $value;
                 }
             }
@@ -508,20 +254,17 @@ class AI_HTTP_Anthropic_Provider {
         return $processed_messages;
     }
 
-    /**
-     * Handles file uploads via Files API and converts to Anthropic multimodal format
-     */
-    private function build_anthropic_multimodal_content($content_items) {
+    private function build_multimodal_content($content_items) {
         $content = [];
 
         foreach ($content_items as $content_item) {
             if (isset($content_item['type'])) {
                 switch ($content_item['type']) {
                     case 'text':
-                        $content[] = array(
+                        $content[] = [
                             'type' => 'text',
                             'text' => $content_item['text'] ?? ''
-                        );
+                        ];
                         break;
 
                     case 'file':
@@ -530,53 +273,37 @@ class AI_HTTP_Anthropic_Provider {
                             $mime_type = $content_item['mime_type'] ?? '';
 
                             if (empty($file_path) || !file_exists($file_path)) {
-                                continue 2; // Skip this content item
+                                continue 2;
                             }
 
                             if (empty($mime_type)) {
                                 $mime_type = mime_content_type($file_path);
                             }
 
-                            // Validate file type against Anthropic's supported formats
                             if (!$this->is_supported_file_type($mime_type)) {
-                                if (defined('WP_DEBUG') && WP_DEBUG) {
-                                    error_log("Anthropic: Unsupported file type: {$mime_type} for file: {$file_path}");
-                                }
-                                continue 2; // Skip this content item
+                                continue 2;
                             }
 
-                            // Upload file via Files API
-                            $file_id = $this->upload_file_via_files_api($file_path);
+                            $file_id = $this->upload_file_via_callback($file_path);
 
-                            // Determine content block type based on MIME type
                             if (strpos($mime_type, 'image/') === 0) {
-                                $content[] = array(
+                                $content[] = [
                                     'type' => 'image',
-                                    'source' => array(
+                                    'source' => [
                                         'type' => 'file',
                                         'file_id' => $file_id
-                                    )
-                                );
-                            } elseif ($mime_type === 'application/pdf' || strpos($mime_type, 'text/') === 0) {
-                                $content[] = array(
-                                    'type' => 'document',
-                                    'source' => array(
-                                        'type' => 'file',
-                                        'file_id' => $file_id
-                                    )
-                                );
+                                    ]
+                                ];
                             } else {
-                                // For other file types, try document block
-                                $content[] = array(
+                                $content[] = [
                                     'type' => 'document',
-                                    'source' => array(
+                                    'source' => [
                                         'type' => 'file',
                                         'file_id' => $file_id
-                                    )
-                                );
+                                    ]
+                                ];
                             }
                         } catch (Exception $e) {
-                            // Log error but continue processing other content
                             if (defined('WP_DEBUG') && WP_DEBUG) {
                                 error_log('Anthropic file upload failed: ' . $e->getMessage());
                             }
@@ -584,7 +311,6 @@ class AI_HTTP_Anthropic_Provider {
                         break;
 
                     default:
-                        // Pass through other content types
                         $content[] = $content_item;
                         break;
                 }
@@ -594,33 +320,16 @@ class AI_HTTP_Anthropic_Provider {
         return $content;
     }
 
-    private function upload_file_via_files_api($file_path) {
-        if (!$this->files_api_callback) {
-            throw new Exception('Files API callback not set - cannot upload files');
-        }
-
-        if (!file_exists($file_path)) {
-            throw new Exception('File not found: ' . esc_html($file_path));
-        }
-
-        return call_user_func($this->files_api_callback, $file_path, 'user_data', 'anthropic');
-    }
-
     private function is_supported_file_type($mime_type) {
         $supported_types = [
-            // Images for vision
             'image/jpeg',
             'image/png',
             'image/gif',
             'image/webp',
-            // Documents
             'application/pdf',
             'text/plain',
-            // Add other supported types as needed
         ];
 
         return in_array($mime_type, $supported_types, true);
     }
-
-
 }
