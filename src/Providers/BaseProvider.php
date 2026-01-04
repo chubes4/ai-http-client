@@ -309,7 +309,7 @@ abstract class AI_HTTP_BaseProvider {
         
         $schema = [
             'type' => 'object',
-            'properties' => $properties
+            'properties' => (object) $properties
         ];
         
         if (!empty($required)) {
