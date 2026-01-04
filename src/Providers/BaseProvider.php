@@ -261,6 +261,30 @@ abstract class AI_HTTP_BaseProvider {
         return $request;
     }
 
+    /**
+     * Sanitize message to only include provider-safe fields.
+     *
+     * Filters out internal application fields (like metadata) that providers
+     * don't recognize. Uses a whitelist approach for safety.
+     *
+     * @param array $message Raw message with potential internal fields
+     * @return array Sanitized message with only provider-safe fields
+     */
+    protected function sanitize_message_fields(array $message): array {
+        $allowed_fields = [
+            'role',
+            'content',
+            'name',
+            'tool_call_id',
+            'tool_calls',
+            'images',
+            'image_urls',
+            'files',
+        ];
+
+        return array_intersect_key($message, array_flip($allowed_fields));
+    }
+
     protected function handle_request_error($result, $provider_request) {
         AIHttpError::trigger_error($this->get_provider_name(), 'API request failed: ' . esc_html($result['error']), [
             'provider' => strtolower($this->get_provider_name()),

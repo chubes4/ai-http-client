@@ -325,22 +325,24 @@ class AI_HTTP_Gemini_Provider extends AI_HTTP_BaseProvider {
 
         foreach ($messages as $message) {
             if (!isset($message['role']) || !isset($message['content'])) {
-                $processed_messages[] = $message;
+                $processed_messages[] = $this->sanitize_message_fields($message);
                 continue;
             }
 
-            $processed_message = ['role' => $message['role']];
+            $sanitized = $this->sanitize_message_fields($message);
+            $processed_message = ['role' => $sanitized['role']];
 
             if (is_array($message['content'])) {
                 $processed_message['content'] = $this->build_multimodal_content($message['content']);
             } else {
-                $processed_message['content'] = $message['content'];
+                $processed_message['content'] = $sanitized['content'];
             }
 
-            foreach ($message as $key => $value) {
-                if (!in_array($key, ['role', 'content'])) {
-                    $processed_message[$key] = $value;
-                }
+            if (isset($sanitized['name'])) {
+                $processed_message['name'] = $sanitized['name'];
+            }
+            if (isset($sanitized['tool_call_id'])) {
+                $processed_message['tool_call_id'] = $sanitized['tool_call_id'];
             }
 
             $processed_messages[] = $processed_message;

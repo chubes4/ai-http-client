@@ -112,22 +112,24 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_BaseProvider {
 
         foreach ($messages as $message) {
             if (!isset($message['role']) || !isset($message['content'])) {
-                $normalized[] = $message;
+                $normalized[] = $this->sanitize_message_fields($message);
                 continue;
             }
 
-            $normalized_message = ['role' => $message['role']];
+            $sanitized = $this->sanitize_message_fields($message);
+            $normalized_message = ['role' => $sanitized['role']];
 
             if (isset($message['images']) || isset($message['image_urls']) || isset($message['files']) || is_array($message['content'])) {
                 $normalized_message['content'] = $this->build_multimodal_content($message);
             } else {
-                $normalized_message['content'] = $message['content'];
+                $normalized_message['content'] = $sanitized['content'];
             }
 
-            foreach ($message as $key => $value) {
-                if (!in_array($key, ['role', 'content', 'images', 'image_urls', 'files', 'tool_calls'])) {
-                    $normalized_message[$key] = $value;
-                }
+            if (isset($sanitized['name'])) {
+                $normalized_message['name'] = $sanitized['name'];
+            }
+            if (isset($sanitized['tool_call_id'])) {
+                $normalized_message['tool_call_id'] = $sanitized['tool_call_id'];
             }
 
             $normalized[] = $normalized_message;
