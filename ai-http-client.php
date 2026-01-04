@@ -12,7 +12,9 @@
  * @link https://github.com/chubes4/ai-http-client
  */
 
-defined('ABSPATH') || exit;
+if (!defined('ABSPATH')) {
+    return;
+}
 
 if (!defined('AI_HTTP_CLIENT_VERSION')) {
     define('AI_HTTP_CLIENT_VERSION', '2.0.7');
@@ -22,7 +24,7 @@ if (!defined('AI_HTTP_CLIENT_PATH')) {
     define('AI_HTTP_CLIENT_PATH', __DIR__);
 }
 
-if (!defined('AI_HTTP_CLIENT_URL')) {
+if (!defined('AI_HTTP_CLIENT_URL') && function_exists('plugin_dir_url')) {
     define('AI_HTTP_CLIENT_URL', plugin_dir_url(__FILE__));
 }
 
@@ -69,4 +71,6 @@ function ai_http_client_wordpress_init() {
     }
 }
 
-add_action('plugins_loaded', 'ai_http_client_init', 1);
+if (function_exists('add_action')) {
+    add_action('plugins_loaded', 'ai_http_client_init', 1);
+}
