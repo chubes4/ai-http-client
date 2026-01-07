@@ -234,7 +234,12 @@ class AI_HTTP_OpenAI_Provider extends AI_HTTP_BaseProvider {
                                         break;
                                     case 'tool_call':
                                         $function_name = $content_item['name'] ?? '';
-                                        $function_arguments = $content_item['arguments'] ?? [];
+                                        $function_arguments_json = $content_item['arguments'] ?? '{}';
+                                        
+                                        $function_arguments = json_decode($function_arguments_json, true);
+                                        if (json_last_error() !== JSON_ERROR_NONE) {
+                                            $function_arguments = [];
+                                        }
                                         
                                         if (!empty($function_name)) {
                                             $tool_calls[] = [
