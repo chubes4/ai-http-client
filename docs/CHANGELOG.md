@@ -5,6 +5,12 @@ All notable changes to the AI HTTP Client library will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.8] - 2026-01-16
+
+### Fixed
+
+- **Invalid JSON Response Handling**: Added validation for JSON decoding errors in `BaseProvider::execute_request()`. When an AI provider returns invalid JSON, the library now properly triggers an error and throws an exception with diagnostic information including the provider name, JSON error message, and response preview.
+
 ## [2.0.7] - 2025-11-28
 
 ### Removed
