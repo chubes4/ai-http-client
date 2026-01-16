@@ -5,11 +5,35 @@ All notable changes to the AI HTTP Client library will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.8] - 2026-01-16
+## [2.0.12] - 2026-01-16
 
 ### Fixed
 
-- **Invalid JSON Response Handling**: Added validation for JSON decoding errors in `BaseProvider::execute_request()`. When an AI provider returns invalid JSON, the library now properly triggers an error and throws an exception with diagnostic information including the provider name, JSON error message, and response preview.
+- **Invalid JSON Response Handling**: Added validation for JSON decoding errors in `BaseProvider::request()`. When an AI provider returns invalid JSON (e.g., Cloudflare HTML error page with HTTP 200), the library now triggers an error and throws an exception with diagnostic information including the provider name, JSON error message, and response preview.
+
+## [2.0.11] - 2026-01-15
+
+### Fixed
+
+- **Tool Call Arguments Parsing**: Fixed `tool_call` arguments parsing to JSON decode like the `function_call` path, ensuring consistent argument handling across different response formats.
+
+## [2.0.10] - 2026-01-14
+
+### Added
+
+- **Non-WordPress Environment Support**: Added defensive checks for non-WordPress environments to support testing scenarios where WordPress functions may not be available.
+
+## [2.0.9] - 2026-01-13
+
+### Added
+
+- **Message Field Sanitization**: Added whitelist-based message field sanitization in `BaseProvider::sanitize_message_fields()` to filter out internal application fields (like metadata) that AI providers don't recognize, preventing provider errors.
+
+## [2.0.8] - 2026-01-12
+
+### Fixed
+
+- **Empty Properties Serialization**: Fixed empty properties serializing as array `[]` instead of object `{}` in JSON schema conversion, which caused provider validation errors.
 
 ## [2.0.7] - 2025-11-28
 
