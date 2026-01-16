@@ -65,8 +65,23 @@ abstract class AI_HTTP_BaseProvider {
         if (!$result['success']) {
             $this->handle_request_error($result, $provider_request);
         }
-        
+
         $raw_response = json_decode($result['data'], true);
+
+        if ($raw_response === null && json_last_error() !== JSON_ERROR_NONE) {
+            AIHttpError::trigger_error($this->get_provider_name(), 'Invalid JSON response', [
+                'provider' => strtolower($this->get_provider_name()),
+                'json_error' => json_last_error_msg(),
+                'response_preview' => substr($result['data'] ?? '', 0, 500)
+            ]);
+
+            throw new Exception(sprintf(
+                '%s returned invalid JSON: %s',
+                $this->get_provider_name(),
+                json_last_error_msg()
+            ));
+        }
+
         return $this->format_response($raw_response);
     }
 
