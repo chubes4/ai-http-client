@@ -210,6 +210,18 @@ abstract class AI_HTTP_BaseProvider {
         return $this->base_url . $this->get_files_endpoint() . '/' . $file_id;
     }
 
+    protected function normalize_filename($file_path) {
+        $filename = basename($file_path);
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+
+        if (empty($extension)) {
+            return $filename;
+        }
+
+        $basename = pathinfo($filename, PATHINFO_FILENAME);
+        return $basename . '.' . strtolower($extension);
+    }
+
     protected function build_multipart_body($file_path, $purpose, $boundary) {
         $body = '';
         
@@ -218,7 +230,7 @@ abstract class AI_HTTP_BaseProvider {
         $body .= $purpose . "\r\n";
         
         $body .= "--{$boundary}\r\n";
-        $body .= 'Content-Disposition: form-data; name="file"; filename="' . basename($file_path) . "\"\r\n";
+        $body .= 'Content-Disposition: form-data; name="file"; filename="' . $this->normalize_filename($file_path) . "\"\r\n";
         $body .= "Content-Type: " . mime_content_type($file_path) . "\r\n\r\n";
         $body .= file_get_contents($file_path) . "\r\n";
         $body .= "--{$boundary}--\r\n";
