@@ -1,5 +1,11 @@
 # AI HTTP Client for WordPress
 
+> **Archived:** This package is superseded by WordPress core's `wp-ai-client`
+> APIs. Data Machine no longer uses this runtime dependency; provider/model/key
+> administration and image generation have moved to `wp-ai-client`-shaped
+> capabilities. This repository remains available for historical reference only
+> and should not be used for new work.
+
 A professional WordPress library for unified AI provider communication. Supports OpenAI, Anthropic, Google Gemini, Grok, and OpenRouter with standardized request/response formats.
 
 **Key Features:**
